@@ -1,0 +1,124 @@
+name: Validação (TDD + BDD + Arquitetura Limpa)
+
+on:
+  pull_request:
+    branches: [DEV, QAS, PRD]
+  push:
+    branches: [DEV, QAS, PRD]
+
+jobs:
+  # hashFiles não funciona no `if` de job (roda antes do checkout), por isso a detecção fica num job à parte
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.d.outputs.rust }}
+      frontend: ${{ steps.d.outputs.frontend }}
+      tauri: ${{ steps.d.outputs.tauri }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: d
+        run: |
+          echo "rust=$([ -f Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "frontend=$([ -f package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "tauri=$([ -f src-tauri/tauri.conf.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+  rust:
+    name: Rust core
+    needs: detect
+    if: ${{ needs.detect.outputs.rust == 'true' }}
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy, llvm-tools-preview
+      - uses: Swatinem/rust-cache@v2
+      - name: Formatação
+        run: cargo fmt --all --check
+      - name: Lint
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Testes (unitários + BDD)
+        run: cargo test --workspace
+      - name: Cobertura
+        run: |
+          cargo install cargo-llvm-cov --locked
+          cargo llvm-cov --workspace --fail-under-lines 80
+
+  frontend:
+    name: Frontend
+    needs: detect
+    if: ${{ needs.detect.outputs.frontend == 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Formatação
+        run: pnpm prettier --check .
+      - name: Lint + fronteiras de arquitetura
+        run: pnpm lint
+      - name: Tipos
+        run: pnpm tsc --noEmit
+      - name: Testes (unitários + BDD) com cobertura
+        run: pnpm test --coverage
+
+  build-windows:
+    name: Build instalador Windows
+    needs: [detect, rust, frontend]
+    # Só gera instalador depois que o código entra numa branch de ambiente (não em PR)
+    if: ${{ github.event_name == 'push' && needs.detect.outputs.tauri == 'true' }}
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      # DEV/QAS: gera o instalador e publica como artefato do pipeline
+      - name: Build (DEV/QAS)
+        if: ${{ github.ref_name != 'PRD' }}
+        uses: tauri-apps/tauri-action@v0
+        env:
+          # Necessário porque bundle.createUpdaterArtifacts = true (assina os pacotes de update)
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          args: --bundles nsis,msi
+
+      - name: Publicar artefato
+        if: ${{ github.ref_name != 'PRD' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: motogp-launcher-${{ github.ref_name }}-${{ github.run_number }}
+          path: |
+            **/target/release/bundle/nsis/*.exe
+            **/target/release/bundle/msi/*.msi
+          retention-days: 30
+
+      # PRD: gera o instalador e publica numa GitHub Release + latest.json (consumido pelo updater do app)
+      - name: Build + Release (PRD)
+        if: ${{ github.ref_name == 'PRD' }}
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          uploadUpdaterJson: true
+          args: --bundles nsis,msi
+          tagName: v__VERSION__
+          releaseName: 'MotoGP Launcher v__VERSION__'
+          releaseBody: 'Baixe o instalador `.exe` (setup) ou o `.msi` abaixo.'
+          releaseDraft: false
+          prerelease: false

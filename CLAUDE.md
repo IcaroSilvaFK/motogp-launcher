@@ -16,3 +16,33 @@ Todo trabalho de desenvolvimento segue este pipeline de papéis:
 6. **Codex** — revisão final e melhorias do que foi implementado.
 
 Regra: o chat não implementa direto. Demanda de desenvolvimento → Codex gera as tasks → PO dispara os devs (Sonnet) → QA valida (Haiku) → Codex revisa → chat reporta ao usuário.
+
+## Fluxo de Git / issues (obrigatório para toda task)
+
+1. **Codex elabora** a task com todos os detalhes (contexto, escopo, critérios de aceite).
+2. **Publica uma issue** no repositório remoto (`gh issue create`) com esse detalhamento.
+3. **Dev abre uma branch** a partir de `DEV`, vinculada à issue, para manter o histórico (ex.: `feat/<nº-issue>-<slug>`).
+4. **Dev finaliza a task** na branch.
+5. A entrega **passa por toda a revisão** (QA Haiku + revisão/melhorias do Codex).
+6. Só depois: **abre o PR para `DEV`** referenciando a issue (`Closes #<nº>`) e **fecha a issue**.
+
+### Branches padrão
+
+| Branch | Ambiente | Recebe de |
+|--------|----------|-----------|
+| `DEV` | Desenvolvimento (integração) | PRs das branches de task (`feat/…`, `fix/…`) |
+| `QAS` | Homologação / QA | PR de promoção `DEV → QAS` |
+| `PRD` | Produção | PR de promoção `QAS → PRD` |
+
+- Ninguém commita direto em `DEV`, `QAS` ou `PRD`: tudo entra via PR.
+- O pipeline gera o **instalador Windows** (setup `.exe` NSIS e `.msi`) depois que todos os gates passam. Em `DEV`/`QAS` ele fica como artefato do pipeline (30 dias). Em `PRD` vira uma **GitHub Release** `v<versão>` (versão vinda do `tauri.conf.json`), junto com o `latest.json` do **auto-update**: o app instalado se atualiza pelo front. Setup em [docs/auto-update.md](docs/auto-update.md).
+- Promoção só segue em frente (`DEV → QAS → PRD`). Hotfix sai de `PRD` e volta por PR para `PRD`, `QAS` e `DEV`.
+
+## Workflow de validação: TDD + BDD + Arquitetura Limpa (obrigatório)
+
+Detalhes em [docs/workflow-validacao.md](docs/workflow-validacao.md). Resumo:
+
+- **BDD:** toda issue tem critérios de aceite em Gherkin, e cada cenário vira teste.
+- **TDD:** Red → Green → Refactor; teste sempre antes do código. Cobertura ≥ 90% em domain/application e ≥ 80% no geral.
+- **Arquitetura Limpa:** dependências só para dentro (`interface → infrastructure → application → domain`). Rust em crates separados (`domain`, `application`, `infrastructure`, `src-tauri`). Frontend em `domain/application/infrastructure/ui`, com fronteiras checadas no lint.
+- **Gates:** o QA (Haiku) roda fmt, lint, tipos, testes, BDD, arquitetura e cobertura. Depois o Codex revisa. O CI em `.github/workflows/validacao.yml` repete os mesmos gates.
