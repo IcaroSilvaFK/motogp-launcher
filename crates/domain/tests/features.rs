@@ -8,12 +8,14 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+#[path = "bdd/mod_grouping.rs"]
+mod mod_grouping;
+
 type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
-const FEATURES: &[(&str, Runner)] = &[];
+const FEATURES: &[(&str, Runner)] = &[("mod_grouping", || Box::pin(mod_grouping::run()))];
 
 /// Absolute path of a `.feature` file in `tests/features/`.
-#[allow(dead_code)] // used as soon as the first feature is registered
 pub fn feature(file: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("tests/features")

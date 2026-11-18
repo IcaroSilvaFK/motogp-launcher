@@ -5,11 +5,18 @@
 
 mod config;
 mod game;
+mod mod_entry;
+mod mod_grouping;
 mod profile;
 
 pub use config::Config;
 pub use game::{
     find_app_id, install_dir_matches, is_engine_folder, is_motogp_folder, mods_dir_for, GameInfo,
     SteamManifest,
+};
+pub use mod_entry::{is_valid_mod_id, mod_id_from_hash, ModEntry, MOD_ID_LEN};
+pub use mod_grouping::{
+    base_name, display_name, extension_of, group_pak_files, is_mod_file, GroupingError, ModGroup,
+    MOD_EXTENSIONS,
 };
 pub use profile::{normalize_name, Profile, ProfileError, VANILLA_ID};

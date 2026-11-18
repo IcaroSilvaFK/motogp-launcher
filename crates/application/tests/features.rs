@@ -10,6 +10,8 @@ use std::pin::Pin;
 
 #[path = "bdd/game_detection.rs"]
 mod game_detection;
+#[path = "bdd/library.rs"]
+mod library;
 #[path = "bdd/profiles.rs"]
 mod profiles;
 
@@ -18,6 +20,7 @@ type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 const FEATURES: &[(&str, Runner)] = &[
     ("game-detection", || Box::pin(game_detection::run())),
     ("profiles", || Box::pin(profiles::run())),
+    ("library", || Box::pin(library::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

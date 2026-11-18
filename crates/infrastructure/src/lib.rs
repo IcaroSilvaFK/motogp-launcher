@@ -10,6 +10,11 @@ mod steam;
 mod store;
 #[cfg(windows)]
 mod windows_registry;
+mod library_files;
+mod library_repository;
+mod mod_library;
+mod sha256_hasher;
+mod zip_archive;
 
 pub use data_dir::DataDir;
 pub use game_files::FsGameFiles;
@@ -18,3 +23,8 @@ pub use steam::{parse_app_manifest, parse_library_folders, SteamLibraries};
 pub use store::{load_json, save_json, JsonConfigStore};
 #[cfg(windows)]
 pub use windows_registry::read_steam_path;
+pub use library_files::FsLibraryFiles;
+pub use library_repository::JsonModRepository;
+pub use mod_library::{mod_library, ModLibrary};
+pub use sha256_hasher::Sha256Hasher;
+pub use zip_archive::ZipArchiveReader;
