@@ -8,12 +8,17 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+#[path = "bdd/game_detection.rs"]
+mod game_detection;
 #[path = "bdd/profiles.rs"]
 mod profiles;
 
 type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
-const FEATURES: &[(&str, Runner)] = &[("profiles", || Box::pin(profiles::run()))];
+const FEATURES: &[(&str, Runner)] = &[
+    ("game-detection", || Box::pin(game_detection::run())),
+    ("profiles", || Box::pin(profiles::run())),
+];
 
 /// Absolute path of a `.feature` file in `tests/features/`.
 pub fn feature(file: &str) -> PathBuf {
