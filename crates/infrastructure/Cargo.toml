@@ -1,6 +1,6 @@
 [package]
 name = "motogp-infrastructure"
-description = "Adapters (fs, JSON, ZIP, Steam, processos) que implementam os ports."
+description = "Adapters (fs, JSON, ZIP, Steam, processes) that implement the ports."
 version.workspace = true
 edition.workspace = true
 license.workspace = true

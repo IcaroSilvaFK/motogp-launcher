@@ -88,7 +88,14 @@ fn docs_preserved(_w: &mut ScaffoldWorld) {
     assert!(root().join("docs/superpowers/specs").is_dir());
     let git = Command::new("git")
         .current_dir(root())
-        .args(["log", "--oneline", "-n", "1", "--", "docs/workflow-validacao.md"])
+        .args([
+            "log",
+            "--oneline",
+            "-n",
+            "1",
+            "--",
+            "docs/workflow-validacao.md",
+        ])
         .output()
         .expect("git unavailable");
     assert!(
@@ -199,8 +206,7 @@ fn cargo_fixture(_w: &mut ScaffoldWorld) {
 fn run_validators(w: &mut ScaffoldWorld) {
     let (ok, stdout) = eslint_fixture("violations");
     w.lint_violations_found = !ok && stdout.contains("boundaries/dependencies");
-    let metadata =
-        cargo_metadata(&root().join("src-tauri/tests/fixtures/outward-deps/Cargo.toml"));
+    let metadata = cargo_metadata(&root().join("src-tauri/tests/fixtures/outward-deps/Cargo.toml"));
     w.cargo_violations_found = !dependency_violations(&metadata).is_empty();
     let (valid_ok, _) = eslint_fixture("valid");
     w.composition_root_valid = valid_ok;

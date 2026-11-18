@@ -1,5 +1,5 @@
-//! Camada de interface (Tauri): bootstrap, comandos finos, conversão de DTOs
-//! e mapeamento de erros. A composição dos adapters acontece aqui.
+//! Interface layer (Tauri): bootstrap, thin commands, DTO conversion and error
+//! mapping. The adapters are composed here.
 
 mod bootstrap;
 

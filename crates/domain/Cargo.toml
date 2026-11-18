@@ -1,10 +1,10 @@
 [package]
 name = "motogp-domain"
-description = "Entidades e regras puras do MotoGP Launcher (sem dependências externas)."
+description = "Pure entities and rules of MotoGP Launcher (no external dependencies)."
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 
-# Regra de arquitetura: o domain NÃO tem dependências de produção.
+# Architecture rule: the domain has NO production dependencies.
 [dependencies]

@@ -1,4 +1,4 @@
-// Evita a janela de console extra no Windows em release. NÃO remover.
+// Prevents the extra console window on Windows in release. DO NOT remove.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {

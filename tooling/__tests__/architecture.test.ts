@@ -48,8 +48,6 @@ describe('frontend architecture (eslint-plugin-boundaries)', () => {
 
   it('rejects_infrastructure_import_from_a_non_root_file_named_main', async () => {
     const messages = await lint('violations');
-    expect(
-      messages.some((m) => m.file.endsWith('src/ui/main.tsx') && m.rule === 'boundaries/dependencies'),
-    ).toBe(true);
+    expect(messages.some((m) => m.file.endsWith('src/ui/main.tsx') && m.rule === 'boundaries/dependencies')).toBe(true);
   });
 });

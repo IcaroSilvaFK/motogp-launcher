@@ -59,7 +59,11 @@ fn allowed_runtime_deps(package: &str) -> Option<&'static [&'static str]> {
 }
 
 /// Inner layers that may only depend inward among themselves.
-const LAYERS: [&str; 3] = ["motogp-domain", "motogp-application", "motogp-infrastructure"];
+const LAYERS: [&str; 3] = [
+    "motogp-domain",
+    "motogp-application",
+    "motogp-infrastructure",
+];
 
 /// Returns the violations of `interface -> infrastructure -> application -> domain`.
 pub fn dependency_violations(metadata: &Value) -> Vec<String> {

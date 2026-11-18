@@ -1,4 +1,4 @@
-//! Camada de aplicação: casos de uso e ports (traits).
+//! Application layer: use cases and ports (traits).
 //!
-//! Depende apenas de `motogp-domain`. Os ports e casos de uso entram nas
-//! issues que os utilizam.
+//! Depends only on `motogp-domain`. Ports and use cases arrive in the issues
+//! that need them.

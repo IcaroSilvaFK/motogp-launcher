@@ -1,4 +1,4 @@
-//! Camada de infraestrutura: adapters que implementam os ports da aplicação.
+//! Infrastructure layer: adapters that implement the application ports.
 //!
-//! Fs/JSON, ZIP/SHA-256 e Steam/processos entram aqui quando necessários,
-//! nunca no núcleo (`domain`/`application`).
+//! Fs/JSON, ZIP/SHA-256 and Steam/process code goes here when needed, never
+//! in the core (`domain`/`application`).

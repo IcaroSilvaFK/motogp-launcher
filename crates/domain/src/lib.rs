@@ -1,4 +1,4 @@
-//! Camada de domínio: entidades, value objects e regras puras.
+//! Domain layer: entities, value objects and pure rules.
 //!
-//! Sem I/O, sem serde, sem Tauri e sem outros crates do projeto.
-//! As entidades entram nas próximas issues, sempre guiadas por testes.
+//! No I/O, no serde, no Tauri and no other project crates.
+//! Entities arrive in the next issues, always driven by tests.
