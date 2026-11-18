@@ -19,7 +19,11 @@ export const boundariesConfig = [
     settings: {
       'boundaries/elements': [...layers.map((type) => ({ type, pattern: `src/${type}` }))],
       // The composition root is a single, explicit file (not a layer).
-      'boundaries/files': [{ pattern: 'src/main.tsx', category: 'composition-root' }],
+      'boundaries/files': [
+        { pattern: 'src/main.tsx', category: 'composition-root' },
+        { pattern: '**/*.test.*', category: 'test' },
+        { pattern: 'src/test-setup.ts', category: 'test' },
+      ],
       'import/resolver': {
         node: { extensions: ['.js', '.jsx', '.ts', '.tsx'] },
       },
@@ -29,6 +33,8 @@ export const boundariesConfig = [
         'error',
         {
           default: 'disallow',
+          checkAllOrigins: true,
+          checkUnknownLocals: true,
           policies: [
             { from: { element: { type: 'domain' } }, allow: { to: { element: { type: 'domain' } } } },
             {
@@ -45,7 +51,19 @@ export const boundariesConfig = [
             },
             {
               from: { file: { categories: 'composition-root' } },
-              allow: { to: { element: { types: layers } } },
+              allow: { to: [{ element: { types: layers } }, { module: { origin: 'external' } }] },
+            },
+            {
+              from: { element: { types: ['application', 'infrastructure', 'ui'] } },
+              allow: { to: { module: { origin: 'external' } } },
+            },
+            {
+              from: { file: { categories: 'test' } },
+              allow: { to: { module: { origin: 'external', source: ['vitest', '@testing-library/**'] } } },
+            },
+            {
+              from: { element: { types: ['domain', 'application', 'ui'] } },
+              disallow: { to: { module: { origin: 'external', source: '@tauri-apps/**' } } },
             },
           ],
         },

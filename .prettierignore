@@ -6,6 +6,7 @@ coverage/
 src-tauri/gen/
 pnpm-lock.yaml
 Cargo.lock
+.worktrees/
 
 # Existing project documents are preserved as-is (not reformatted)
 docs/

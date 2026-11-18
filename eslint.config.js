@@ -7,6 +7,7 @@ import { boundariesConfig } from './tooling/boundaries.config.mjs';
 export default tseslint.config(
   {
     ignores: [
+      '.worktrees/**',
       'dist/**',
       'coverage/**',
       'target/**',

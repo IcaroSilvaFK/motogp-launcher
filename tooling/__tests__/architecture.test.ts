@@ -50,4 +50,15 @@ describe('frontend architecture (eslint-plugin-boundaries)', () => {
     const messages = await lint('violations');
     expect(messages.some((m) => m.file.endsWith('src/ui/main.tsx') && m.rule === 'boundaries/dependencies')).toBe(true);
   });
+
+  it.each([
+    'src/domain/ImportsTauri.ts',
+    'src/domain/ImportsReact.ts',
+    'src/application/ImportsTauri.ts',
+    'src/ui/ImportsTauri.tsx',
+    'src/ui/ImportsUnclassified.tsx',
+  ])('rejects an adapter boundary bypass in %s', async (file) => {
+    const messages = await lint('violations');
+    expect(messages.some((m) => m.file.endsWith(file) && m.rule === 'boundaries/dependencies')).toBe(true);
+  });
 });

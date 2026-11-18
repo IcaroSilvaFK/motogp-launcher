@@ -7,11 +7,12 @@ Feature: Start the project with boundaries and mandatory validation
     And the workspace contains domain, application, infrastructure and src-tauri
     And the workspace and frontend tests finish successfully
 
-  Scenario: Open the application on Windows
-    Given the MSVC, Rust, Node, pnpm and WebView2 prerequisites are available
-    When I run the application with pnpm tauri dev
-    Then I see the MotoGP Launcher window with the specified dimensions
-    And the frontend renders without errors
+  # The real Windows window-opening smoke is manual (docs/workflow-validacao.md).
+  Scenario: Validate the Windows application configuration
+    Given the Tauri scaffold is available
+    When I inspect the application startup configuration
+    Then the MotoGP Launcher window is configured with the specified dimensions
+    And the frontend entrypoint is configured
 
   Scenario: Reject dependencies that violate the architecture
     Given an import from ui to infrastructure in a lint fixture

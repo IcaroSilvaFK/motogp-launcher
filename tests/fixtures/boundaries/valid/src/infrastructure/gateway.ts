@@ -1,1 +1,3 @@
-export const gateway = () => 'tauri';
+import { invoke } from '@tauri-apps/api/core';
+
+export const gateway = () => invoke('load');

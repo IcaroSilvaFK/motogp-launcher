@@ -22,12 +22,19 @@ export default defineConfig({
     globals: false,
     setupFiles: ['./src/test-setup.ts'],
     include: ['src/**/*.test.{ts,tsx}', 'tooling/**/*.test.ts'],
-    exclude: ['node_modules/**', 'tests/fixtures/**', 'target/**', 'dist/**'],
+    exclude: ['.worktrees/**', 'node_modules/**', 'tests/fixtures/**', 'target/**', 'dist/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],
       include: ['src/**/*.{ts,tsx}'],
-      exclude: ['src/**/*.test.{ts,tsx}', 'src/**/__tests__/**', 'src/**/*.d.ts', 'src/test-setup.ts', 'src/main.tsx'],
+      exclude: [
+        '.worktrees/**',
+        'src/**/*.test.{ts,tsx}',
+        'src/**/__tests__/**',
+        'src/**/*.d.ts',
+        'src/test-setup.ts',
+        'src/main.tsx',
+      ],
       thresholds: {
         lines: thresholds.overall,
         'src/domain/**': { lines: thresholds.core },

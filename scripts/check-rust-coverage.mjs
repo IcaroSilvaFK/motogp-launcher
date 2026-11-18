@@ -31,7 +31,31 @@ const pct = (covered, count) => (count === 0 ? 100 : (covered / count) * 100);
  * @returns {{ ok: boolean, failures: string[], notes: string[] }}
  */
 export function evaluateRustCoverage(report) {
-  const files = report.data.flatMap((d) => d.files).map((f) => ({ ...f, filename: f.filename.replace(/\\/g, '/') }));
+  if (
+    !Array.isArray(report?.data) ||
+    report.data.length === 0 ||
+    report.data.some((entry) => !Array.isArray(entry?.files))
+  ) {
+    throw new Error('Invalid Rust coverage report');
+  }
+  const files = report.data
+    .flatMap((d) => d.files)
+    .map((file) => {
+      const lines = file?.summary?.lines;
+      if (
+        typeof file?.filename !== 'string' ||
+        !file.filename ||
+        !Number.isSafeInteger(lines?.count) ||
+        !Number.isSafeInteger(lines?.covered) ||
+        lines.count < 0 ||
+        lines.covered < 0 ||
+        lines.covered > lines.count
+      ) {
+        throw new Error('Invalid Rust coverage file or line counters');
+      }
+      return { ...file, filename: `/${file.filename.replace(/\\/g, '/')}` };
+    })
+    .filter((file) => !file.filename.includes('/.worktrees/'));
   const failures = [];
   const notes = [];
 
