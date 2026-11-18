@@ -1,21 +1,12 @@
 use std::path::PathBuf;
 
 /// User configuration: pure model, no I/O and no serialization concerns.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Config {
     /// Game installation directory, when already chosen.
     pub game_dir: Option<PathBuf>,
     /// Identifier of the active profile, when one is selected.
     pub active_profile: Option<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Config {
-            game_dir: None,
-            active_profile: None,
-        }
-    }
 }
 
 #[cfg(test)]
