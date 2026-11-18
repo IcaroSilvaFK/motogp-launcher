@@ -1,4 +1,4 @@
-name: Validação (TDD + BDD + Arquitetura Limpa)
+name: Validation (TDD + BDD + Clean Architecture)
 
 on:
   pull_request:
@@ -65,9 +65,9 @@ jobs:
         run: pnpm test --coverage
 
   build-windows:
-    name: Build instalador Windows
+    name: Build Windows installer
     needs: [rust, frontend]
-    # Só gera instalador depois que o código entra numa branch de ambiente (não em PR)
+    # Only builds the installer after the code lands on an environment branch (not on PRs)
     if: ${{ github.event_name == 'push' }}
     runs-on: windows-latest
     permissions:
@@ -83,18 +83,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # dev/qas: gera o instalador e publica como artefato do pipeline
+      # dev/qas: builds the installer and publishes it as a pipeline artifact
       - name: Build (dev/qas)
         if: ${{ github.ref_name != 'main' }}
         uses: tauri-apps/tauri-action@v0
         env:
-          # Usado só quando bundle.createUpdaterArtifacts for ligado (issue de auto-update)
+          # Only used when bundle.createUpdaterArtifacts is enabled (auto-update issue)
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           args: --bundles nsis,msi
 
-      - name: Publicar artefato
+      - name: Upload artifact
         if: ${{ github.ref_name != 'main' }}
         uses: actions/upload-artifact@v4
         with:
@@ -104,7 +104,7 @@ jobs:
             **/target/release/bundle/msi/*.msi
           retention-days: 30
 
-      # main (produção): gera o instalador e publica numa GitHub Release + latest.json (consumido pelo updater do app)
+      # main (production): builds the installer and publishes it to a GitHub Release + latest.json (consumed by the app updater)
       - name: Build + Release (main)
         if: ${{ github.ref_name == 'main' }}
         uses: tauri-apps/tauri-action@v0
@@ -117,6 +117,6 @@ jobs:
           args: --bundles nsis,msi
           tagName: v__VERSION__
           releaseName: 'MotoGP Launcher v__VERSION__'
-          releaseBody: 'Baixe o instalador `.exe` (setup) ou o `.msi` abaixo.'
+          releaseBody: 'Download the setup `.exe` or the `.msi` below.'
           releaseDraft: false
           prerelease: false
