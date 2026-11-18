@@ -1,0 +1,10 @@
+[package]
+name = "motogp-domain"
+description = "Pure entities and rules of MotoGP Launcher (no external dependencies)."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# Architecture rule: the domain has NO production dependencies.
+[dependencies]

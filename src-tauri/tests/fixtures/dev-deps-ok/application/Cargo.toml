@@ -1,0 +1,12 @@
+[package]
+name = "motogp-application"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+motogp-domain = { path = "../domain" }
+
+[dev-dependencies]
+motogp-infrastructure = { path = "../infrastructure" }
+cucumber = "0.21"
+
