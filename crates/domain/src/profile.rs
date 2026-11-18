@@ -16,7 +16,12 @@ pub enum ProfileError {
 
 impl fmt::Display for ProfileError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        let text = match self {
+            ProfileError::EmptyName => "empty profile name",
+            ProfileError::NotFound => "profile not found",
+            ProfileError::VanillaProtected => "the Vanilla profile cannot be deleted",
+        };
+        f.write_str(text)
     }
 }
 
@@ -31,34 +36,50 @@ pub struct Profile {
 }
 
 /// Trims `name`; a blank result is `ProfileError::EmptyName`.
-pub fn normalize_name(_name: &str) -> Result<String, ProfileError> {
-    todo!()
+pub fn normalize_name(name: &str) -> Result<String, ProfileError> {
+    let trimmed = name.trim();
+    if trimmed.is_empty() {
+        Err(ProfileError::EmptyName)
+    } else {
+        Ok(trimmed.to_string())
+    }
 }
 
 impl Profile {
     /// New profile without mods; the name is trimmed and must not be blank.
-    pub fn new(_id: impl Into<String>, _name: &str) -> Result<Profile, ProfileError> {
-        todo!()
+    pub fn new(id: impl Into<String>, name: &str) -> Result<Profile, ProfileError> {
+        Ok(Profile {
+            id: id.into(),
+            name: normalize_name(name)?,
+            mod_ids: Vec::new(),
+        })
     }
 
     /// The built-in Vanilla profile: ID `vanilla`, name `Vanilla`, no mods.
     pub fn vanilla() -> Profile {
-        todo!()
+        Profile {
+            id: VANILLA_ID.to_string(),
+            name: "Vanilla".to_string(),
+            mod_ids: Vec::new(),
+        }
     }
 
     pub fn is_vanilla(&self) -> bool {
-        todo!()
+        self.id == VANILLA_ID
     }
 
     /// Renames in place; a blank name leaves the profile unchanged.
-    pub fn rename(&mut self, _name: &str) -> Result<(), ProfileError> {
-        todo!()
+    pub fn rename(&mut self, name: &str) -> Result<(), ProfileError> {
+        self.name = normalize_name(name)?;
+        Ok(())
     }
 
     /// Removes every occurrence of `mod_id`, keeping the order of the others.
     /// Returns whether anything was removed.
-    pub fn remove_mod(&mut self, _mod_id: &str) -> bool {
-        todo!()
+    pub fn remove_mod(&mut self, mod_id: &str) -> bool {
+        let before = self.mod_ids.len();
+        self.mod_ids.retain(|id| id != mod_id);
+        self.mod_ids.len() != before
     }
 }
 

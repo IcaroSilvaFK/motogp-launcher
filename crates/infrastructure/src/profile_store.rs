@@ -4,6 +4,7 @@ use motogp_application::{AppError, Clock, ProfileRepository};
 use motogp_domain::Profile;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Serialization shape of one entry of `profiles.json` (kept out of the domain).
 #[derive(Debug, Serialize, Deserialize)]
@@ -15,14 +16,22 @@ struct ProfileDto {
 }
 
 impl From<ProfileDto> for Profile {
-    fn from(_dto: ProfileDto) -> Self {
-        todo!()
+    fn from(dto: ProfileDto) -> Self {
+        Profile {
+            id: dto.id,
+            name: dto.name,
+            mod_ids: dto.mod_ids,
+        }
     }
 }
 
 impl From<&Profile> for ProfileDto {
-    fn from(_profile: &Profile) -> Self {
-        todo!()
+    fn from(profile: &Profile) -> Self {
+        ProfileDto {
+            id: profile.id.clone(),
+            name: profile.name.clone(),
+            mod_ids: profile.mod_ids.clone(),
+        }
     }
 }
 
@@ -40,13 +49,13 @@ impl JsonProfileStore {
 
 impl ProfileRepository for JsonProfileStore {
     fn load(&self) -> Result<Vec<Profile>, AppError> {
-        let _ = (&self.path, load_json::<Vec<ProfileDto>>);
-        todo!()
+        let dtos: Vec<ProfileDto> = load_json(&self.path)?;
+        Ok(dtos.into_iter().map(Profile::from).collect())
     }
 
-    fn save(&self, _profiles: &[Profile]) -> Result<(), AppError> {
-        let _ = save_json::<Vec<ProfileDto>>;
-        todo!()
+    fn save(&self, profiles: &[Profile]) -> Result<(), AppError> {
+        let dtos: Vec<ProfileDto> = profiles.iter().map(ProfileDto::from).collect();
+        save_json(&self.path, &dtos)
     }
 }
 
@@ -56,7 +65,10 @@ pub struct SystemClock;
 
 impl Clock for SystemClock {
     fn now_millis(&self) -> u64 {
-        todo!()
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|elapsed| elapsed.as_millis() as u64)
+            .unwrap_or(0)
     }
 }
 

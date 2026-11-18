@@ -1,5 +1,5 @@
 use crate::{AppError, Clock, ProfileRepository};
-use motogp_domain::{Profile, ProfileError};
+use motogp_domain::{normalize_name, Profile, ProfileError, VANILLA_ID};
 use std::fmt;
 
 /// Failure of a profile use case: a business rule or the storage.
@@ -23,7 +23,10 @@ impl From<AppError> for ProfileServiceError {
 
 impl fmt::Display for ProfileServiceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+        match self {
+            ProfileServiceError::Profile(error) => error.fmt(f),
+            ProfileServiceError::Storage(error) => error.fmt(f),
+        }
     }
 }
 
@@ -40,45 +43,109 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
         Self { repository, clock }
     }
 
-    /// Lists the profiles; an empty store is seeded with Vanilla and persisted.
-    pub fn list(&self) -> Result<Vec<Profile>, ProfileServiceError> {
-        let _ = (&self.repository, &self.clock);
-        todo!()
+    /// Loads the collection; an empty one is seeded with Vanilla and persisted.
+    /// Invalid storage is an error and is never reseeded.
+    fn load_seeded(&self) -> Result<Vec<Profile>, ProfileServiceError> {
+        let profiles = self.repository.load()?;
+        if profiles.is_empty() {
+            let seeded = vec![Profile::vanilla()];
+            self.repository.save(&seeded)?;
+            return Ok(seeded);
+        }
+        Ok(profiles)
     }
 
-    pub fn get(&self, _id: &str) -> Result<Profile, ProfileServiceError> {
-        todo!()
+    /// Lists the profiles; an empty store is seeded with Vanilla and persisted.
+    pub fn list(&self) -> Result<Vec<Profile>, ProfileServiceError> {
+        self.load_seeded()
+    }
+
+    pub fn get(&self, id: &str) -> Result<Profile, ProfileServiceError> {
+        self.load_seeded()?
+            .into_iter()
+            .find(|profile| profile.id == id)
+            .ok_or_else(|| ProfileError::NotFound.into())
     }
 
     /// Creates a profile with a fresh `p<unix_millis>` ID and no mods.
-    pub fn create(&self, _name: &str) -> Result<Profile, ProfileServiceError> {
-        todo!()
+    pub fn create(&self, name: &str) -> Result<Profile, ProfileServiceError> {
+        let name = normalize_name(name)?;
+        let mut profiles = self.load_seeded()?;
+        let profile = Profile::new(self.next_id(&profiles), &name)?;
+        profiles.push(profile.clone());
+        self.repository.save(&profiles)?;
+        Ok(profile)
     }
 
-    pub fn rename(&self, _id: &str, _name: &str) -> Result<Profile, ProfileServiceError> {
-        todo!()
+    pub fn rename(&self, id: &str, name: &str) -> Result<Profile, ProfileServiceError> {
+        let name = normalize_name(name)?;
+        self.update(id, |profile| profile.rename(&name))
     }
 
     /// Deletes a profile; Vanilla is always refused.
-    pub fn delete(&self, _id: &str) -> Result<(), ProfileServiceError> {
-        todo!()
+    pub fn delete(&self, id: &str) -> Result<(), ProfileServiceError> {
+        if id == VANILLA_ID {
+            return Err(ProfileError::VanillaProtected.into());
+        }
+        let mut profiles = self.load_seeded()?;
+        let before = profiles.len();
+        profiles.retain(|profile| profile.id != id);
+        if profiles.len() == before {
+            return Err(ProfileError::NotFound.into());
+        }
+        self.repository.save(&profiles)?;
+        Ok(())
     }
 
     /// Replaces the mods of a profile, preserving the given order.
-    pub fn set_mods(
-        &self,
-        _id: &str,
-        _mod_ids: Vec<String>,
-    ) -> Result<Profile, ProfileServiceError> {
-        todo!()
+    pub fn set_mods(&self, id: &str, mod_ids: Vec<String>) -> Result<Profile, ProfileServiceError> {
+        self.update(id, |profile| {
+            profile.mod_ids = mod_ids;
+            Ok(())
+        })
     }
 
     /// Removes `mod_id` from every profile (used after a mod leaves the library).
-    pub fn remove_mod_everywhere(&self, _mod_id: &str) -> Result<(), ProfileServiceError> {
-        todo!()
+    pub fn remove_mod_everywhere(&self, mod_id: &str) -> Result<(), ProfileServiceError> {
+        let mut profiles = self.load_seeded()?;
+        let changed = profiles
+            .iter_mut()
+            .fold(false, |acc, profile| profile.remove_mod(mod_id) | acc);
+        if changed {
+            self.repository.save(&profiles)?;
+        }
+        Ok(())
+    }
+
+    /// Applies `change` to one profile and persists the collection.
+    fn update(
+        &self,
+        id: &str,
+        change: impl FnOnce(&mut Profile) -> Result<(), ProfileError>,
+    ) -> Result<Profile, ProfileServiceError> {
+        let mut profiles = self.load_seeded()?;
+        let profile = profiles
+            .iter_mut()
+            .find(|profile| profile.id == id)
+            .ok_or(ProfileError::NotFound)?;
+        change(profile)?;
+        let updated = profile.clone();
+        self.repository.save(&profiles)?;
+        Ok(updated)
+    }
+
+    /// `p<unix_millis>`, bumped until it is free so rapid creations never collide.
+    fn next_id(&self, profiles: &[Profile]) -> String {
+        let mut millis = self.clock.now_millis();
+        loop {
+            let id = format!("p{millis}");
+            if profiles.iter().all(|profile| profile.id != id) {
+                return id;
+            }
+            millis += 1;
+        }
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

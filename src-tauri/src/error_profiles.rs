@@ -2,10 +2,25 @@
 //! the issue #2 mapping; business rules get their own stable codes.
 use crate::CommandError;
 use motogp_application::ProfileServiceError;
+use motogp_domain::ProfileError;
+
+fn rule_code(rule: &ProfileError) -> &'static str {
+    match rule {
+        ProfileError::EmptyName => "empty_profile_name",
+        ProfileError::NotFound => "profile_not_found",
+        ProfileError::VanillaProtected => "vanilla_protected",
+    }
+}
 
 impl From<&ProfileServiceError> for CommandError {
-    fn from(_error: &ProfileServiceError) -> Self {
-        todo!()
+    fn from(error: &ProfileServiceError) -> Self {
+        match error {
+            ProfileServiceError::Storage(app) => CommandError::from(app),
+            ProfileServiceError::Profile(rule) => CommandError {
+                code: rule_code(rule).to_string(),
+                message: rule.to_string(),
+            },
+        }
     }
 }
 
@@ -19,7 +34,6 @@ impl From<ProfileServiceError> for CommandError {
 mod tests {
     use super::*;
     use motogp_application::AppError;
-    use motogp_domain::ProfileError;
 
     fn rule(error: ProfileError) -> CommandError {
         CommandError::from(ProfileServiceError::Profile(error))
