@@ -1,0 +1,11 @@
+[package]
+name = "motogp-infrastructure"
+description = "Adapters (fs, JSON, ZIP, Steam, processos) que implementam os ports."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+motogp-domain = { path = "../domain" }
+motogp-application = { path = "../application" }

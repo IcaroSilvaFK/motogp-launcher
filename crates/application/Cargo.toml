@@ -1,0 +1,14 @@
+[package]
+name = "motogp-application"
+description = "Casos de uso e ports (traits) do MotoGP Launcher."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# Regra de arquitetura: a única dependência de produção é o domain.
+[dependencies]
+motogp-domain = { path = "../domain" }
+
+# Tooling de teste (BDD) fica somente em dev-dependencies.
+[dev-dependencies]
