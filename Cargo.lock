@@ -2320,12 +2320,18 @@ dependencies = [
 name = "motogp-application"
 version = "0.1.0"
 dependencies = [
+ "cucumber",
+ "futures",
  "motogp-domain",
 ]
 
 [[package]]
 name = "motogp-domain"
 version = "0.1.0"
+dependencies = [
+ "cucumber",
+ "futures",
+]
 
 [[package]]
 name = "motogp-infrastructure"

@@ -155,3 +155,7 @@ Gherkin: `crates/infrastructure/tests/features/persistence.feature`, run by `cra
 ### Manual smoke: `pnpm tauri dev`
 
 Prerequisites: MSVC build tools, Rust stable (MSVC), Node 22, pnpm (corepack), WebView2 Runtime. Run `pnpm tauri dev` and confirm the "MotoGP Launcher" window opens with a 1100x700 client area (minimum 900x600) and shows the "MotoGP Launcher" heading. Verified on Windows 11 during issue #1.
+
+### BDD runners per crate
+
+`domain`, `application` and `infrastructure` each have one `features` test target (`tests/features.rs`, `harness = false`). It is a dispatcher: every feature owns `tests/bdd/<feature>.rs` with its own `World` and `pub async fn run() -> bool` that runs only `tests/features/<feature>.feature`. Adding a feature means one `#[path]` module line and one `FEATURES` entry, so parallel issues only touch those lines.
