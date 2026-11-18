@@ -4,6 +4,8 @@ use motogp_application::{AppError, ConfigRepository};
 use motogp_domain::Config;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::fs;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 /// Serialization shape of `config.json` (kept out of the domain model).
@@ -34,14 +36,62 @@ impl From<&Config> for ConfigDto {
 
 /// Loads JSON from `path`. A missing file yields `T::default()`; an existing
 /// but empty or invalid file is an error (and is never overwritten).
-pub fn load_json<T: DeserializeOwned + Default>(_path: &Path) -> Result<T, AppError> {
-    todo!("red")
+pub fn load_json<T: DeserializeOwned + Default>(path: &Path) -> Result<T, AppError> {
+    let bytes = match fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(T::default()),
+        Err(e) => {
+            return Err(AppError::Read {
+                location: path.display().to_string(),
+                detail: e.to_string(),
+            })
+        }
+    };
+    serde_json::from_slice(&bytes).map_err(|e| AppError::Corrupted {
+        location: path.display().to_string(),
+        detail: e.to_string(),
+    })
+}
+
+fn temp_path(path: &Path) -> PathBuf {
+    let mut os = path.as_os_str().to_owned();
+    os.push(".tmp");
+    PathBuf::from(os)
+}
+
+fn write_error(path: &Path, detail: impl ToString) -> AppError {
+    AppError::Write {
+        location: path.display().to_string(),
+        detail: detail.to_string(),
+    }
 }
 
 /// Saves `value` as pretty JSON through `<path>.tmp` and an atomic replace.
 /// On failure the previous file is left untouched and the temp file removed.
-pub fn save_json<T: Serialize>(_path: &Path, _value: &T) -> Result<(), AppError> {
-    todo!("red")
+///
+/// `fs::rename` replaces an existing destination on Windows too (std uses
+/// `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`, or POSIX-semantics rename
+/// on recent versions), so no extra crate is needed.
+pub fn save_json<T: Serialize>(path: &Path, value: &T) -> Result<(), AppError> {
+    let json = serde_json::to_vec_pretty(value).map_err(|e| write_error(path, e))?;
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        fs::create_dir_all(parent).map_err(|e| write_error(path, e))?;
+    }
+    let tmp = temp_path(path);
+    let result = write_synced(&tmp, &json).and_then(|()| fs::rename(&tmp, path));
+    if let Err(e) = result {
+        // Best effort: never touches `path`; a directory squatting on the temp
+        // path is not removed by `remove_file`.
+        let _ = fs::remove_file(&tmp);
+        return Err(write_error(path, e));
+    }
+    Ok(())
+}
+
+fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
+    let mut file = fs::File::create(path)?;
+    file.write_all(bytes)?;
+    file.sync_all()
 }
 
 /// `ConfigRepository` backed by a JSON file.

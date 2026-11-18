@@ -14,13 +14,33 @@ pub struct CommandError {
 }
 
 /// The only place with user-facing text (currently English).
-fn user_message(_error: &AppError) -> String {
-    todo!("red")
+fn user_message(error: &AppError) -> String {
+    let location = error.location();
+    match error {
+        AppError::Read { .. } => format!("Could not read the data at {location}."),
+        AppError::Write { .. } => {
+            format!("Could not save the data at {location}. The previous version was kept.")
+        }
+        AppError::Corrupted { .. } => {
+            format!("The data at {location} is corrupted or unreadable. The file was not modified.")
+        }
+    }
+}
+
+fn error_code(error: &AppError) -> &'static str {
+    match error {
+        AppError::Read { .. } => "read_failed",
+        AppError::Write { .. } => "write_failed",
+        AppError::Corrupted { .. } => "data_corrupted",
+    }
 }
 
 impl From<&AppError> for CommandError {
-    fn from(_error: &AppError) -> Self {
-        todo!("red")
+    fn from(error: &AppError) -> Self {
+        CommandError {
+            code: error_code(error).to_string(),
+            message: user_message(error),
+        }
     }
 }
 

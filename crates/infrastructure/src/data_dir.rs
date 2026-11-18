@@ -13,27 +13,27 @@ impl DataDir {
     }
 
     pub fn root(&self) -> &Path {
-        todo!("red")
+        &self.root
     }
 
     pub fn config_file(&self) -> PathBuf {
-        todo!("red")
+        self.root.join("config.json")
     }
 
     pub fn profiles_file(&self) -> PathBuf {
-        todo!("red")
+        self.root.join("profiles.json")
     }
 
     pub fn library_file(&self) -> PathBuf {
-        todo!("red")
+        self.root.join("library.json")
     }
 
     pub fn deployed_file(&self) -> PathBuf {
-        todo!("red")
+        self.root.join("deployed.json")
     }
 
     pub fn library_dir(&self) -> PathBuf {
-        todo!("red")
+        self.root.join("library")
     }
 }
 

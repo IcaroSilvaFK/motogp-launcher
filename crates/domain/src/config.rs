@@ -11,7 +11,10 @@ pub struct Config {
 
 impl Default for Config {
     fn default() -> Self {
-        todo!("red: default config")
+        Config {
+            game_dir: None,
+            active_profile: None,
+        }
     }
 }
 

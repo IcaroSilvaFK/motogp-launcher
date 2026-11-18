@@ -16,18 +16,31 @@ pub enum AppError {
 impl AppError {
     /// Where the failure happened (usually a file path).
     pub fn location(&self) -> &str {
-        todo!("red")
+        match self {
+            AppError::Read { location, .. }
+            | AppError::Write { location, .. }
+            | AppError::Corrupted { location, .. } => location,
+        }
     }
 
     /// Technical detail reported by the adapter.
     pub fn detail(&self) -> &str {
-        todo!("red")
+        match self {
+            AppError::Read { detail, .. }
+            | AppError::Write { detail, .. }
+            | AppError::Corrupted { detail, .. } => detail,
+        }
     }
 }
 
 impl fmt::Display for AppError {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!("red")
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let what = match self {
+            AppError::Read { .. } => "could not read",
+            AppError::Write { .. } => "could not write",
+            AppError::Corrupted { .. } => "corrupted data in",
+        };
+        write!(f, "{what} {}: {}", self.location(), self.detail())
     }
 }
 

@@ -12,11 +12,11 @@ impl<R: ConfigRepository> ConfigService<R> {
     }
 
     pub fn load(&self) -> Result<Config, AppError> {
-        todo!("red")
+        self.repository.load()
     }
 
-    pub fn save(&self, _config: &Config) -> Result<(), AppError> {
-        todo!("red")
+    pub fn save(&self, config: &Config) -> Result<(), AppError> {
+        self.repository.save(config)
     }
 }
 
