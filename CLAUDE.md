@@ -32,11 +32,11 @@ Regra: o chat não implementa direto. Demanda de desenvolvimento → Codex gera 
 |--------|----------|-----------|
 | `DEV` | Desenvolvimento (integração) | PRs das branches de task (`feat/…`, `fix/…`) |
 | `QAS` | Homologação / QA | PR de promoção `DEV → QAS` |
-| `PRD` | Produção | PR de promoção `QAS → PRD` |
+| `main` | Produção (PRD) | PR de promoção `QAS → main` |
 
-- Ninguém commita direto em `DEV`, `QAS` ou `PRD`: tudo entra via PR.
-- O pipeline gera o **instalador Windows** (setup `.exe` NSIS e `.msi`) depois que todos os gates passam. Em `DEV`/`QAS` ele fica como artefato do pipeline (30 dias). Em `PRD` vira uma **GitHub Release** `v<versão>` (versão vinda do `tauri.conf.json`), junto com o `latest.json` do **auto-update**: o app instalado se atualiza pelo front. Setup em [docs/auto-update.md](docs/auto-update.md).
-- Promoção só segue em frente (`DEV → QAS → PRD`). Hotfix sai de `PRD` e volta por PR para `PRD`, `QAS` e `DEV`.
+- Ninguém commita direto em `DEV`, `QAS` ou `main`: tudo entra via PR.
+- O pipeline gera o **instalador Windows** (setup `.exe` NSIS e `.msi`) depois que todos os gates passam. Em `DEV`/`QAS` ele fica como artefato do pipeline (30 dias). Em `main` vira uma **GitHub Release** `v<versão>` (versão vinda do `tauri.conf.json`), junto com o `latest.json` do **auto-update**: o app instalado se atualiza pelo front. Setup em [docs/auto-update.md](docs/auto-update.md).
+- Promoção só segue em frente (`DEV → QAS → main`). Hotfix sai de `main` e volta por PR para `main`, `QAS` e `DEV`.
 
 ## Workflow de validação: TDD + BDD + Arquitetura Limpa (obrigatório)
 

@@ -4,7 +4,7 @@ O launcher instalado verifica se existe versão nova, baixa o pacote, instala e 
 
 ## Fluxo
 
-1. Um merge em `PRD` dispara o pipeline, que gera o instalador e a GitHub Release `v<versão>` junto com o `latest.json` (versão, notas e assinatura).
+1. Um merge em `main` (produção) dispara o pipeline, que gera o instalador e a GitHub Release `v<versão>` junto com o `latest.json` (versão, notas e assinatura).
 2. Ao abrir, o app consulta `https://github.com/<owner>/<repo>/releases/latest/download/latest.json`.
 3. Se a versão for maior que a instalada, o front mostra "Nova versão disponível". O usuário clica em **Atualizar**, o app baixa, confere a assinatura, instala e reinicia.
 

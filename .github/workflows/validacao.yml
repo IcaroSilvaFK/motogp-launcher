@@ -2,9 +2,9 @@ name: Validação (TDD + BDD + Arquitetura Limpa)
 
 on:
   pull_request:
-    branches: [DEV, QAS, PRD]
+    branches: [DEV, QAS, main]
   push:
-    branches: [DEV, QAS, PRD]
+    branches: [DEV, QAS, main]
 
 jobs:
   # hashFiles não funciona no `if` de job (roda antes do checkout), por isso a detecção fica num job à parte
@@ -87,7 +87,7 @@ jobs:
 
       # DEV/QAS: gera o instalador e publica como artefato do pipeline
       - name: Build (DEV/QAS)
-        if: ${{ github.ref_name != 'PRD' }}
+        if: ${{ github.ref_name != 'main' }}
         uses: tauri-apps/tauri-action@v0
         env:
           # Necessário porque bundle.createUpdaterArtifacts = true (assina os pacotes de update)
@@ -97,7 +97,7 @@ jobs:
           args: --bundles nsis,msi
 
       - name: Publicar artefato
-        if: ${{ github.ref_name != 'PRD' }}
+        if: ${{ github.ref_name != 'main' }}
         uses: actions/upload-artifact@v4
         with:
           name: motogp-launcher-${{ github.ref_name }}-${{ github.run_number }}
@@ -106,9 +106,9 @@ jobs:
             **/target/release/bundle/msi/*.msi
           retention-days: 30
 
-      # PRD: gera o instalador e publica numa GitHub Release + latest.json (consumido pelo updater do app)
-      - name: Build + Release (PRD)
-        if: ${{ github.ref_name == 'PRD' }}
+      # main (produção): gera o instalador e publica numa GitHub Release + latest.json (consumido pelo updater do app)
+      - name: Build + Release (main)
+        if: ${{ github.ref_name == 'main' }}
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
