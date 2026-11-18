@@ -6,26 +6,11 @@ on:
   push:
     branches: [dev, qas, main]
 
+# The scaffold (Cargo.toml, package.json, tauri.conf.json) is part of the repository,
+# so the required jobs below always run and are never skipped.
 jobs:
-  # hashFiles não funciona no `if` de job (roda antes do checkout), por isso a detecção fica num job à parte
-  detect:
-    runs-on: ubuntu-latest
-    outputs:
-      rust: ${{ steps.d.outputs.rust }}
-      frontend: ${{ steps.d.outputs.frontend }}
-      tauri: ${{ steps.d.outputs.tauri }}
-    steps:
-      - uses: actions/checkout@v4
-      - id: d
-        run: |
-          echo "rust=$([ -f Cargo.toml ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "frontend=$([ -f package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "tauri=$([ -f src-tauri/tauri.conf.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
   rust:
     name: Rust core
-    needs: detect
-    if: ${{ needs.detect.outputs.rust == 'true' }}
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -33,21 +18,34 @@ jobs:
         with:
           components: rustfmt, clippy, llvm-tools-preview
       - uses: Swatinem/rust-cache@v2
-      - name: Formatação
+      # Node + pnpm are needed by the interface BDD scenarios (they run the real ESLint)
+      # and by the coverage gate script.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Formatting
         run: cargo fmt --all --check
       - name: Lint
         run: cargo clippy --workspace --all-targets -- -D warnings
-      - name: Testes (unitários + BDD)
+      - name: Unit tests
         run: cargo test --workspace
-      - name: Cobertura
+      - name: BDD scenarios
+        run: cargo test --workspace --test features
+      - name: Architecture (Cargo dependencies point inward)
+        run: cargo test -p motogp-launcher --test architecture
+      - uses: taiki-e/install-action@cargo-llvm-cov
+      - name: Coverage (>= 90% per core crate, >= 80% overall)
+        shell: bash
         run: |
-          cargo install cargo-llvm-cov --locked
-          cargo llvm-cov --workspace --fail-under-lines 80
+          cargo llvm-cov --workspace --json --summary-only --output-path coverage-rust.json \
+            --ignore-filename-regex 'src-tauri[\\/]src[\\/](main|bootstrap)\.rs'
+          node scripts/check-rust-coverage.mjs coverage-rust.json
 
   frontend:
     name: Frontend
-    needs: detect
-    if: ${{ needs.detect.outputs.frontend == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -57,20 +55,20 @@ jobs:
           node-version: 22
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - name: Formatação
+      - name: Formatting
         run: pnpm prettier --check .
-      - name: Lint + fronteiras de arquitetura
+      - name: Lint + architecture boundaries
         run: pnpm lint
-      - name: Tipos
+      - name: Types
         run: pnpm tsc --noEmit
-      - name: Testes (unitários + BDD) com cobertura
+      - name: Tests (unit + BDD) with coverage
         run: pnpm test --coverage
 
   build-windows:
     name: Build instalador Windows
-    needs: [detect, rust, frontend]
+    needs: [rust, frontend]
     # Só gera instalador depois que o código entra numa branch de ambiente (não em PR)
-    if: ${{ github.event_name == 'push' && needs.detect.outputs.tauri == 'true' }}
+    if: ${{ github.event_name == 'push' }}
     runs-on: windows-latest
     permissions:
       contents: write
@@ -90,7 +88,7 @@ jobs:
         if: ${{ github.ref_name != 'main' }}
         uses: tauri-apps/tauri-action@v0
         env:
-          # Necessário porque bundle.createUpdaterArtifacts = true (assina os pacotes de update)
+          # Usado só quando bundle.createUpdaterArtifacts for ligado (issue de auto-update)
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
