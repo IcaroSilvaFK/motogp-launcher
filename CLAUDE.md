@@ -32,6 +32,12 @@ Regra: o chat não implementa direto. Demanda de desenvolvimento → Codex gera 
 
 **One branch per unit of work, always.** Every task, fix, translation or doc change gets its own branch from `dev` and its own PR; never mix unrelated changes in the same branch. Parallel work uses separate `git worktree`s so branches don't step on each other.
 
+**Parallelize by default; never run issues one by one when they are independent.**
+- At any moment, every issue whose dependencies are satisfied must be in progress, each one with its own PO/dev/QA agents in its own worktree (`../motogp-launcher-wt-<issue>`).
+- Do not wait for a PR to be merged to start dependent work: stack the new branch on the unmerged parent branch, then rebase it onto `dev` as soon as the parent merges.
+- Review (Codex), QA, translation/docs and CI waits run concurrently with development; the orchestrator never idles waiting on a single agent.
+- Only serialize what truly conflicts: the same files, or a dependency whose contract (ports/types) doesn't exist yet.
+
 ### Branches padrão
 
 | Branch | Ambiente | Recebe de |
