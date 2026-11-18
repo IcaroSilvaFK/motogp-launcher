@@ -1,0 +1,56 @@
+//! Gate 6 (Cargo architecture) and workspace integrity.
+mod support;
+
+use std::path::PathBuf;
+use support::{cargo_metadata, dependency_violations, member_names, workspace_root};
+
+fn fixture(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests/fixtures")
+        .join(name)
+        .join("Cargo.toml")
+}
+
+#[test]
+fn workspace_members_are_registered() {
+    let metadata = cargo_metadata(&workspace_root().join("Cargo.toml"));
+    assert_eq!(
+        member_names(&metadata),
+        vec![
+            "motogp-application",
+            "motogp-domain",
+            "motogp-infrastructure",
+            "motogp-launcher",
+        ]
+    );
+}
+
+#[test]
+fn rejects_outward_cargo_dependencies() {
+    let metadata = cargo_metadata(&fixture("outward-deps"));
+    let violations = dependency_violations(&metadata);
+    assert!(
+        violations
+            .iter()
+            .any(|v| v.contains("motogp-application") && v.contains("motogp-infrastructure")),
+        "application -> infrastructure should be rejected: {violations:?}"
+    );
+    assert!(
+        violations
+            .iter()
+            .any(|v| v.contains("motogp-domain") && v.contains("serde")),
+        "domain -> external dependency should be rejected: {violations:?}"
+    );
+}
+
+#[test]
+fn accepts_dev_dependencies_in_the_core() {
+    let metadata = cargo_metadata(&fixture("dev-deps-ok"));
+    assert_eq!(dependency_violations(&metadata), Vec::<String>::new());
+}
+
+#[test]
+fn real_workspace_dependencies_point_inward() {
+    let metadata = cargo_metadata(&workspace_root().join("Cargo.toml"));
+    assert_eq!(dependency_violations(&metadata), Vec::<String>::new());
+}
