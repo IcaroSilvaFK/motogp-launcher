@@ -7,7 +7,7 @@ Feature: Start the project with boundaries and mandatory validation
     And the workspace contains domain, application, infrastructure and src-tauri
     And the workspace and frontend tests finish successfully
 
-  # The real Windows window-opening smoke is manual (docs/workflow-validacao.md).
+  # The real Windows window-opening smoke is manual (docs/validation-workflow.md).
   Scenario: Validate the Windows application configuration
     Given the Tauri scaffold is available
     When I inspect the application startup configuration
