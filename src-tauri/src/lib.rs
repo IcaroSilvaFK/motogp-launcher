@@ -2,5 +2,7 @@
 //! mapping. The adapters are composed here.
 
 mod bootstrap;
+mod error;
 
 pub use bootstrap::run;
+pub use error::CommandError;
