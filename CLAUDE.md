@@ -21,22 +21,22 @@ Regra: o chat não implementa direto. Demanda de desenvolvimento → Codex gera 
 
 1. **Codex elabora** a task com todos os detalhes (contexto, escopo, critérios de aceite).
 2. **Publica uma issue** no repositório remoto (`gh issue create`) com esse detalhamento.
-3. **Dev abre uma branch** a partir de `DEV`, vinculada à issue, para manter o histórico (ex.: `feat/<nº-issue>-<slug>`).
+3. **Dev abre uma branch** a partir de `dev`, vinculada à issue, para manter o histórico (ex.: `feat/<nº-issue>-<slug>`).
 4. **Dev finaliza a task** na branch.
 5. A entrega **passa por toda a revisão** (QA Haiku + revisão/melhorias do Codex).
-6. Só depois: **abre o PR para `DEV`** referenciando a issue (`Closes #<nº>`) e **fecha a issue**.
+6. Só depois: **abre o PR para `dev`** referenciando a issue (`Closes #<nº>`) e **fecha a issue**.
 
 ### Branches padrão
 
 | Branch | Ambiente | Recebe de |
 |--------|----------|-----------|
-| `DEV` | Desenvolvimento (integração) | PRs das branches de task (`feat/…`, `fix/…`) |
-| `QAS` | Homologação / QA | PR de promoção `DEV → QAS` |
-| `main` | Produção (PRD) | PR de promoção `QAS → main` |
+| `dev` | Desenvolvimento (integração) | PRs das branches de task (`feat/…`, `fix/…`) |
+| `qas` | Homologação / QA | PR de promoção `dev → qas` |
+| `main` | Produção (PRD) | PR de promoção `qas → main` |
 
-- Ninguém commita direto em `DEV`, `QAS` ou `main`: tudo entra via PR.
-- O pipeline gera o **instalador Windows** (setup `.exe` NSIS e `.msi`) depois que todos os gates passam. Em `DEV`/`QAS` ele fica como artefato do pipeline (30 dias). Em `main` vira uma **GitHub Release** `v<versão>` (versão vinda do `tauri.conf.json`), junto com o `latest.json` do **auto-update**: o app instalado se atualiza pelo front. Setup em [docs/auto-update.md](docs/auto-update.md).
-- Promoção só segue em frente (`DEV → QAS → main`). Hotfix sai de `main` e volta por PR para `main`, `QAS` e `DEV`.
+- Ninguém commita direto em `dev`, `qas` ou `main`: tudo entra via PR.
+- O pipeline gera o **instalador Windows** (setup `.exe` NSIS e `.msi`) depois que todos os gates passam. Em `dev`/`qas` ele fica como artefato do pipeline (30 dias). Em `main` vira uma **GitHub Release** `v<versão>` (versão vinda do `tauri.conf.json`), junto com o `latest.json` do **auto-update**: o app instalado se atualiza pelo front. Setup em [docs/auto-update.md](docs/auto-update.md).
+- Promoção só segue em frente (`dev → qas → main`). Hotfix sai de `main` e volta por PR para `main`, `qas` e `dev`.
 
 ## Workflow de validação: TDD + BDD + Arquitetura Limpa (obrigatório)
 

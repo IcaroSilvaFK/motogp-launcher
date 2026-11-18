@@ -2,9 +2,9 @@ name: Validação (TDD + BDD + Arquitetura Limpa)
 
 on:
   pull_request:
-    branches: [DEV, QAS, main]
+    branches: [dev, qas, main]
   push:
-    branches: [DEV, QAS, main]
+    branches: [dev, qas, main]
 
 jobs:
   # hashFiles não funciona no `if` de job (roda antes do checkout), por isso a detecção fica num job à parte
@@ -85,8 +85,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      # DEV/QAS: gera o instalador e publica como artefato do pipeline
-      - name: Build (DEV/QAS)
+      # dev/qas: gera o instalador e publica como artefato do pipeline
+      - name: Build (dev/qas)
         if: ${{ github.ref_name != 'main' }}
         uses: tauri-apps/tauri-action@v0
         env:
