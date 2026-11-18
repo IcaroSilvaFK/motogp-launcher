@@ -46,7 +46,7 @@ Regra: o chat não implementa direto. Demanda de desenvolvimento → Codex gera 
 | `qas` | Homologação / QA | PR de promoção `dev → qas` |
 | `main` | Produção (PRD) | PR de promoção `qas → main` |
 
-- Ninguém commita direto em `dev`, `qas` ou `main`: tudo entra via PR.
+- Ninguém commita direto em `dev`, `qas` ou `main`: tudo entra via PR. Isso é **imposto no GitHub** por proteção de branch, valendo também para admins: PR obrigatório (0 aprovações), checks `Rust core` e `Frontend` obrigatórios, sem force-push e sem deletar a branch.
 - O pipeline gera o **instalador Windows** (setup `.exe` NSIS e `.msi`) depois que todos os gates passam. Em `dev`/`qas` ele fica como artefato do pipeline (30 dias). Em `main` vira uma **GitHub Release** `v<versão>` (versão vinda do `tauri.conf.json`), junto com o `latest.json` do **auto-update**: o app instalado se atualiza pelo front. Setup em [docs/auto-update.md](docs/auto-update.md).
 - Promoção só segue em frente (`dev → qas → main`). Hotfix sai de `main` e volta por PR para `main`, `qas` e `dev`.
 

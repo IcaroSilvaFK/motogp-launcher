@@ -1,0 +1,4 @@
+# Isolated fixture (NOT part of the main workspace): used by the architecture tests.
+[workspace]
+resolver = "2"
+members = ["domain", "application", "infrastructure"]

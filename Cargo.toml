@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+exclude = ["src-tauri/tests/fixtures"]
+members = [
+    "crates/domain",
+    "crates/application",
+    "crates/infrastructure",
+    "src-tauri",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.77"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
