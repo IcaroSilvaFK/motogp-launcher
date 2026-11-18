@@ -1,5 +1,9 @@
 # motogp-launcher
 
+## Language
+
+**File names and file contents are always in English**: code, identifiers, comments, test names, Gherkin `.feature` files (Feature/Scenario/Given/When/Then), commit messages, branch names, docs, issues/PRs and error messages. Only the chat with the user stays in Portuguese.
+
 ## Memória e preferências
 
 Sempre salvar memórias, decisões e preferências **localmente no projeto** (neste `CLAUDE.md` ou em `docs/`), nunca só na memória global do usuário.
@@ -25,6 +29,8 @@ Regra: o chat não implementa direto. Demanda de desenvolvimento → Codex gera 
 4. **Dev finaliza a task** na branch.
 5. A entrega **passa por toda a revisão** (QA Haiku + revisão/melhorias do Codex).
 6. Só depois: **abre o PR para `dev`** referenciando a issue (`Closes #<nº>`) e **fecha a issue**.
+
+**One branch per unit of work, always.** Every task, fix, translation or doc change gets its own branch from `dev` and its own PR; never mix unrelated changes in the same branch. Parallel work uses separate `git worktree`s so branches don't step on each other.
 
 ### Branches padrão
 
