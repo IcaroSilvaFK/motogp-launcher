@@ -1,14 +1,35 @@
 //! `ContentHasher` adapter: streaming SHA-256.
-use motogp_application::{ContentHasher, LibraryError};
+use motogp_application::{AppError, ContentHasher, LibraryError};
+use sha2::{Digest, Sha256};
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
+
+const CHUNK_SIZE: usize = 64 * 1024;
 
 /// Computes the SHA-256 of a file in fixed-size chunks (mods can be large).
 #[derive(Debug, Default, Clone, Copy)]
 pub struct Sha256Hasher;
 
 impl ContentHasher for Sha256Hasher {
-    fn sha256_hex(&self, _file: &Path) -> Result<String, LibraryError> {
-        todo!()
+    fn sha256_hex(&self, file: &Path) -> Result<String, LibraryError> {
+        let read_error = |e: std::io::Error| {
+            LibraryError::Storage(AppError::Read {
+                location: file.display().to_string(),
+                detail: e.to_string(),
+            })
+        };
+        let mut input = File::open(file).map_err(read_error)?;
+        let mut hasher = Sha256::new();
+        let mut buffer = vec![0u8; CHUNK_SIZE];
+        loop {
+            let read = input.read(&mut buffer).map_err(read_error)?;
+            if read == 0 {
+                break;
+            }
+            hasher.update(&buffer[..read]);
+        }
+        Ok(format!("{:x}", hasher.finalize()))
     }
 }
 

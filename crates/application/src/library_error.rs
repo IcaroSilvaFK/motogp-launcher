@@ -35,8 +35,26 @@ impl From<GroupingError> for LibraryError {
 }
 
 impl fmt::Display for LibraryError {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LibraryError::Storage(error) => write!(f, "{error}"),
+            LibraryError::Grouping(error) => write!(f, "{error}"),
+            LibraryError::UnsupportedFormat { extension } if extension.is_empty() => write!(
+                f,
+                "unsupported format: the file has no extension (expected .pak, .utoc, .ucas or .zip)"
+            ),
+            LibraryError::UnsupportedFormat { extension } => write!(
+                f,
+                "unsupported format: .{extension} (expected .pak, .utoc, .ucas or .zip)"
+            ),
+            LibraryError::NoPakFound => write!(f, "no .pak file found in the archive"),
+            LibraryError::NameCollision { name } => write!(
+                f,
+                "two files in the archive flatten to the same name: {name}"
+            ),
+            LibraryError::InvalidId { id } => write!(f, "invalid mod ID: {id:?}"),
+            LibraryError::NotFound { id } => write!(f, "no mod with ID {id} in the library"),
+        }
     }
 }
 
@@ -54,6 +72,12 @@ mod tests {
                     extension: "rar".into(),
                 },
                 "unsupported format",
+            ),
+            (
+                LibraryError::UnsupportedFormat {
+                    extension: String::new(),
+                },
+                "no extension",
             ),
             (LibraryError::NoPakFound, "no .pak"),
             (

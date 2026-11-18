@@ -1,8 +1,39 @@
 //! `LibraryFiles` adapter: the `library/` folder on disk. IDs and file names
 //! are validated here (the files boundary), so nothing is written or deleted
 //! outside the library.
-use motogp_application::{LibraryError, LibraryFiles};
-use std::path::{Path, PathBuf};
+use motogp_application::{AppError, LibraryError, LibraryFiles};
+use motogp_domain::is_valid_mod_id;
+use std::fs::{self, OpenOptions};
+use std::io;
+use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+const STAGING_PREFIX: &str = ".staging-";
+static STAGING_COUNTER: AtomicU32 = AtomicU32::new(0);
+
+fn read_error(path: &Path, error: impl ToString) -> LibraryError {
+    LibraryError::Storage(AppError::Read {
+        location: path.display().to_string(),
+        detail: error.to_string(),
+    })
+}
+
+fn write_error(path: &Path, error: impl ToString) -> LibraryError {
+    LibraryError::Storage(AppError::Write {
+        location: path.display().to_string(),
+        detail: error.to_string(),
+    })
+}
+
+/// A plain file name: exactly one normal path component, no separators.
+fn is_plain_file_name(name: &str) -> bool {
+    let mut components = Path::new(name).components();
+    matches!(
+        (components.next(), components.next()),
+        (Some(Component::Normal(part)), None) if part == name && !name.contains(['/', '\\'])
+    )
+}
 
 /// File operations rooted at the library directory.
 #[derive(Debug, Clone)]
@@ -18,34 +49,113 @@ impl FsLibraryFiles {
     }
 }
 
+impl FsLibraryFiles {
+    /// Only direct children of the library named `.staging-*` may be moved
+    /// from or deleted as staging areas.
+    fn check_staging(&self, staging: &Path) -> Result<(), LibraryError> {
+        let is_staging = staging.parent() == Some(self.library_dir.as_path())
+            && staging
+                .file_name()
+                .is_some_and(|n| n.to_string_lossy().starts_with(STAGING_PREFIX));
+        if is_staging {
+            Ok(())
+        } else {
+            Err(write_error(
+                staging,
+                "not a staging directory of the library",
+            ))
+        }
+    }
+}
+
 impl LibraryFiles for FsLibraryFiles {
-    fn list_dir(&self, _dir: &Path) -> Result<Vec<String>, LibraryError> {
-        let _ = &self.library_dir;
-        todo!()
+    fn list_dir(&self, dir: &Path) -> Result<Vec<String>, LibraryError> {
+        let mut names = Vec::new();
+        for entry in fs::read_dir(dir).map_err(|e| read_error(dir, e))? {
+            let entry = entry.map_err(|e| read_error(dir, e))?;
+            if entry.file_type().map_err(|e| read_error(dir, e))?.is_file() {
+                names.push(entry.file_name().to_string_lossy().into_owned());
+            }
+        }
+        Ok(names)
     }
 
     fn create_staging(&self) -> Result<PathBuf, LibraryError> {
-        todo!()
+        fs::create_dir_all(&self.library_dir).map_err(|e| write_error(&self.library_dir, e))?;
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_or(0, |d| d.as_nanos());
+        let sequence = STAGING_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let staging = self.library_dir.join(format!(
+            "{STAGING_PREFIX}{}-{nanos}-{sequence}",
+            std::process::id()
+        ));
+        fs::create_dir(&staging).map_err(|e| write_error(&staging, e))?;
+        Ok(staging)
     }
 
-    fn copy_file(&self, _source: &Path, _dest_dir: &Path) -> Result<(), LibraryError> {
-        todo!()
+    fn copy_file(&self, source: &Path, dest_dir: &Path) -> Result<(), LibraryError> {
+        let name = source
+            .file_name()
+            .ok_or_else(|| read_error(source, "not a file path"))?;
+        let target = dest_dir.join(name);
+        let mut input = fs::File::open(source).map_err(|e| read_error(source, e))?;
+        // `create_new` never overwrites an existing file.
+        let mut output = OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&target)
+            .map_err(|e| write_error(&target, e))?;
+        io::copy(&mut input, &mut output).map_err(|e| write_error(&target, e))?;
+        Ok(())
     }
 
-    fn file_size(&self, _file: &Path) -> Result<u64, LibraryError> {
-        todo!()
+    fn file_size(&self, file: &Path) -> Result<u64, LibraryError> {
+        fs::metadata(file)
+            .map(|m| m.len())
+            .map_err(|e| read_error(file, e))
     }
 
-    fn publish(&self, _staging: &Path, _files: &[String], _id: &str) -> Result<(), LibraryError> {
-        todo!()
+    fn publish(&self, staging: &Path, files: &[String], id: &str) -> Result<(), LibraryError> {
+        if !is_valid_mod_id(id) {
+            return Err(LibraryError::InvalidId { id: id.to_string() });
+        }
+        self.check_staging(staging)?;
+        if let Some(bad) = files.iter().find(|name| !is_plain_file_name(name)) {
+            return Err(write_error(staging, format!("unsafe file name {bad:?}")));
+        }
+
+        let target = self.library_dir.join(id);
+        let existed = target.exists();
+        fs::create_dir_all(&target).map_err(|e| write_error(&target, e))?;
+        for name in files {
+            if let Err(e) = fs::rename(staging.join(name), target.join(name)) {
+                if !existed {
+                    let _ = fs::remove_dir_all(&target);
+                }
+                return Err(write_error(&target.join(name), e));
+            }
+        }
+        Ok(())
     }
 
-    fn discard(&self, _staging: &Path) -> Result<(), LibraryError> {
-        todo!()
+    fn discard(&self, staging: &Path) -> Result<(), LibraryError> {
+        self.check_staging(staging)?;
+        match fs::remove_dir_all(staging) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => Err(write_error(staging, e)),
+            _ => Ok(()),
+        }
     }
 
-    fn remove_mod_dir(&self, _id: &str) -> Result<(), LibraryError> {
-        todo!()
+    fn remove_mod_dir(&self, id: &str) -> Result<(), LibraryError> {
+        if !is_valid_mod_id(id) {
+            return Err(LibraryError::InvalidId { id: id.to_string() });
+        }
+        let target = self.library_dir.join(id);
+        match fs::remove_dir_all(&target) {
+            Err(e) if e.kind() != io::ErrorKind::NotFound => Err(write_error(&target, e)),
+            _ => Ok(()),
+        }
     }
 }
 

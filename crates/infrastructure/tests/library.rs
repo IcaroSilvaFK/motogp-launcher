@@ -173,7 +173,7 @@ fn remove_deletes_dir_and_index_entry() {
 #[test]
 fn remove_rejects_ids_that_could_escape_the_library() {
     let env = env();
-    fs::create_dir_all(&env.root.join("data").join("keep")).unwrap();
+    fs::create_dir_all(env.root.join("data").join("keep")).unwrap();
     for id in ["..", "../keep", "..\\keep", ""] {
         assert!(matches!(
             mod_library(&env.data).remove(id),

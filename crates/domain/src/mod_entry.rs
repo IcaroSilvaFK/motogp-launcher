@@ -15,13 +15,17 @@ pub struct ModEntry {
 pub const MOD_ID_LEN: usize = 12;
 
 /// Mod ID: the first 12 characters of the content hash, lowercased.
-pub fn mod_id_from_hash(_hash_hex: &str) -> String {
-    todo!()
+pub fn mod_id_from_hash(hash_hex: &str) -> String {
+    hash_hex
+        .chars()
+        .take(MOD_ID_LEN)
+        .collect::<String>()
+        .to_ascii_lowercase()
 }
 
 /// `true` for exactly 12 lowercase hexadecimal characters.
-pub fn is_valid_mod_id(_id: &str) -> bool {
-    todo!()
+pub fn is_valid_mod_id(id: &str) -> bool {
+    id.len() == MOD_ID_LEN && id.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
 }
 
 #[cfg(test)]

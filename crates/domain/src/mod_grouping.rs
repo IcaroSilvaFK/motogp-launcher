@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::fmt;
 
 /// Extensions that belong to a mod (compared case-insensitively).
@@ -15,8 +16,10 @@ pub struct ModGroup {
 impl ModGroup {
     /// The `.pak` file of the group.
     pub fn pak_file(&self) -> Option<&str> {
-        let _ = &self.files;
-        todo!()
+        self.files
+            .iter()
+            .map(String::as_str)
+            .find(|name| extension_of(name).as_deref() == Some("pak"))
     }
 
     /// Display name: the base name without the final `_P`.
@@ -32,37 +35,76 @@ pub enum GroupingError {
 }
 
 impl fmt::Display for GroupingError {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!()
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GroupingError::MissingPak { group } => {
+                write!(f, "mod \"{group}\" has no .pak file")
+            }
+        }
     }
 }
 
 impl std::error::Error for GroupingError {}
 
+/// Position of the extension dot; a leading or trailing dot is not an extension.
+fn extension_dot(file_name: &str) -> Option<usize> {
+    file_name
+        .rfind('.')
+        .filter(|&i| i > 0 && i + 1 < file_name.len())
+}
+
 /// Lowercased extension of a file name, when it has one.
-pub fn extension_of(_file_name: &str) -> Option<String> {
-    todo!()
+pub fn extension_of(file_name: &str) -> Option<String> {
+    extension_dot(file_name).map(|i| file_name[i + 1..].to_ascii_lowercase())
 }
 
 /// File name without its extension.
-pub fn base_name(_file_name: &str) -> &str {
-    todo!()
+pub fn base_name(file_name: &str) -> &str {
+    extension_dot(file_name).map_or(file_name, |i| &file_name[..i])
 }
 
 /// `true` when the file name has a mod extension (`.pak`, `.utoc`, `.ucas`).
-pub fn is_mod_file(_file_name: &str) -> bool {
-    todo!()
+pub fn is_mod_file(file_name: &str) -> bool {
+    extension_of(file_name).is_some_and(|ext| MOD_EXTENSIONS.contains(&ext.as_str()))
 }
 
 /// Removes only a final `_P` from a base name.
-pub fn display_name(_base_name: &str) -> String {
-    todo!()
+pub fn display_name(base_name: &str) -> String {
+    base_name
+        .strip_suffix("_P")
+        .filter(|name| !name.is_empty())
+        .unwrap_or(base_name)
+        .to_string()
 }
 
 /// Groups file names by base name. Unrelated extensions are ignored and every
 /// resulting group must contain a `.pak`.
-pub fn group_pak_files(_file_names: &[String]) -> Result<Vec<ModGroup>, GroupingError> {
-    todo!()
+pub fn group_pak_files(file_names: &[String]) -> Result<Vec<ModGroup>, GroupingError> {
+    let mut groups: BTreeMap<String, ModGroup> = BTreeMap::new();
+    for name in file_names.iter().filter(|name| is_mod_file(name)) {
+        let base = base_name(name);
+        groups
+            .entry(base.to_lowercase())
+            .or_insert_with(|| ModGroup {
+                base_name: base.to_string(),
+                files: Vec::new(),
+            })
+            .files
+            .push(name.clone());
+    }
+    groups
+        .into_values()
+        .map(|mut group| {
+            group.files.sort();
+            group.files.dedup();
+            match group.pak_file() {
+                Some(_) => Ok(group),
+                None => Err(GroupingError::MissingPak {
+                    group: group.base_name,
+                }),
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]

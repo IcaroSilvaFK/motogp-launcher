@@ -201,3 +201,25 @@ Prerequisites: MSVC build tools, Rust stable (MSVC), Node 22, pnpm (corepack), W
 ### BDD runners per crate
 
 `domain`, `application` and `infrastructure` each have one `features` test target (`tests/features.rs`, `harness = false`). It is a dispatcher: every feature owns `tests/bdd/<feature>.rs` with its own `World` and `pub async fn run() -> bool` that runs only `tests/features/<feature>.feature`. Adding a feature means one `#[path]` module line and one `FEATURES` entry, so parallel issues only touch those lines.
+
+### Scenario traceability (issue #3)
+
+Gherkin: `crates/domain/tests/features/mod-grouping.feature` (pure rules), `crates/application/tests/features/library.feature` (in-memory fakes, `crates/application/tests/support/fakes.rs`) and `crates/infrastructure/tests/features/file-import.feature` (real fs/ZIP/SHA-256 in temp dirs). Step modules: `tests/bdd/mod_grouping.rs`, `tests/bdd/library.rs`, `tests/bdd/file_import.rs`. Use-case tests: `crates/application/tests/mod_service.rs`; adapter integration tests: `crates/infrastructure/tests/library.rs`.
+
+| Scenario | Test |
+|----------|------|
+| Import a loose pak | `import_single_pak_copies_into_library` (infra), `import_single_pak_registers_the_entry` (application) + cucumber in `library.feature` and `file-import.feature` |
+| Pick up only the siblings of the chosen mod | `import_pak_picks_up_utoc_ucas_siblings` (infra), `import_picks_only_the_siblings_of_the_chosen_mod` (application) + cucumber |
+| Find mods in the subfolders of a ZIP | `import_zip_with_nested_folders_finds_all_paks` (infra), `import_zip_returns_every_valid_group` (application) + cucumber |
+| Reject a ZIP without a pak | `import_zip_without_pak_errors` (infra), `zip_without_pak_errors` (application) + cucumber |
+| Reject a group without a pak | `utoc_without_pak_errors` (domain), `import_utoc_without_pak_sibling_errors` (application) + cucumber in `mod-grouping.feature` |
+| Reimport without duplicating | `reimport_same_pak_does_not_duplicate` (application), `reimport_same_content_returns_the_existing_entry` (infra) + cucumber |
+| Remove a mod | `remove_deletes_dir_and_index_entry` (infra), `remove_deletes_the_folder_and_the_index_entry` (application) + cucumber |
+| Ignore directory traversal in a ZIP | `zip_entry_with_parent_traversal_is_ignored` (infra), `entries_without_a_safe_name_are_ignored` (ZIP adapter) + cucumber |
+| Reject a collision when flattening subfolders | `flattened_zip_name_collision_is_rejected` (infra), `colliding_flattened_names_are_rejected_without_overwriting` (ZIP adapter) + cucumber |
+| Reject an unsupported format | `unsupported_extension_is_rejected` (application), `unsupported_format_is_rejected_before_touching_the_library` (infra) + cucumber |
+| A failed import publishes nothing | `failed_import_does_not_publish_index_entry`, `index_failure_rolls_back_the_published_folder` (application) + cucumber |
+| Mod ID is the first 12 SHA-256 hex characters | `mod_id_matches_first_twelve_sha256_hex` (infra, SHA-256 of `abc`), `mod_id_is_the_first_twelve_lowercase_hex_characters` (domain) |
+| Case-insensitive extensions, unrelated extensions ignored, display name | `group_accepts_case_insensitive_extensions`, `group_ignores_unrelated_extensions`, `display_name_strips_only_the_final_p_suffix` (domain) + cucumber |
+| Remove only validated IDs | `remove_rejects_ids_that_are_not_twelve_lowercase_hex` (application), `remove_rejects_ids_that_could_escape_the_library` (infra), `remove_mod_dir_deletes_only_the_validated_id_folder` (fs adapter) |
+| Error mapping at the Tauri boundary | `src-tauri/src/error_library.rs` unit tests (`From<LibraryError> for CommandError`) |

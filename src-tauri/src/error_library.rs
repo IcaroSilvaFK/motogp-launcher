@@ -3,10 +3,44 @@
 //! variants get their own stable code and message.
 use crate::CommandError;
 use motogp_application::LibraryError;
+use motogp_domain::GroupingError;
 
+/// Stable code and user-facing text (currently English) for the
+/// library-specific variants; `Storage` is delegated to the shared mapping.
 impl From<&LibraryError> for CommandError {
-    fn from(_error: &LibraryError) -> Self {
-        todo!()
+    fn from(error: &LibraryError) -> Self {
+        let (code, message) = match error {
+            LibraryError::Storage(app_error) => return CommandError::from(app_error),
+            LibraryError::Grouping(GroupingError::MissingPak { group }) => (
+                "mod_without_pak",
+                format!("The mod \"{group}\" has no .pak file."),
+            ),
+            LibraryError::UnsupportedFormat { extension } => (
+                "unsupported_format",
+                format!(
+                "Unsupported format \".{extension}\". Import a .pak, .utoc, .ucas or .zip file."
+            ),
+            ),
+            LibraryError::NoPakFound => (
+                "no_pak_found",
+                "The archive does not contain any .pak file.".to_string(),
+            ),
+            LibraryError::NameCollision { name } => (
+                "name_collision",
+                format!("The archive has more than one file named {name} in different folders."),
+            ),
+            LibraryError::InvalidId { id } => {
+                ("invalid_mod_id", format!("\"{id}\" is not a valid mod ID."))
+            }
+            LibraryError::NotFound { id } => (
+                "mod_not_found",
+                format!("No mod with ID {id} exists in the library."),
+            ),
+        };
+        CommandError {
+            code: code.to_string(),
+            message,
+        }
     }
 }
 

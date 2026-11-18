@@ -1,4 +1,5 @@
 //! `ModRepository` adapter: the library index stored in `library.json`.
+use crate::store::{load_json, save_json};
 use motogp_application::{LibraryError, ModRepository};
 use motogp_domain::ModEntry;
 use serde::{Deserialize, Serialize};
@@ -20,6 +21,28 @@ struct LibraryDto {
     mods: Vec<ModDto>,
 }
 
+impl From<ModDto> for ModEntry {
+    fn from(dto: ModDto) -> Self {
+        ModEntry {
+            id: dto.id,
+            name: dto.name,
+            files: dto.files,
+            size_bytes: dto.size_bytes,
+        }
+    }
+}
+
+impl From<&ModEntry> for ModDto {
+    fn from(entry: &ModEntry) -> Self {
+        ModDto {
+            id: entry.id.clone(),
+            name: entry.name.clone(),
+            files: entry.files.clone(),
+            size_bytes: entry.size_bytes,
+        }
+    }
+}
+
 /// Library index backed by a JSON file (atomic saves via the issue #2 store).
 #[derive(Debug, Clone)]
 pub struct JsonModRepository {
@@ -34,16 +57,25 @@ impl JsonModRepository {
 
 impl ModRepository for JsonModRepository {
     fn list(&self) -> Result<Vec<ModEntry>, LibraryError> {
-        let _ = &self.path;
-        todo!()
+        let library = load_json::<LibraryDto>(&self.path)?;
+        Ok(library.mods.into_iter().map(ModEntry::from).collect())
     }
 
-    fn add(&self, _entry: &ModEntry) -> Result<(), LibraryError> {
-        todo!()
+    fn add(&self, entry: &ModEntry) -> Result<(), LibraryError> {
+        let mut library = load_json::<LibraryDto>(&self.path)?;
+        library.mods.push(ModDto::from(entry));
+        Ok(save_json(&self.path, &library)?)
     }
 
-    fn remove(&self, _id: &str) -> Result<bool, LibraryError> {
-        todo!()
+    fn remove(&self, id: &str) -> Result<bool, LibraryError> {
+        let mut library = load_json::<LibraryDto>(&self.path)?;
+        let before = library.mods.len();
+        library.mods.retain(|m| m.id != id);
+        if library.mods.len() == before {
+            return Ok(false);
+        }
+        save_json(&self.path, &library)?;
+        Ok(true)
     }
 }
 

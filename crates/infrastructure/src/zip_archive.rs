@@ -1,15 +1,79 @@
 //! `ArchiveReader` adapter: ZIP extraction. Entries are flattened, unsafe
 //! names (no `enclosed_name()`) are ignored and nothing is overwritten.
-use motogp_application::{ArchiveReader, LibraryError};
+use motogp_application::{AppError, ArchiveReader, LibraryError};
+use motogp_domain::is_mod_file;
+use std::fs::{self, OpenOptions};
+use std::io;
 use std::path::Path;
+
+/// Characters that are invalid in Windows file names (or control characters).
+fn has_invalid_chars(name: &str) -> bool {
+    name.chars().any(|c| {
+        c.is_control() || matches!(c, '<' | '>' | ':' | '"' | '|' | '?' | '*' | '\\' | '/')
+    })
+}
 
 /// Reads ZIP archives with the `zip` crate.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct ZipArchiveReader;
 
 impl ArchiveReader for ZipArchiveReader {
-    fn extract_flat(&self, _archive: &Path, _dest_dir: &Path) -> Result<Vec<String>, LibraryError> {
-        todo!()
+    fn extract_flat(&self, archive: &Path, dest_dir: &Path) -> Result<Vec<String>, LibraryError> {
+        let archive_location = archive.display().to_string();
+        let corrupted = |e: &dyn std::fmt::Display| {
+            LibraryError::Storage(AppError::Corrupted {
+                location: archive_location.clone(),
+                detail: e.to_string(),
+            })
+        };
+        let file = fs::File::open(archive).map_err(|e| {
+            LibraryError::Storage(AppError::Read {
+                location: archive_location.clone(),
+                detail: e.to_string(),
+            })
+        })?;
+        let mut zip = zip::ZipArchive::new(file).map_err(|e| corrupted(&e))?;
+
+        let mut written: Vec<String> = Vec::new();
+        for index in 0..zip.len() {
+            let mut entry = zip.by_index(index).map_err(|e| corrupted(&e))?;
+            if entry.is_dir() {
+                continue;
+            }
+            // Entries without a safe (enclosed) name never reach the disk.
+            let Some(safe_path) = entry.enclosed_name() else {
+                continue;
+            };
+            let Some(name) = safe_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .map(str::to_string)
+            else {
+                continue;
+            };
+            if !is_mod_file(&name) || has_invalid_chars(&name) {
+                continue;
+            }
+            if written.iter().any(|w| w.eq_ignore_ascii_case(&name)) {
+                return Err(LibraryError::NameCollision { name });
+            }
+            let target = dest_dir.join(&name);
+            let write_error = |e: io::Error| {
+                LibraryError::Storage(AppError::Write {
+                    location: target.display().to_string(),
+                    detail: e.to_string(),
+                })
+            };
+            // `create_new` never overwrites an existing file.
+            let mut out = OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&target)
+                .map_err(write_error)?;
+            io::copy(&mut entry, &mut out).map_err(write_error)?;
+            written.push(name);
+        }
+        Ok(written)
     }
 }
 
