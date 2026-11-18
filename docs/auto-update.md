@@ -1,63 +1,63 @@
-# Auto-update pelo front (Tauri Updater)
+# In-app auto-update (Tauri Updater)
 
-O launcher instalado verifica se existe versão nova, baixa o pacote, instala e reinicia, tudo pela interface.
+The installed launcher checks whether a newer version exists, downloads the package, installs it and restarts, all from the UI.
 
-## Fluxo
+## Flow
 
-1. Um merge em `main` (produção) dispara o pipeline, que gera o instalador e a GitHub Release `v<versão>` junto com o `latest.json` (versão, notas e assinatura).
-2. Ao abrir, o app consulta `https://github.com/<owner>/<repo>/releases/latest/download/latest.json`.
-3. Se a versão for maior que a instalada, o front mostra "Nova versão disponível". O usuário clica em **Atualizar**, o app baixa, confere a assinatura, instala e reinicia.
+1. A merge into `main` (production) triggers the pipeline, which produces the installer and the GitHub Release `v<version>` together with `latest.json` (version, notes and signature).
+2. On startup, the app queries `https://github.com/<owner>/<repo>/releases/latest/download/latest.json`.
+3. If the version is greater than the installed one, the front end shows "New version available". The user clicks **Update**, and the app downloads, verifies the signature, installs and restarts.
 
-## Setup (uma vez)
+## Setup (once)
 
-1. **Gerar o par de chaves** (a chave privada **nunca** vai para o repo):
+1. **Generate the key pair** (the private key **never** goes into the repo):
    ```sh
    pnpm tauri signer generate -w ~/.tauri/motogp-launcher.key
    ```
-2. **Secrets no GitHub** (Settings → Secrets → Actions):
-   - `TAURI_SIGNING_PRIVATE_KEY`: conteúdo do arquivo `.key`
-   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: a senha escolhida
-3. **Plugin:** `pnpm tauri add updater` e `pnpm add @tauri-apps/plugin-process`.
+2. **GitHub secrets** (Settings → Secrets → Actions):
+   - `TAURI_SIGNING_PRIVATE_KEY`: contents of the `.key` file
+   - `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`: the chosen password
+3. **Plugin:** `pnpm tauri add updater` and `pnpm add @tauri-apps/plugin-process`.
 4. **`src-tauri/tauri.conf.json`:**
    ```json
    {
      "bundle": { "createUpdaterArtifacts": true },
      "plugins": {
        "updater": {
-         "pubkey": "<conteúdo do .key.pub>",
+         "pubkey": "<contents of .key.pub>",
          "endpoints": ["https://github.com/<owner>/<repo>/releases/latest/download/latest.json"],
          "windows": { "installMode": "passive" }
        }
      }
    }
    ```
-5. **Capabilities** (`src-tauri/capabilities/default.json`): adicionar `"updater:default"` e `"process:allow-restart"`.
+5. **Capabilities** (`src-tauri/capabilities/default.json`): add `"updater:default"` and `"process:allow-restart"`.
 
-## Arquitetura Limpa no front
+## Clean Architecture on the front end
 
 - `application/ports/UpdateService.ts`: interface `check()`, `downloadAndInstall(onProgress)`, `restart()`.
-- `infrastructure/tauri/TauriUpdateService.ts`: adapter que usa `@tauri-apps/plugin-updater` e `plugin-process`.
-- `application/useCases/checkForUpdate.ts`: caso de uso, testado com um fake do port (TDD).
-- `ui/UpdateBanner.tsx`: só apresentação (versão nova, notas, barra de progresso, botão).
+- `infrastructure/tauri/TauriUpdateService.ts`: adapter using `@tauri-apps/plugin-updater` and `plugin-process`.
+- `application/useCases/checkForUpdate.ts`: use case, tested with a fake of the port (TDD).
+- `ui/UpdateBanner.tsx`: presentation only (new version, notes, progress bar, button).
 
-## Cenário BDD base
+## Base BDD scenario
 
 ```gherkin
-Funcionalidade: Atualização automática
-  Cenário: Existe versão mais nova
-    Dado que o app instalado está na versão "1.0.0"
-    E a última release é "1.1.0"
-    Quando o app inicia
-    Então o banner "Nova versão 1.1.0 disponível" é exibido
-    Quando o usuário clica em "Atualizar"
-    Então o progresso do download é exibido
-    E o app reinicia na versão "1.1.0"
+Feature: Automatic update
+  Scenario: A newer version exists
+    Given the installed app is on version "1.0.0"
+    And the latest release is "1.1.0"
+    When the app starts
+    Then the banner "New version 1.1.0 available" is shown
+    When the user clicks "Update"
+    Then the download progress is shown
+    And the app restarts on version "1.1.0"
 
-  Cenário: Já está na última versão
-    Dado que o app instalado está na versão "1.1.0"
-    E a última release é "1.1.0"
-    Quando o app inicia
-    Então nenhum banner de atualização é exibido
+  Scenario: Already on the latest version
+    Given the installed app is on version "1.1.0"
+    And the latest release is "1.1.0"
+    When the app starts
+    Then no update banner is shown
 ```
 
-> Repo privado: o `latest.json` de release privada não é acessível sem token. Para o auto-update funcionar, o repo (ou só as releases) precisa ser público, ou é preciso usar outro host para o `latest.json`.
+> Private repo: the `latest.json` of a private release is not reachable without a token. For auto-update to work, the repo (or just its releases) must be public, or another host must be used for `latest.json`.

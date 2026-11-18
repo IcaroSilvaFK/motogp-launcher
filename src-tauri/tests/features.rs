@@ -1,5 +1,5 @@
 //! BDD runner (cucumber, `harness = false`) for the scenarios in `tests/features/`.
-//! Scenario traceability: see `docs/workflow-validacao.md` (Scaffold section).
+//! Scenario traceability: see `docs/validation-workflow.md` (Scaffold section).
 mod support;
 
 use cucumber::{given, then, when, World};
@@ -58,7 +58,7 @@ fn eslint_fixture(fixture: &str) -> (bool, String) {
 fn project_has_docs(_w: &mut ScaffoldWorld) {
     for path in [
         "CLAUDE.md",
-        "docs/workflow-validacao.md",
+        "docs/validation-workflow.md",
         "docs/auto-update.md",
         "docs/tasks/README.md",
         ".github/workflows/validacao.yml",
@@ -85,13 +85,13 @@ fn docs_preserved(_w: &mut ScaffoldWorld) {
             "-n",
             "1",
             "--",
-            "docs/workflow-validacao.md",
+            "docs/validation-workflow.md",
         ])
         .output()
         .expect("git unavailable");
     assert!(
         !git.stdout.is_empty(),
-        "the git history of workflow-validacao.md should exist"
+        "the git history of validation-workflow.md should exist"
     );
 }
 

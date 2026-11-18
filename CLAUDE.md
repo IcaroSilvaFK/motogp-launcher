@@ -4,57 +4,57 @@
 
 **File names and file contents are always in English**: code, identifiers, comments, test names, Gherkin `.feature` files (Feature/Scenario/Given/When/Then), commit messages, branch names, docs, issues/PRs and error messages. Only the chat with the user stays in Portuguese.
 
-## Memória e preferências
+## Memory and preferences
 
-Sempre salvar memórias, decisões e preferências **localmente no projeto** (neste `CLAUDE.md` ou em `docs/`), nunca só na memória global do usuário.
+Always save memories, decisions and preferences **locally in the project** (in this `CLAUDE.md` or in `docs/`), never only in the user's global memory.
 
-## Fluxo de desenvolvimento (multi-agente)
+## Development flow (multi-agent)
 
-Todo trabalho de desenvolvimento segue este pipeline de papéis:
+All development work follows this pipeline of roles:
 
-1. **Agente especializado geral (o chat)** — ponto de contato com o usuário; entende o pedido, orquestra o fluxo e consolida o resultado.
-2. **Codex** — organiza e elabora as tasks (quebra o trabalho em tarefas detalhadas).
-3. **Agente PO (1)** — coordena os desenvolvedores: distribui as tasks e acompanha a entrega.
-4. **Agentes desenvolvedores (N)** — implementam as tasks, em paralelo quando possível. **Modelo: Sonnet** (`model: "sonnet"`).
-5. **Agentes de QA (N)** — testam e validam o que os devs entregaram. **Modelo: Haiku** (`model: "haiku"`).
-6. **Codex** — revisão final e melhorias do que foi implementado.
+1. **General specialized agent (the chat)**: point of contact with the user; understands the request, orchestrates the flow and consolidates the result.
+2. **Codex**: organizes and writes up the tasks (breaks the work down into detailed tasks).
+3. **PO agent (1)**: coordinates the developers: hands out the tasks and follows the delivery.
+4. **Developer agents (N)**: implement the tasks, in parallel when possible. **Model: Sonnet** (`model: "sonnet"`).
+5. **QA agents (N)**: test and validate what the devs delivered. **Model: Haiku** (`model: "haiku"`).
+6. **Codex**: final review and improvements to what was implemented.
 
-Regra: o chat não implementa direto. Demanda de desenvolvimento → Codex gera as tasks → PO dispara os devs (Sonnet) → QA valida (Haiku) → Codex revisa → chat reporta ao usuário.
+Rule: the chat does not implement directly. Development request → Codex generates the tasks → PO dispatches the devs (Sonnet) → QA validates (Haiku) → Codex reviews → chat reports to the user.
 
-## Fluxo de Git / issues (obrigatório para toda task)
+## Git / issues flow (mandatory for every task)
 
-1. **Codex elabora** a task com todos os detalhes (contexto, escopo, critérios de aceite).
-2. **Publica uma issue** no repositório remoto (`gh issue create`) com esse detalhamento.
-3. **Dev abre uma branch** a partir de `dev`, vinculada à issue, para manter o histórico (ex.: `feat/<nº-issue>-<slug>`).
-4. **Dev finaliza a task** na branch.
-5. A entrega **passa por toda a revisão** (QA Haiku + revisão/melhorias do Codex).
-6. Só depois: **abre o PR para `dev`** referenciando a issue (`Closes #<nº>`) e **fecha a issue**.
+1. **Codex writes up** the task with all the details (context, scope, acceptance criteria).
+2. **Publishes an issue** on the remote repository (`gh issue create`) with that detail.
+3. **Dev opens a branch** from `dev`, linked to the issue, to keep the history (e.g. `feat/<issue-no>-<slug>`).
+4. **Dev finishes the task** on the branch.
+5. The delivery **goes through the whole review** (QA Haiku + Codex review/improvements).
+6. Only then: **opens the PR to `dev`** referencing the issue (`Closes #<no>`) and **closes the issue**.
 
-**One branch per unit of work, always.** Every task, fix, translation or doc change gets its own branch from `dev` and its own PR; never mix unrelated changes in the same branch. Parallel work uses separate `git worktree`s so branches don't step on each other.
+**One branch per unit of work, always.** Every task, fix, translation or doc change gets its own branch from `dev` and its own PR; never mix unrelated changes in the same branch. Parallel work uses separate `git worktree`s inside the repo, under `.worktrees/<issue>` (git-ignored), so branches don't step on each other.
 
 **Parallelize by default; never run issues one by one when they are independent.**
-- At any moment, every issue whose dependencies are satisfied must be in progress, each one with its own PO/dev/QA agents in its own worktree (`../motogp-launcher-wt-<issue>`).
+- At any moment, every issue whose dependencies are satisfied must be in progress, each one with its own PO/dev/QA agents in its own worktree (`.worktrees/<issue>`).
 - Do not wait for a PR to be merged to start dependent work: stack the new branch on the unmerged parent branch, then rebase it onto `dev` as soon as the parent merges.
 - Review (Codex), QA, translation/docs and CI waits run concurrently with development; the orchestrator never idles waiting on a single agent.
 - Only serialize what truly conflicts: the same files, or a dependency whose contract (ports/types) doesn't exist yet.
 
-### Branches padrão
+### Standard branches
 
-| Branch | Ambiente | Recebe de |
-|--------|----------|-----------|
-| `dev` | Desenvolvimento (integração) | PRs das branches de task (`feat/…`, `fix/…`) |
-| `qas` | Homologação / QA | PR de promoção `dev → qas` |
-| `main` | Produção (PRD) | PR de promoção `qas → main` |
+| Branch | Environment | Receives from |
+|--------|-------------|---------------|
+| `dev` | Development (integration) | PRs from task branches (`feat/…`, `fix/…`) |
+| `qas` | Staging / QA | Promotion PR `dev → qas` |
+| `main` | Production (PRD) | Promotion PR `qas → main` |
 
-- Ninguém commita direto em `dev`, `qas` ou `main`: tudo entra via PR. Isso é **imposto no GitHub** por proteção de branch, valendo também para admins: PR obrigatório (0 aprovações), checks `Rust core` e `Frontend` obrigatórios, sem force-push e sem deletar a branch.
-- O pipeline gera o **instalador Windows** (setup `.exe` NSIS e `.msi`) depois que todos os gates passam. Em `dev`/`qas` ele fica como artefato do pipeline (30 dias). Em `main` vira uma **GitHub Release** `v<versão>` (versão vinda do `tauri.conf.json`), junto com o `latest.json` do **auto-update**: o app instalado se atualiza pelo front. Setup em [docs/auto-update.md](docs/auto-update.md).
-- Promoção só segue em frente (`dev → qas → main`). Hotfix sai de `main` e volta por PR para `main`, `qas` e `dev`.
+- Nobody commits directly to `dev`, `qas` or `main`: everything goes in via PR. This is **enforced on GitHub** by branch protection, applying to admins too: PR required (0 approvals), `Rust core` and `Frontend` checks required, no force-push and no branch deletion.
+- The pipeline produces the **Windows installer** (NSIS setup `.exe` and `.msi`) after all gates pass. On `dev`/`qas` it stays as a pipeline artifact (30 days). On `main` it becomes a **GitHub Release** `v<version>` (version taken from `tauri.conf.json`), together with the **auto-update** `latest.json`: the installed app updates itself from the front end. Setup in [docs/auto-update.md](docs/auto-update.md).
+- Promotion only moves forward (`dev → qas → main`). A hotfix starts from `main` and comes back via PR to `main`, `qas` and `dev`.
 
-## Workflow de validação: TDD + BDD + Arquitetura Limpa (obrigatório)
+## Validation workflow: TDD + BDD + Clean Architecture (mandatory)
 
-Detalhes em [docs/workflow-validacao.md](docs/workflow-validacao.md). Resumo:
+Details in [docs/validation-workflow.md](docs/validation-workflow.md). Summary:
 
-- **BDD:** toda issue tem critérios de aceite em Gherkin, e cada cenário vira teste.
-- **TDD:** Red → Green → Refactor; teste sempre antes do código. Cobertura ≥ 90% em domain/application e ≥ 80% no geral.
-- **Arquitetura Limpa:** dependências só para dentro (`interface → infrastructure → application → domain`). Rust em crates separados (`domain`, `application`, `infrastructure`, `src-tauri`). Frontend em `domain/application/infrastructure/ui`, com fronteiras checadas no lint.
-- **Gates:** o QA (Haiku) roda fmt, lint, tipos, testes, BDD, arquitetura e cobertura. Depois o Codex revisa. O CI em `.github/workflows/validacao.yml` repete os mesmos gates.
+- **BDD:** every issue has acceptance criteria in Gherkin, and each scenario becomes a test.
+- **TDD:** Red → Green → Refactor; test always before code. Coverage ≥ 90% in domain/application and ≥ 80% overall.
+- **Clean Architecture:** dependencies only point inward (`interface → infrastructure → application → domain`). Rust in separate crates (`domain`, `application`, `infrastructure`, `src-tauri`). Frontend in `domain/application/infrastructure/ui`, with boundaries checked in lint.
+- **Gates:** QA (Haiku) runs fmt, lint, types, tests, BDD, architecture and coverage. Then Codex reviews. The CI in `.github/workflows/validacao.yml` repeats the same gates.

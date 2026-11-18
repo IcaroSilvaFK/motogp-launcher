@@ -1,56 +1,56 @@
 # MotoGP Mod Launcher — Design
 
-## Intenção
+## Intent
 
-Projeto de estudo: um launcher de mods para os jogos MotoGP (Milestone, Unreal Engine) feito do zero, leve, inspirado no SwoftyLauncher (F1 25), mas sem a parte de injeção de código na engine. O autor quer entender cada peça; o código do Swofty (Rust) serve de referência de leitura, não de base.
+A study project: a lightweight mod launcher for the MotoGP games (Milestone, Unreal Engine) built from scratch, inspired by SwoftyLauncher (F1 25), but without the engine code-injection part. The author wants to understand each piece; the Swofty code (Rust) serves as reading reference, not as a base.
 
-## Objetivos (MVP)
+## Goals (MVP)
 
-1. Localizar a pasta do jogo (auto-detecção via Steam + escolha manual).
-2. Importar mods `.pak` (com `.utoc`/`.ucas` do UE5, se houver) soltos ou dentro de `.zip` para uma biblioteca do launcher.
-3. Perfis: listas ordenadas de mods (ex.: "Vanilla", "Pinturas 2025").
-4. Jogar: aplica os mods do perfil em `~mods`, abre o jogo pela Steam, e ao fechar o jogo remove o que aplicou.
+1. Locate the game folder (auto-detection via Steam + manual choice).
+2. Import `.pak` mods (with UE5 `.utoc`/`.ucas`, if any), loose or inside `.zip`, into a launcher library.
+3. Profiles: ordered lists of mods (e.g. "Vanilla", "Pinturas 2025").
+4. Play: deploys the profile's mods into `~mods`, opens the game through Steam, and when the game closes removes what it deployed.
 
-## Não-objetivos
+## Non-goals
 
-- Injeção/hook de código na engine (o "Mixin" do Swofty).
-- Editor de banco de dados, UI in-game, navegador de mods online.
+- Code injection/hooking into the engine (Swofty's "Mixin").
+- Database editor, in-game UI, online mod browser.
 - 7z/RAR, Linux/Proton, auto-update.
 
-## Anti-objetivos (falha mesmo funcionando)
+## Anti-goals (a failure even if it works)
 
-- Apagar qualquer arquivo em `~mods` que o launcher não colocou lá.
-- Deixar o jogo modificado depois de uma sessão (incluindo após crash do launcher).
-- Executável/instalador pesado (alvo: < 15 MB).
+- Deleting any file in `~mods` that the launcher did not put there.
+- Leaving the game modified after a session (including after a launcher crash).
+- A heavy executable/installer (target: < 15 MB).
 
-## Restrições
+## Constraints
 
-- Windows 10/11, Steam. Desenvolvimento e execução no Windows (não WSL).
-- Tauri 2 + Rust estável; frontend React + TypeScript + Vite; pnpm.
-- Não copiar código do Swofty (licença PolyForm Noncommercial).
+- Windows 10/11, Steam. Development and execution on Windows (not WSL).
+- Tauri 2 + stable Rust; React + TypeScript + Vite frontend; pnpm.
+- Do not copy Swofty code (PolyForm Noncommercial license).
 
-## Abordagens consideradas
+## Approaches considered
 
-| Opção | Prós | Contras |
+| Option | Pros | Cons |
 |---|---|---|
-| **Tauri (Rust + web)** — escolhida | Mesma linguagem do Swofty (estudo), binário ~5–10 MB | Curva do Rust |
-| Wails (Go + web) | Autor já sabe Go, rápido de entregar | Aprende menos; não espelha o Swofty |
-| C# + Avalonia | UI nativa, autor conhece .NET | Mais pesado, estilização trabalhosa |
+| **Tauri (Rust + web)** — chosen | Same language as Swofty (study), ~5–10 MB binary | Rust learning curve |
+| Wails (Go + web) | Author already knows Go, quick to deliver | Learns less; does not mirror Swofty |
+| C# + Avalonia | Native UI, author knows .NET | Heavier, styling is laborious |
 
-Electron descartado (≈150 MB, contra o "leve"). O usuário escolheu Tauri.
+Electron discarded (≈150 MB, against "lightweight"). The user chose Tauri.
 
-## Decisões de como (chamadas do Claude, corrigíveis)
+## How decisions (Claude's calls, correctable)
 
-- **Frontend React+TS**: o autor já usa React/TS.
-- **Detecção do jogo**: lê `SteamPath` no registro (`HKCU\Software\Valve\Steam`), percorre `libraryfolders.vdf`, procura em `steamapps/common` pastas cujo nome começa com `MotoGP`. O App ID vem do `appmanifest_*.acf` cujo `installdir` bate com a pasta. Nenhum App ID fica fixo no código (funciona para 24, 25…).
-- **Pasta de mods**: `<raiz>/<Projeto>/Content/Paks/~mods`, onde `<Projeto>` é a subpasta da raiz que contém `Content/Paks`.
-- **Agrupamento**: arquivos com o mesmo nome-base (`X.pak`, `X.utoc`, `X.ucas`) formam um mod; `.pak` é obrigatório.
-- **Ordem de carga**: ordem do perfil; arquivos aplicados como `NNN_<modId>_<nomeOriginal>.<ext>` (o sufixo `_P` original continua no fim).
-- **Aplicação**: hard link quando mesmo volume, senão cópia. Tudo que foi aplicado vai para `deployed.json`; a limpeza apaga só o que está lá. Na abertura do launcher, se `deployed.json` não estiver vazio, limpa (recuperação de crash).
-- **Fim da sessão**: poll a cada 2 s de processos cujo executável está dentro da raiz do jogo; se nunca aparecer em 120 s, ou sumir por 2 polls seguidos, limpa.
-- **Dados**: `app_data_dir` do Tauri (`%APPDATA%\<identifier>`): `config.json`, `profiles.json`, `library.json`, `library/<modId>/…`, `deployed.json`.
-- **Id do mod**: 12 primeiros hex do SHA-256 do conteúdo do `.pak` → reimportar o mesmo mod não duplica.
+- **React+TS frontend**: the author already uses React/TS.
+- **Game detection**: reads `SteamPath` from the registry (`HKCU\Software\Valve\Steam`), walks `libraryfolders.vdf`, looks in `steamapps/common` for folders whose name starts with `MotoGP`. The App ID comes from the `appmanifest_*.acf` whose `installdir` matches the folder. No App ID is hard-coded (works for 24, 25…).
+- **Mods folder**: `<root>/<Project>/Content/Paks/~mods`, where `<Project>` is the root subfolder that contains `Content/Paks`.
+- **Grouping**: files with the same base name (`X.pak`, `X.utoc`, `X.ucas`) form a mod; `.pak` is mandatory.
+- **Load order**: profile order; files deployed as `NNN_<modId>_<originalName>.<ext>` (the original `_P` suffix stays at the end).
+- **Deployment**: hard link on the same volume, otherwise copy. Everything deployed goes into `deployed.json`; cleanup deletes only what is there. When the launcher opens, if `deployed.json` is not empty, it cleans (crash recovery).
+- **End of session**: poll every 2 s for processes whose executable is inside the game root; if it never appears within 120 s, or disappears for 2 polls in a row, clean up.
+- **Data**: Tauri's `app_data_dir` (`%APPDATA%\<identifier>`): `config.json`, `profiles.json`, `library.json`, `library/<modId>/…`, `deployed.json`.
+- **Mod id**: first 12 hex characters of the SHA-256 of the `.pak` content → reimporting the same mod does not duplicate it.
 
-## Deixado para o builder
+## Left to the builder
 
-Visual da interface, mensagens de erro exatas, estrutura de componentes React.
+Visual look of the interface, exact error messages, React component structure.

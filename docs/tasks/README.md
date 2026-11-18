@@ -1,43 +1,43 @@
-# Issues do MotoGP Launcher
+# MotoGP Launcher issues
 
-Estas 11 issues adaptam as 10 tasks do plano de 18/11/2026 ao fluxo de TDD, BDD e Arquitetura Limpa. A issue 10 adiciona o auto-update; a Task 10 original passa a ser a issue 11. Os arquivos estão preparados para publicação futura: nenhum número de issue GitHub foi presumido.
+These 11 issues adapt the 10 tasks of the 2026-11-18 plan to the TDD, BDD and Clean Architecture flow. Issue 10 adds auto-update; the original Task 10 becomes issue 11. The files are prepared for future publication: the GitHub issue numbers equal the plan order NN (issue 1 = 01, and so on).
 
-| NN | Título | Depende de | Branch |
+| NN | Title | Depends on | Branch |
 | --- | --- | --- | --- |
-| 01 | [Crie o scaffold e os gates de validação](01-criar-scaffold-e-gates.md) | — | `feat/01-criar-scaffold-e-gates` |
-| 02 | [Persista dados JSON e trate erros sem perda](02-persistir-dados-e-erros.md) | 01 | `feat/02-persistir-dados-e-erros` |
-| 03 | [Importe mods para a biblioteca local](03-importar-biblioteca-de-mods.md) | 02 | `feat/03-importar-biblioteca-de-mods` |
-| 04 | [Gerencie perfis e a ordem dos mods](04-gerenciar-perfis-ordenados.md) | 02 | `feat/04-gerenciar-perfis-ordenados` |
-| 05 | [Detecte instalações MotoGP pela Steam](05-detectar-instalacoes-do-jogo.md) | 02 | `feat/05-detectar-instalacoes-do-jogo` |
-| 06 | [Aplique e limpe mods com manifesto seguro](06-aplicar-e-limpar-mods.md) | 03 | `feat/06-aplicar-e-limpar-mods` |
-| 07 | [Inicie o jogo e acompanhe a sessão](07-iniciar-e-acompanhar-sessao.md) | 05 | `feat/07-iniciar-e-acompanhar-sessao` |
-| 08 | [Integre comandos Tauri e recuperação de sessão](08-integrar-comandos-e-recuperacao.md) | 03, 04, 05, 06, 07 | `feat/08-integrar-comandos-e-recuperacao` |
-| 09 | [Construa a interface do launcher](09-construir-interface-do-launcher.md) | 08 | `feat/09-construir-interface-do-launcher` |
-| 10 | [Atualize o aplicativo pela interface](10-atualizar-aplicativo-pelo-front.md) | 09 | `feat/10-atualizar-aplicativo-pelo-front` |
-| 11 | [Valide o build Windows e a sessão real](11-validar-build-e-jogo-real.md) | 10 | `feat/11-validar-build-e-jogo-real` |
+| 01 | [Create the scaffold and validation gates](01-scaffold-and-gates.md) | — | `feat/1-scaffold-and-gates` |
+| 02 | [Persist JSON data and handle errors without loss](02-persist-json-data.md) | 01 | `feat/2-persist-json-data` |
+| 03 | [Import mods into the local library](03-import-mod-library.md) | 02 | `feat/3-import-mod-library` |
+| 04 | [Manage profiles and mod order](04-manage-ordered-profiles.md) | 02 | `feat/4-manage-ordered-profiles` |
+| 05 | [Detect MotoGP installs through Steam](05-detect-game-installs.md) | 02 | `feat/5-detect-game-installs` |
+| 06 | [Deploy and clean mods with a safe manifest](06-deploy-and-clean-mods.md) | 03 | `feat/6-deploy-and-clean-mods` |
+| 07 | [Launch the game and track the session](07-launch-and-track-session.md) | 05 | `feat/7-launch-and-track-session` |
+| 08 | [Integrate Tauri commands and session recovery](08-tauri-commands-and-recovery.md) | 03, 04, 05, 06, 07 | `feat/8-tauri-commands-and-recovery` |
+| 09 | [Build the launcher UI](09-launcher-ui.md) | 08 | `feat/9-launcher-ui` |
+| 10 | [Update the app from the UI](10-in-app-auto-update.md) | 09 | `feat/10-in-app-auto-update` |
+| 11 | [Validate the Windows build and the real session](11-validate-build-and-real-game.md) | 10 | `feat/11-validate-build-and-real-game` |
 
-As dependências no frontmatter são referências locais de dois dígitos; transitivas estão implícitas. Após 02, as issues 03/04/05 podem avançar independentemente; 06 exige 03 e 07 exige 05. Isso indica possibilidade de execução, sem iniciar agentes ou desenvolvimento neste planejamento. 08 integra as cinco entregas, 09 entrega a UI, 10 adiciona atualização e 11 valida o conjunto.
+The dependencies in the frontmatter are local two-digit references; transitive ones are implicit. After 02, issues 03/04/05 can proceed independently; 06 requires 03 and 07 requires 05. This indicates what can be executed, without starting agents or development in this planning step. 08 integrates the five deliveries, 09 delivers the UI, 10 adds updating and 11 validates the whole.
 
-## Fontes e precedência
+## Sources and precedence
 
-Leia [CLAUDE.md](../../CLAUDE.md), [workflow de validação](../workflow-validacao.md), [auto-update](../auto-update.md), [design](../superpowers/specs/2026-11-18-motogp-launcher-design.md) e [plano original](../superpowers/plans/2026-11-18-motogp-launcher.md). O pedido atual e as regras novas substituem a organização monolítica antiga e o não objetivo de auto-update. O workflow existente [.github/workflows/validacao.yml](../../.github/workflows/validacao.yml) foi considerado para evitar recriar jobs já presentes.
+Read [CLAUDE.md](../../CLAUDE.md), [validation workflow](../validation-workflow.md), [auto-update](../auto-update.md), [design](../superpowers/specs/2026-11-18-motogp-launcher-design.md) and [original plan](../superpowers/plans/2026-11-18-motogp-launcher.md). The current request and the new rules replace the old monolithic organization and the auto-update non-goal. The existing workflow [.github/workflows/validacao.yml](../../.github/workflows/validacao.yml) was taken into account to avoid recreating jobs that already exist.
 
-## Decisões de adaptação
+## Adaptation decisions
 
-- **Camadas:** workspace Cargo na raiz com `crates/domain`, `crates/application`, `crates/infrastructure`, `src-tauri`; modelos puros no domain, ports/casos de uso em application, serde/fs/ZIP/Steam/processos em adapters, DTOs/composição/comandos finos no Tauri. Dependências de produção de application limitam-se a domain; `cucumber` e outros auxiliares de teste são dev-dependencies, sem exceção para I/O no código do núcleo.
-- **Frontend:** `src/domain|application|infrastructure|ui`, com `eslint-plugin-boundaries`; injeção em `src/main.tsx`, exceção de composição restrita ao arquivo. Tipos puros não importam o SDK e ui nunca importa infrastructure.
-- **BDD:** Rust usa `tests/features/*.feature` no crate responsável e target `features` com `harness = false`/crate cucumber. Execute todos com `cargo test --workspace --test features`, ou selecione por `-p motogp-domain`, `-p motogp-application`, `-p motogp-infrastructure` e `-p motogp-launcher`, nomes fixados na issue 01. Frontend conserva o Gherkin em `tests/features/frontend/` e o executa como describe/it Vitest + Testing Library, conforme workflow; não usa cucumber Rust para componentes React. Cada cenário deve ter teste rastreável, inclusive integração quando não for unitário.
-- **TDD:** os **35 nomes de testes originais** das Tasks 2–8 foram preservados nas issues 02–08. Testes fs/ZIP/Steam com `tempfile` continuam como contratos/integração de infrastructure; regras/casos de uso são testados sem disco/rede/Tauri com fakes. Tasks 1, 9 e 10 originais não nomeavam unitários; as issues correspondentes propõem verificações novas, sem alegar que já existem.
-- **Gates:** 01 adapta o CI existente para que Rust core e Frontend executem todos os gates e imponham ≥90% em cada domain/application e ≥80% geral por stack. A ausência inicial de linhas de núcleo é explicitada, nunca substituída por regra de negócio fictícia ou desativação dos limites posteriores.
-- **Consistência:** o App ID é validado antes de deploy, conciliando Task 8 com a exigência manual da Task 9 de não criar `~mods` quando o ID falta. Vanilla é protegido na aplicação, além da UI; excluir o perfil ativo volta a Vanilla. JSON de zero bytes é corrupção; somente arquivo ausente ou coleção JSON válida vazia permitem semear perfis.
-- **Arquivos e crash:** a gravação do manifesto por arquivo foi mantida, mas a issue 06 exige recuperação testada nos intervalos de interrupção, com rastreio de propriedade e sem apagar por prefixo. Colisões de nomes ZIP, sobrescrita no fallback de cópia, manifesto com caminho inseguro e limpeza parcial têm critérios explícitos. A recuperação de crash ocorre na próxima abertura; não há promessa de limpeza com o launcher encerrado.
-- **Updater:** exige clique, assinatura válida e sessão limpa antes de instalar/reiniciar. Owner/repo, acesso público ao feed, chave pública e secrets são pré-requisitos externos a confirmar na implementação da issue 10; nenhum valor foi inventado e nenhuma chave/token é entregue nestes arquivos. Sem feed acessível não existe aceite de atualização real; não presuma acesso anônimo à release privada. `latest.json` carrega as assinaturas dos pacotes, sem exigir uma assinatura separada do próprio JSON.
-- **Build:** workspace altera o destino padrão para `target/release`, respeitando configuração efetiva. O limite objetivo do plano é executável <15 MB; registre também tamanhos dos instaladores e avalie a meta do design de instalador leve. O bootstrap WebView2 pode afetar o instalador. Testes reais de jogo/atualização são obrigatórios na issue 11, em ambiente Windows controlado, além da suíte determinística do CI.
+- **Layers:** Cargo workspace at the root with `crates/domain`, `crates/application`, `crates/infrastructure`, `src-tauri`; pure models in domain, ports/use cases in application, serde/fs/ZIP/Steam/processes in adapters, DTOs/composition/thin commands in Tauri. Production dependencies of application are limited to domain; `cucumber` and other test helpers are dev-dependencies, with no I/O exception in core code.
+- **Frontend:** `src/domain|application|infrastructure|ui`, with `eslint-plugin-boundaries`; injection in `src/main.tsx`, composition exception restricted to that file. Pure types do not import the SDK and ui never imports infrastructure.
+- **BDD:** Rust uses `tests/features/*.feature` in the responsible crate and a `features` target with `harness = false`/the cucumber crate. Run them all with `cargo test --workspace --test features`, or select with `-p motogp-domain`, `-p motogp-application`, `-p motogp-infrastructure` and `-p motogp-launcher`, names fixed in issue 01. The frontend keeps its Gherkin in `tests/features/frontend/` and runs it as Vitest + Testing Library describe/it, per the workflow; it does not use Rust cucumber for React components. Each scenario must have a traceable test, including integration when it is not a unit test.
+- **TDD:** the **35 original test names** of Tasks 2–8 were preserved in issues 02–08. fs/ZIP/Steam tests with `tempfile` remain infrastructure contracts/integration; rules/use cases are tested without disk/network/Tauri using fakes. Original Tasks 1, 9 and 10 did not name unit tests; the corresponding issues propose new checks, without claiming they already exist.
+- **Gates:** 01 adapts the existing CI so that Rust core and Frontend run all gates and enforce ≥90% on each domain/application and ≥80% overall per stack. The initial absence of core lines is made explicit, never replaced by a fictitious business rule or by disabling the later limits.
+- **Consistency:** the App ID is validated before deploy, reconciling Task 8 with Task 9's manual requirement of not creating `~mods` when the ID is missing. Vanilla is protected in the application, beyond the UI; deleting the active profile falls back to Vanilla. A zero-byte JSON is corruption; only a missing file or a valid empty JSON collection allows seeding profiles.
+- **Files and crash:** the per-file manifest write was kept, but issue 06 requires tested recovery across the interruption windows, with ownership tracking and no deletion by prefix. ZIP name collisions, overwrite in the copy fallback, a manifest with an unsafe path and partial cleanup have explicit criteria. Crash recovery happens on the next launch; there is no promise of cleanup while the launcher is closed.
+- **Updater:** requires a click, a valid signature and a clean session before installing/restarting. Owner/repo, public access to the feed, public key and secrets are external prerequisites to confirm when implementing issue 10; no value was invented and no key/token is delivered in these files. Without an accessible feed there is no real-update acceptance; do not assume anonymous access to a private release. `latest.json` carries the package signatures, without requiring a separate signature of the JSON itself.
+- **Build:** the workspace changes the default output to `target/release`, respecting the effective configuration. The plan's objective limit is an executable <15 MB; also record the installer sizes and evaluate the design's lightweight-installer goal. The WebView2 bootstrapper may affect the installer. Real game/update tests are mandatory in issue 11, in a controlled Windows environment, in addition to the deterministic CI suite.
 
-## Publicação e fluxo futuro
+## Publication and future flow
 
-Publique futuramente cada corpo como issue, aplique labels e substitua referências locais por links/números reais quando disponíveis. `NN` é ordem do plano, não número GitHub. O campo `branch: feat/<NN>-<slug>` segue o formato solicitado; se a numeração GitHub for diferente, vincule a issue real explicitamente na branch/PR e use `Closes #<nº-real>`, sem assumir que NN coincide com ela. Essa escolha atende ao formato atual mesmo que o exemplo de CLAUDE.md use número da issue no nome da branch.
+Publish each body as an issue later, apply labels and replace local references with real links/numbers when available. `NN` is the plan order and matches the GitHub issue number. The `branch: feat/<N>-<slug>` field uses the issue number without the leading zero; if the GitHub numbering ever differs, explicitly link the real issue in the branch/PR and use `Closes #<real-no>`, without assuming NN matches it.
 
-As branches de task saem de `dev`. Desenvolvedores seguem TDD, QA Haiku executa os oito gates e Codex revisa/aplica melhorias antes da abertura do PR para `dev`. Promoção ocorre por PR `dev → qas → main`; hotfix segue o fluxo de CLAUDE.md. Não criar commits diretos nessas branches nem promover sem os checks Rust core e Frontend.
+Task branches come from `dev`. Developers follow TDD, QA Haiku runs the eight gates and Codex reviews/applies improvements before the PR to `dev` is opened. Promotion happens via PR `dev → qas → main`; hotfixes follow the CLAUDE.md flow. Do not create direct commits on those branches nor promote without the Rust core and Frontend checks.
 
-Este lote contém apenas especificações Markdown. Não executa scaffold, testes do produto, comandos Git/gh, publicação de issues, configuração de secrets ou releases.
+This batch contains Markdown specifications only. It does not run scaffolding, product tests, Git/gh commands, issue publication, secrets configuration or releases.
