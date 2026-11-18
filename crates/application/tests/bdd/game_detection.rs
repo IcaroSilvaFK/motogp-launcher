@@ -96,7 +96,7 @@ impl GameWorld {
     }
 }
 
-#[given(expr = "the game folder {string} has the project {string} with Content/Paks")]
+#[given(expr = "the game folder {string} has the project {string} with Content\\/Paks")]
 fn game_with_project(w: &mut GameWorld, root: String, project: String) {
     w.fake
         .0
@@ -112,7 +112,7 @@ fn steam_manifest(w: &mut GameWorld, install_dir: String, app_id: String) {
     });
 }
 
-#[given(expr = "a root {string} without Content/Paks in its project folders")]
+#[given(expr = "a root {string} without Content\\/Paks in its project folders")]
 fn root_without_paks(w: &mut GameWorld, root: String) {
     w.fake
         .0
@@ -129,7 +129,7 @@ fn two_valid_games(w: &mut GameWorld, first: String, second: String) {
     }
 }
 
-#[given(expr = "a root {string} with Engine/Content/Paks and Bike/Content/Paks")]
+#[given(expr = "a root {string} with Engine\\/Content\\/Paks and Bike\\/Content\\/Paks")]
 fn engine_and_bike(w: &mut GameWorld, root: String) {
     let mut tree = w.fake.0.borrow_mut();
     tree.add(&format!("{root}/Engine/Content/Paks"));

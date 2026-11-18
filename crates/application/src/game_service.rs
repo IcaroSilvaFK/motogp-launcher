@@ -1,6 +1,6 @@
 use crate::{GameError, GameFiles, SteamLocator};
-use motogp_domain::GameInfo;
-use std::path::Path;
+use motogp_domain::{find_app_id, is_engine_folder, is_motogp_folder, GameInfo};
+use std::path::{Path, PathBuf};
 
 /// Use cases: detect Steam installations and inspect a manually chosen root.
 pub struct GameService<L: SteamLocator, F: GameFiles> {
@@ -15,14 +15,58 @@ impl<L: SteamLocator, F: GameFiles> GameService<L, F> {
 
     /// MotoGP installations across all Steam libraries. No Steam: empty list.
     pub fn detect_games(&self) -> Result<Vec<GameInfo>, GameError> {
-        let _ = (&self.locator, &self.files);
-        todo!()
+        let mut games: Vec<GameInfo> = Vec::new();
+        for library in self.locator.library_folders()? {
+            for dir in self.files.common_dirs(&library)? {
+                let is_candidate = dir
+                    .file_name()
+                    .is_some_and(|n| is_motogp_folder(&n.to_string_lossy()));
+                if !is_candidate {
+                    continue;
+                }
+                match self.inspect_root(&dir) {
+                    Ok(game) if !games.iter().any(|g| g.root == game.root) => games.push(game),
+                    Ok(_) | Err(GameError::NotUnrealGame { .. }) => {}
+                    Err(other) => return Err(other),
+                }
+            }
+        }
+        Ok(games)
     }
 
     /// Validates `root` as an Unreal game; creates nothing on disk.
     pub fn inspect_root(&self, root: &Path) -> Result<GameInfo, GameError> {
-        let _ = (&self.locator, &self.files);
-        todo!("{root:?}")
+        let mut projects = self.files.subdirs(root)?;
+        projects.sort();
+        let project = projects
+            .into_iter()
+            .filter(|name| !is_engine_folder(name))
+            .find(|name| self.files.has_paks(&root.join(name)))
+            .ok_or_else(|| GameError::NotUnrealGame {
+                root: root.to_path_buf(),
+            })?;
+        let folder = root
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let app_id = match steamapps_of(root) {
+            Some(steamapps) => find_app_id(&self.files.manifests(&steamapps)?, &folder),
+            None => None,
+        };
+        Ok(GameInfo::new(root.to_path_buf(), &project, app_id))
+    }
+}
+
+/// `steamapps` folder owning `root` when it lives in `steamapps/common`.
+fn steamapps_of(root: &Path) -> Option<PathBuf> {
+    let common = root.parent()?;
+    let is_common = common
+        .file_name()
+        .is_some_and(|n| n.to_string_lossy().eq_ignore_ascii_case("common"));
+    if is_common {
+        common.parent().map(Path::to_path_buf)
+    } else {
+        None
     }
 }
 

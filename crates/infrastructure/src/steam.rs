@@ -1,18 +1,96 @@
 //! Steam file formats (VDF/ACF) and the Steam library locator adapter.
 use motogp_application::{AppError, SteamLocator};
 use motogp_domain::SteamManifest;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Library roots listed in `libraryfolders.vdf`, with VDF escapes resolved
 /// (`\\` becomes `\`). Handles both the modern (`"path"`) and legacy formats.
 pub fn parse_library_folders(vdf: &str) -> Vec<PathBuf> {
-    todo!("{}", vdf.len())
+    let tokens = tokenize(vdf);
+    let mut libraries = Vec::new();
+    let mut depth = 0usize;
+    let mut i = 0;
+    while i < tokens.len() {
+        match (&tokens[i], tokens.get(i + 1)) {
+            (Token::Str(key), Some(Token::Str(value))) => {
+                let legacy_entry = depth == 1 && key.chars().all(|c| c.is_ascii_digit());
+                if key.eq_ignore_ascii_case("path") || legacy_entry {
+                    libraries.push(PathBuf::from(value));
+                }
+                i += 2;
+            }
+            (Token::Open, _) => {
+                depth += 1;
+                i += 1;
+            }
+            (Token::Close, _) => {
+                depth = depth.saturating_sub(1);
+                i += 1;
+            }
+            _ => i += 1,
+        }
+    }
+    libraries
 }
 
 /// `appid` and `installdir` of an `appmanifest_*.acf`; `None` when either is
 /// missing or the id is not a number.
 pub fn parse_app_manifest(acf: &str) -> Option<SteamManifest> {
-    todo!("{}", acf.len())
+    let tokens = tokenize(acf);
+    let mut app_id: Option<u32> = None;
+    let mut install_dir: Option<String> = None;
+    for pair in tokens.windows(2) {
+        if let [Token::Str(key), Token::Str(value)] = pair {
+            if key.eq_ignore_ascii_case("appid") && app_id.is_none() {
+                app_id = value.trim().parse().ok();
+            } else if key.eq_ignore_ascii_case("installdir") && install_dir.is_none() {
+                install_dir = Some(value.clone());
+            }
+        }
+    }
+    Some(SteamManifest {
+        app_id: app_id?,
+        install_dir: install_dir?,
+    })
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Token {
+    Str(String),
+    Open,
+    Close,
+}
+
+/// Minimal VDF tokenizer: quoted strings (with backslash escapes) and braces.
+/// An unterminated string ends tokenization.
+fn tokenize(text: &str) -> Vec<Token> {
+    let mut tokens = Vec::new();
+    let mut chars = text.chars();
+    while let Some(c) = chars.next() {
+        match c {
+            '{' => tokens.push(Token::Open),
+            '}' => tokens.push(Token::Close),
+            '"' => {
+                let mut value = String::new();
+                loop {
+                    match chars.next() {
+                        None => return tokens,
+                        Some('"') => break,
+                        Some('\\') => match chars.next() {
+                            Some('n') => value.push('\n'),
+                            Some('t') => value.push('\t'),
+                            Some(other) => value.push(other),
+                            None => return tokens,
+                        },
+                        Some(other) => value.push(other),
+                    }
+                }
+                tokens.push(Token::Str(value));
+            }
+            _ => {}
+        }
+    }
+    tokens
 }
 
 /// Finds Steam libraries from the Steam install path (when known).
@@ -29,8 +107,40 @@ impl SteamLibraries {
 
 impl SteamLocator for SteamLibraries {
     fn library_folders(&self) -> Result<Vec<PathBuf>, AppError> {
-        todo!("{:?}", self.steam_path)
+        let Some(steam_path) = &self.steam_path else {
+            return Ok(Vec::new());
+        };
+        let vdf_path = steam_path.join("steamapps").join("libraryfolders.vdf");
+        let listed = match std::fs::read_to_string(&vdf_path) {
+            Ok(text) => parse_library_folders(&text),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Vec::new(),
+            Err(e) => {
+                return Err(AppError::Read {
+                    location: vdf_path.display().to_string(),
+                    detail: e.to_string(),
+                })
+            }
+        };
+        let mut libraries: Vec<PathBuf> = vec![steam_path.clone()];
+        for library in listed {
+            if !libraries.iter().any(|l| same_path(l, &library)) {
+                libraries.push(library);
+            }
+        }
+        Ok(libraries)
     }
+}
+
+/// Registry paths use forward slashes and VDF paths backslashes; compare
+/// ignoring case and separators.
+fn same_path(a: &Path, b: &Path) -> bool {
+    let key = |p: &Path| {
+        p.to_string_lossy()
+            .replace('\\', "/")
+            .trim_end_matches('/')
+            .to_lowercase()
+    };
+    key(a) == key(b)
 }
 
 #[cfg(test)]

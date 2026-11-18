@@ -1,4 +1,5 @@
 //! Read-only filesystem adapter of the `GameFiles` port.
+use crate::parse_app_manifest;
 use motogp_application::{AppError, GameFiles};
 use motogp_domain::SteamManifest;
 use std::path::{Path, PathBuf};
@@ -9,17 +10,63 @@ pub struct FsGameFiles;
 
 impl GameFiles for FsGameFiles {
     fn common_dirs(&self, library: &Path) -> Result<Vec<PathBuf>, AppError> {
-        todo!("{library:?}")
+        list_dirs(&library.join("steamapps").join("common"))
     }
     fn subdirs(&self, dir: &Path) -> Result<Vec<String>, AppError> {
-        todo!("{dir:?}")
+        Ok(list_dirs(dir)?
+            .iter()
+            .filter_map(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .collect())
     }
     fn has_paks(&self, project_dir: &Path) -> bool {
-        todo!("{project_dir:?}")
+        project_dir.join("Content").join("Paks").is_dir()
     }
     fn manifests(&self, steamapps: &Path) -> Result<Vec<SteamManifest>, AppError> {
-        todo!("{steamapps:?}")
+        let mut manifests = Vec::new();
+        for path in read_entries(steamapps)? {
+            let is_manifest = path.file_name().is_some_and(|n| {
+                let n = n.to_string_lossy().to_lowercase();
+                n.starts_with("appmanifest_") && n.ends_with(".acf")
+            });
+            if !is_manifest {
+                continue;
+            }
+            // An unreadable or malformed manifest only means "no App ID" for that game.
+            if let Some(manifest) = std::fs::read_to_string(&path)
+                .ok()
+                .and_then(|text| parse_app_manifest(&text))
+            {
+                manifests.push(manifest);
+            }
+        }
+        Ok(manifests)
     }
+}
+
+/// Entries of `dir`, sorted; a missing directory is empty, other failures are read errors.
+fn read_entries(dir: &Path) -> Result<Vec<PathBuf>, AppError> {
+    let read_error = |e: std::io::Error| AppError::Read {
+        location: dir.display().to_string(),
+        detail: e.to_string(),
+    };
+    let iter = match std::fs::read_dir(dir) {
+        Ok(iter) => iter,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(read_error(e)),
+    };
+    let mut paths = Vec::new();
+    for entry in iter {
+        paths.push(entry.map_err(read_error)?.path());
+    }
+    paths.sort();
+    Ok(paths)
+}
+
+fn list_dirs(dir: &Path) -> Result<Vec<PathBuf>, AppError> {
+    Ok(read_entries(dir)?
+        .into_iter()
+        .filter(|p| p.is_dir())
+        .collect())
 }
 
 #[cfg(test)]

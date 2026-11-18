@@ -4,7 +4,16 @@ use motogp_application::GameError;
 
 impl From<&GameError> for CommandError {
     fn from(error: &GameError) -> Self {
-        todo!("{error:?}")
+        match error {
+            GameError::NotUnrealGame { root } => CommandError {
+                code: "not_unreal_game".to_string(),
+                message: format!(
+                    "The folder {} is not an Unreal game: Content/Paks not found.",
+                    root.display()
+                ),
+            },
+            GameError::Storage(app_error) => CommandError::from(app_error),
+        }
     }
 }
 

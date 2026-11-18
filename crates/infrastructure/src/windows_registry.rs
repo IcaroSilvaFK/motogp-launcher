@@ -6,7 +6,15 @@ use std::path::PathBuf;
 
 /// Steam install path from the registry; `None` when Steam is not installed.
 pub fn read_steam_path() -> Option<PathBuf> {
-    todo!()
+    use winreg::enums::HKEY_CURRENT_USER;
+    use winreg::RegKey;
+
+    let key = RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(r"Software\Valve\Steam")
+        .ok()?;
+    let path: String = key.get_value("SteamPath").ok()?;
+    let path = path.trim();
+    (!path.is_empty()).then(|| PathBuf::from(path))
 }
 
 impl SteamLibraries {

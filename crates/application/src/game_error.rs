@@ -12,8 +12,15 @@ pub enum GameError {
 }
 
 impl fmt::Display for GameError {
-    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        todo!("{self:?}")
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GameError::NotUnrealGame { root } => write!(
+                f,
+                "not an Unreal game: Content/Paks not found in {}",
+                root.display()
+            ),
+            GameError::Storage(error) => write!(f, "{error}"),
+        }
     }
 }
 

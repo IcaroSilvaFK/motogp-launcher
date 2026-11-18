@@ -23,34 +23,51 @@ pub struct SteamManifest {
 impl GameInfo {
     /// Builds the info for `root` whose Unreal project folder is `project`.
     pub fn new(root: PathBuf, project: &str, app_id: Option<u32>) -> Self {
-        todo!("{root:?} {project} {app_id:?}")
+        let name = root
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        let mods_dir = mods_dir_for(&root, project);
+        Self {
+            name,
+            root,
+            mods_dir,
+            app_id,
+        }
     }
 }
 
 /// A folder in `steamapps/common` is a MotoGP candidate when it starts with
 /// `MotoGP`, ignoring case.
 pub fn is_motogp_folder(name: &str) -> bool {
-    todo!("{name}")
+    name.get(..6)
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case("motogp"))
 }
 
 /// `installdir` from a manifest matches the folder name ignoring case.
 pub fn install_dir_matches(install_dir: &str, folder: &str) -> bool {
-    todo!("{install_dir} {folder}")
+    install_dir.eq_ignore_ascii_case(folder)
 }
 
 /// The Unreal `Engine` folder is never the game project.
 pub fn is_engine_folder(name: &str) -> bool {
-    todo!("{name}")
+    name.eq_ignore_ascii_case("engine")
 }
 
 /// `<root>/<project>/Content/Paks/~mods`.
 pub fn mods_dir_for(root: &Path, project: &str) -> PathBuf {
-    todo!("{root:?} {project}")
+    root.join(project)
+        .join("Content")
+        .join("Paks")
+        .join("~mods")
 }
 
 /// App ID of the manifest whose `installdir` matches `folder`.
 pub fn find_app_id(manifests: &[SteamManifest], folder: &str) -> Option<u32> {
-    todo!("{} {folder}", manifests.len())
+    manifests
+        .iter()
+        .find(|m| install_dir_matches(&m.install_dir, folder))
+        .map(|m| m.app_id)
 }
 
 #[cfg(test)]
