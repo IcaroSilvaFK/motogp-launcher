@@ -11,7 +11,7 @@ pub trait RegistryReader {
     fn read(&self, hive: Hive, subkey: &str, value: &str) -> Option<String>;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Hive {
     CurrentUser,
     LocalMachine,
@@ -24,8 +24,13 @@ const HKLM_VALUE: &str = "InstallPath";
 
 /// HKCU first; falls back to HKLM when the HKCU value is missing or empty.
 pub fn steam_path_from(reader: &impl RegistryReader) -> Option<PathBuf> {
-    let _ = (reader, HKCU_KEY, HKCU_VALUE, HKLM_KEY, HKLM_VALUE);
-    None
+    let non_empty = |raw: Option<String>| {
+        raw.map(|s| s.trim().to_owned())
+            .filter(|s| !s.is_empty())
+            .map(PathBuf::from)
+    };
+    non_empty(reader.read(Hive::CurrentUser, HKCU_KEY, HKCU_VALUE))
+        .or_else(|| non_empty(reader.read(Hive::LocalMachine, HKLM_KEY, HKLM_VALUE)))
 }
 
 struct WinRegistry;
@@ -69,8 +74,7 @@ mod tests {
 
     impl FakeRegistry {
         fn with(mut self, hive: Hive, key: &str, value: &str, data: &str) -> Self {
-            self.0
-                .insert((hive, key.into(), value.into()), data.into());
+            self.0.insert((hive, key.into(), value.into()), data.into());
             self
         }
     }
@@ -85,11 +89,13 @@ mod tests {
     fn hkcu_wins_over_hklm() {
         let reg = FakeRegistry::default()
             .with(Hive::CurrentUser, HKCU_KEY, HKCU_VALUE, "C:/User/Steam")
-            .with(Hive::LocalMachine, HKLM_KEY, HKLM_VALUE, r"C:\Machine\Steam");
-        assert_eq!(
-            steam_path_from(&reg),
-            Some(PathBuf::from("C:/User/Steam"))
-        );
+            .with(
+                Hive::LocalMachine,
+                HKLM_KEY,
+                HKLM_VALUE,
+                r"C:\Machine\Steam",
+            );
+        assert_eq!(steam_path_from(&reg), Some(PathBuf::from("C:/User/Steam")));
     }
 
     #[test]
@@ -110,7 +116,12 @@ mod tests {
     fn falls_back_to_hklm_when_hkcu_is_blank() {
         let reg = FakeRegistry::default()
             .with(Hive::CurrentUser, HKCU_KEY, HKCU_VALUE, "   ")
-            .with(Hive::LocalMachine, HKLM_KEY, HKLM_VALUE, r"C:\Machine\Steam");
+            .with(
+                Hive::LocalMachine,
+                HKLM_KEY,
+                HKLM_VALUE,
+                r"C:\Machine\Steam",
+            );
         assert_eq!(
             steam_path_from(&reg),
             Some(PathBuf::from(r"C:\Machine\Steam"))

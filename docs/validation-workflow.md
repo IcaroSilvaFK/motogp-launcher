@@ -183,12 +183,16 @@ Gherkin: `crates/application/tests/features/game-detection.feature` (fake `Steam
 | Ignore the Engine folder | `engine_folder_is_not_selected` (application), `engine_folder_is_skipped_on_disk`, `engine_folder_ignores_case` (domain) + both features |
 | Allow a manual folder without a Steam manifest | `manual_game_without_manifest_has_no_app_id` + both features |
 | Steam not found in the registry | `missing_steam_returns_empty_list`, `steam_libraries_without_steam_path_is_empty` + both features |
+| Ignore `//` comments in VDF/ACF | `parse_library_folders_skips_comments`, `parse_app_manifest_skips_comments` (infrastructure `steam.rs`) |
+| Read non-overlapping ACF key/value pairs | `parse_app_manifest_ignores_overlapping_pairs` (infrastructure `steam.rs`) |
+| Skip unreadable libraries during automatic detection | `detect_games_skips_unreadable_libraries_and_keeps_scanning` (application, fake port) |
+| Registry precedence and HKLM fallback | `hkcu_wins_over_hklm`, `falls_back_to_hklm_when_hkcu_is_missing`, `falls_back_to_hklm_when_hkcu_is_blank`, `no_steam_anywhere_is_none` (infrastructure `windows_registry.rs`, injectable `RegistryReader`) |
 | Inspection has no write effects | `inspection_does_not_create_mods_directory` (infrastructure) |
 | Error mapping at the Tauri boundary | `src-tauri/src/error_game.rs` unit tests (`not_unreal_game` code) |
 
 ### Manual smoke: Steam registry (Windows)
 
-The `winreg` adapter (`read_steam_path`, `SteamLibraries::from_registry`) is behind `#[cfg(windows)]` and is deliberately not covered by automated tests. Smoke: with Steam installed, `HKCU\Software\Valve\Steam` must have a `SteamPath` value; call `SteamLibraries::from_registry().library_folders()` (or the future detect command) and confirm it lists the Steam install and every library in `libraryfolders.vdf`. With the value missing, the result must be an empty list.
+The precedence/fallback logic is unit-tested through the injectable `RegistryReader`; only the real `winreg` reader (`read_steam_path`, `SteamLibraries::from_registry`) is verified by this smoke. With Steam installed, `HKCU\Software\Valve\Steam` must have a `SteamPath` value (otherwise `HKLM\SOFTWARE\WOW6432Node\Valve\Steam` `InstallPath` is used); call `SteamLibraries::from_registry().library_folders()` (or the future detect command) and confirm it lists the Steam install and every library in `libraryfolders.vdf`. With the value missing, the result must be an empty list.
 
 ### Manual smoke: `pnpm tauri dev`
 
