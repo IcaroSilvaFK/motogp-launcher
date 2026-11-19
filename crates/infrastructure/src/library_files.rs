@@ -126,13 +126,14 @@ impl LibraryFiles for FsLibraryFiles {
         }
 
         let target = self.library_dir.join(id);
-        let existed = target.exists();
-        fs::create_dir_all(&target).map_err(|e| write_error(&target, e))?;
+        fs::create_dir_all(&self.library_dir).map_err(|e| write_error(&self.library_dir, e))?;
+        // Reserve the target atomically: an existing folder (even one missing
+        // from the index) is never reused or modified.
+        fs::create_dir(&target).map_err(|e| write_error(&target, e))?;
         for name in files {
             if let Err(e) = fs::rename(staging.join(name), target.join(name)) {
-                if !existed {
-                    let _ = fs::remove_dir_all(&target);
-                }
+                // Only the directory created above is removed.
+                let _ = fs::remove_dir_all(&target);
                 return Err(write_error(&target.join(name), e));
             }
         }
