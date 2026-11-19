@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Gate 7: coverage thresholds must reject insufficient reports (Rust and frontend).
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -89,11 +89,64 @@ describe('coverage_thresholds_reject_insufficient_coverage', () => {
   it.each([
     '.worktrees/translate/crates/domain/src/b.rs',
     'D:\\repo\\.worktrees\\translate\\crates\\domain\\src\\b.rs',
-  ])('excludes %s from core and overall coverage', (filename) => {
-    expect(evaluateRustCoverage(report({ 'crates/domain/src/a.rs': [90, 100], [filename]: [0, 1000] })).ok).toBe(true);
-    expect(evaluateRustCoverage(report({ 'crates/domain/src/a.rs': [85, 100], [filename]: [1000, 1000] })).ok).toBe(
-      false,
-    );
+    '/repo/.worktrees/translate/crates/domain/src/b.rs',
+  ])('excludes nested worktree file %s from core and overall coverage', (filename) => {
+    const options = { root: '/repo', hasSource: () => false };
+    expect(
+      evaluateRustCoverage(report({ 'crates/domain/src/a.rs': [90, 100], [filename]: [0, 1000] }), options).ok,
+    ).toBe(true);
+    expect(
+      evaluateRustCoverage(report({ 'crates/domain/src/a.rs': [85, 100], [filename]: [1000, 1000] }), options).ok,
+    ).toBe(false);
+  });
+
+  it.each([
+    [
+      '/repo/.worktrees/7',
+      '/repo/.worktrees/7/crates/domain/src/a.rs',
+      '/repo/.worktrees/7/.worktrees/old/crates/domain/src/b.rs',
+    ],
+    [
+      'D:\\repo\\.worktrees\\7',
+      'D:\\repo\\.worktrees\\7\\crates\\domain\\src\\a.rs',
+      'D:\\repo\\.worktrees\\7\\.worktrees\\old\\crates\\domain\\src\\b.rs',
+    ],
+  ])('counts files of the checkout itself when it lives inside .worktrees (root %s)', (cwd, own, nested) => {
+    const options = { root: cwd, hasSource: () => false };
+    const low = evaluateRustCoverage(report({ [own]: [10, 100] }), options);
+    expect(low.ok).toBe(false);
+    expect(low.failures.join('\n')).toMatch(/motogp-domain/);
+    // a nested worktree under the active root is still excluded
+    const high = evaluateRustCoverage(report({ [own]: [95, 100], [nested]: [0, 1000] }), options);
+    expect(high.ok).toBe(true);
+  });
+
+  it('fails when a core crate has source code but zero measurable lines', () => {
+    const result = evaluateRustCoverage(report({}), {
+      root: '/repo',
+      hasSource: (crate: { name: string }) => crate.name === 'motogp-domain',
+    });
+    expect(result.ok).toBe(false);
+    expect(result.failures.join('\n')).toMatch(/motogp-domain.*no measurable lines/);
+  });
+
+  it('the CLI counts the real report files when run from inside a worktree', () => {
+    const directory = mkdtempSync(join(tmpdir(), 'motogp-coverage-'));
+    try {
+      const checkout = join(directory, '.worktrees', '9');
+      mkdirSync(join(checkout, 'crates', 'domain', 'src'), { recursive: true });
+      const path = join(directory, 'report.json');
+      writeFileSync(path, JSON.stringify(report({ [join(checkout, 'crates', 'domain', 'src', 'a.rs')]: [10, 100] })));
+      const run = spawnSync(process.execPath, [join(root, 'scripts/check-rust-coverage.mjs'), path], {
+        encoding: 'utf8',
+        timeout: 10_000,
+        cwd: checkout,
+      });
+      expect(run.status).toBe(1);
+      expect(run.stderr).toMatch(/FAIL.*motogp-domain/);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 
   it('the CLI exits unsuccessfully for insufficient coverage', () => {
