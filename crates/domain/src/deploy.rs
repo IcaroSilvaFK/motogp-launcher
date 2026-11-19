@@ -1,17 +1,37 @@
 use std::path::PathBuf;
 
+/// One file the launcher deployed (or intends to deploy) into `~mods`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeployedFile {
+    /// Destination file name (never a path).
+    pub name: String,
+    /// Library file it was created from. Ownership proof: the destination is
+    /// ours only while it is that same file (hard link) or a byte-for-byte copy.
+    pub source: PathBuf,
+}
+
+impl DeployedFile {
+    pub fn new(name: impl Into<String>, source: impl Into<PathBuf>) -> Self {
+        Self {
+            name: name.into(),
+            source: source.into(),
+        }
+    }
+}
+
 /// Manifest of the files deployed into the game `~mods` folder (the source for
 /// session recovery). Pure data: no I/O.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Deployed {
-    /// Directory the files were deployed into.
+    /// Directory the files were deployed into (never trusted on its own: the
+    /// application checks it against the authorized `~mods` before removing).
     pub mods_dir: PathBuf,
-    /// File names (never paths) proven deployed by this launcher.
-    pub files: Vec<String>,
-    /// Journal: names recorded *before* their materialization. An entry here
-    /// was absent from `mods_dir` when it was recorded, so the launcher owns
-    /// whatever exists under that name; recovery treats it like `files`.
-    pub pending: Vec<String>,
+    /// Files the launcher created.
+    pub files: Vec<DeployedFile>,
+    /// Journal: files recorded *before* their materialization. A journal entry
+    /// proves only an intent, not ownership: a file under that name is deleted
+    /// only if it is verified to be the launcher's own (see `DeployedFile::source`).
+    pub pending: Vec<DeployedFile>,
 }
 
 impl Deployed {
@@ -25,7 +45,7 @@ impl Deployed {
         self.files
             .iter()
             .chain(self.pending.iter())
-            .map(String::as_str)
+            .map(|f| f.name.as_str())
     }
 }
 
@@ -103,8 +123,8 @@ mod tests {
     fn tracked_lists_deployed_and_pending_files() {
         let deployed = Deployed {
             mods_dir: "mods".into(),
-            files: vec!["a".into()],
-            pending: vec!["b".into()],
+            files: vec![DeployedFile::new("a", "lib/a")],
+            pending: vec![DeployedFile::new("b", "lib/b")],
         };
         assert!(!deployed.is_empty());
         assert_eq!(deployed.tracked().collect::<Vec<_>>(), vec!["a", "b"]);

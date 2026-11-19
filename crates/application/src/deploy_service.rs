@@ -1,5 +1,5 @@
-use crate::{DeployError, DeployFiles, DeployedRepository};
-use motogp_domain::{deployed_name, is_safe_file_name, is_valid_mod_id, Deployed};
+use crate::{DeployError, DeployFiles, DeployedRepository, DirCheck};
+use motogp_domain::{deployed_name, is_safe_file_name, is_valid_mod_id, Deployed, DeployedFile};
 use std::path::{Path, PathBuf};
 
 /// One already-ordered mod of the profile, ready to be deployed. The position
@@ -15,11 +15,19 @@ pub struct DeployMod {
 
 /// Use cases: deploy a session into `~mods` and clean it afterwards.
 ///
-/// Protocol (write-ahead journal): for each file the destination name is first
-/// verified absent and persisted in `Deployed::pending`, then created
-/// exclusively, then moved to `Deployed::files`. A process death at any point
-/// leaves every possibly-created file recorded, so [`clean`](Self::clean) can
-/// recover it without scanning by name or prefix.
+/// Protocol (write-ahead journal): for each file the destination name and its
+/// library source are first verified absent and persisted in
+/// `Deployed::pending`, then created exclusively, then moved to
+/// `Deployed::files`. A process death at any point leaves every
+/// possibly-created file recorded, so [`clean`](Self::clean) can recover it
+/// without scanning by name or prefix.
+///
+/// Safety properties of removal: a file is deleted only if (1) the manifest's
+/// directory resolves to the independently authorized `~mods` and (2)
+/// `DeployFiles::owns` proves that exact file is the launcher's (same file as
+/// its library source, or a byte-identical copy). A journal entry alone never
+/// grants ownership: if the proof fails the entry is untracked and the file is
+/// left untouched.
 pub struct DeployService<R, F> {
     repository: R,
     files: F,
@@ -30,10 +38,11 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
         Self { repository, files }
     }
 
-    /// Cleans the previous session (aborting on failure), then deploys `mods`
-    /// in order. Returns the destination names. An empty profile touches nothing.
+    /// Cleans the previous session in `mods_dir` (aborting on failure), then
+    /// deploys `mods` in order. `mods_dir` is the authorized `~mods` derived
+    /// from the configured game install, never from the manifest. Returns the destination names. An empty profile touches nothing.
     pub fn deploy(&self, mods_dir: &Path, mods: &[DeployMod]) -> Result<Vec<String>, DeployError> {
-        self.clean()?;
+        self.clean(mods_dir)?;
         let plan = plan(mods)?;
         if plan.is_empty() {
             return Ok(vec![]);
@@ -48,7 +57,7 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
             Ok(()) => Ok(plan.into_iter().map(|(name, _)| name).collect()),
             Err(error) => {
                 // Best-effort rollback; whatever it cannot remove stays tracked.
-                let _ = self.clean();
+                let _ = self.clean(mods_dir);
                 Err(error)
             }
         }
@@ -60,21 +69,23 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
             ..Deployed::default()
         };
         for (name, source) in plan {
-            // Ownership proof: the name is absent right before it is journaled.
+            // The name is absent right before it is journaled (ownership is
+            // still proven again at removal time, never assumed).
             if self.files.exists(mods_dir, name)? {
                 return Err(DeployError::AlreadyExists { name: name.clone() });
             }
-            manifest.pending.push(name.clone());
+            manifest.pending.push(DeployedFile::new(name.clone(), source.clone()));
             self.repository.save(&manifest)?;
             match self.files.materialize(source, mods_dir, name) {
                 Ok(()) => {
-                    manifest.pending.retain(|n| n != name);
-                    manifest.files.push(name.clone());
+                    manifest.pending.retain(|f| f.name != *name);
+                    manifest.files.push(DeployedFile::new(name.clone(), source.clone()));
                     self.repository.save(&manifest)?;
                 }
                 Err(error @ DeployError::AlreadyExists { .. }) => {
                     // Lost a race to a foreign file: it is not ours, untrack it.
-                    manifest.pending.retain(|n| n != name);
+                    // (If this save fails, `clean` re-verifies ownership.)
+                    manifest.pending.retain(|f| f.name != *name);
                     self.repository.save(&manifest)?;
                     return Err(error);
                 }
@@ -85,10 +96,13 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
         Ok(())
     }
 
-    /// Removes exactly the tracked files (deployed and journaled), tolerating
-    /// missing ones, and returns how many were actually removed. On a partial
-    /// failure the files still present stay tracked and an error is returned.
-    pub fn clean(&self) -> Result<usize, DeployError> {
+    /// Removes the tracked files that are provably the launcher's own and
+    /// returns how many were actually removed. Tracked entries whose file is
+    /// missing or no longer ours (replaced by the user) are untracked without
+    /// touching the file. On a partial failure the entries that could not be
+    /// processed stay tracked and an error is returned. `authorized_mods_dir`
+    /// must come from the configured game install, not from the manifest.
+    pub fn clean(&self, authorized_mods_dir: &Path) -> Result<usize, DeployError> {
         let manifest = self.repository.load()?;
         if manifest.is_empty() {
             return Ok(0);
@@ -102,6 +116,21 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
         if let Some(bad) = manifest.tracked().find(|name| !is_safe_file_name(name)) {
             return Err(DeployError::InvalidPath { path: bad.into() });
         }
+        match self
+            .files
+            .check_dir(&manifest.mods_dir, authorized_mods_dir)?
+        {
+            DirCheck::Authorized => {}
+            DirCheck::Missing => {
+                self.repository.save(&Deployed::default())?;
+                return Ok(0);
+            }
+            DirCheck::Foreign => {
+                return Err(DeployError::UnauthorizedDirectory {
+                    path: manifest.mods_dir.display().to_string(),
+                })
+            }
+        }
 
         let mut removed = 0;
         let mut first_error: Option<DeployError> = None;
@@ -114,12 +143,12 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
             (&manifest.pending, &mut remaining.pending),
         ];
         for (tracked, keep) in groups {
-            for name in tracked {
-                match self.files.remove(&manifest.mods_dir, name) {
+            for entry in tracked {
+                match self.remove_if_owned(&manifest.mods_dir, entry) {
                     Ok(true) => removed += 1,
                     Ok(false) => {}
                     Err(error) => {
-                        keep.push(name.clone());
+                        keep.push(entry.clone());
                         first_error.get_or_insert(error);
                     }
                 }
@@ -139,6 +168,16 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
                     detail: error.to_string(),
                 })
             }
+        }
+    }
+
+    /// `true` when the file was ours and got removed; `false` when it is missing
+    /// or not provably ours (left untouched).
+    fn remove_if_owned(&self, dir: &Path, entry: &DeployedFile) -> Result<bool, DeployError> {
+        if self.files.owns(dir, &entry.name, &entry.source)? {
+            self.files.remove(dir, &entry.name)
+        } else {
+            Ok(false)
         }
     }
 }

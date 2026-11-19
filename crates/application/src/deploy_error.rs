@@ -13,6 +13,8 @@ pub enum DeployError {
     AlreadyExists { name: String },
     /// A name or ID is not a simple relative name, or the manifest is unusable.
     InvalidPath { path: String },
+    /// The manifest points at a directory other than the authorized `~mods`.
+    UnauthorizedDirectory { path: String },
     /// Some files could not be removed; they remain tracked for a retry.
     CleanIncomplete {
         removed: usize,
@@ -36,6 +38,10 @@ impl fmt::Display for DeployError {
                 write!(f, "the destination {name} already exists and was not overwritten")
             }
             DeployError::InvalidPath { path } => write!(f, "invalid path: {path:?}"),
+            DeployError::UnauthorizedDirectory { path } => write!(
+                f,
+                "{path:?} is not the authorized mods directory; nothing was removed"
+            ),
             DeployError::CleanIncomplete {
                 removed,
                 remaining,
