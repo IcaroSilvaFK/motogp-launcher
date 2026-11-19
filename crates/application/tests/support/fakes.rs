@@ -18,6 +18,8 @@ pub struct State {
     pub staging_counter: u32,
     pub fail_copy: bool,
     pub fail_index_add: bool,
+    pub fail_remove_dir: bool,
+    pub fail_publish_id: Option<String>,
     pub discarded: Vec<PathBuf>,
 }
 
@@ -139,6 +141,9 @@ impl LibraryFiles for FakeFiles {
     }
 
     fn publish(&self, staging: &Path, files: &[String], id: &str) -> Result<(), LibraryError> {
+        if self.0.borrow().fail_publish_id.as_deref() == Some(id) {
+            return Err(io_error(staging, "publish failed"));
+        }
         let mut state = self.0.borrow_mut();
         for name in files {
             let content = state
@@ -160,6 +165,9 @@ impl LibraryFiles for FakeFiles {
     }
 
     fn remove_mod_dir(&self, id: &str) -> Result<(), LibraryError> {
+        if self.0.borrow().fail_remove_dir {
+            return Err(io_error(Path::new(id), "sharing violation"));
+        }
         let dir = library_dir().join(id);
         self.0
             .borrow_mut()

@@ -3,7 +3,7 @@
 mod fakes;
 
 use fakes::*;
-use motogp_application::LibraryError;
+use motogp_application::{LibraryError, LibraryFiles};
 use motogp_domain::GroupingError;
 use std::path::Path;
 
@@ -245,4 +245,77 @@ fn remove_rejects_ids_that_are_not_twelve_lowercase_hex() {
         let error = service(&state).remove(id).unwrap_err();
         assert_eq!(error, LibraryError::InvalidId { id: id.into() });
     }
+}
+
+#[test]
+fn zip_import_with_a_failing_second_group_leaves_the_index_unchanged() {
+    let state = new_state();
+    put_file(&state, "src/C.pak", b"CCCCCC-pak");
+    let service = service(&state);
+    let existing = service.import(Path::new("src/C.pak")).unwrap();
+    put_archive(&state, "mods.zip", &[("A.pak", PAK_A), ("B.pak", PAK_B)]);
+    state.borrow_mut().fail_publish_id = Some(id_of(PAK_B));
+
+    let error = service.import(Path::new("mods.zip")).unwrap_err();
+
+    assert!(matches!(error, LibraryError::Storage(_)), "{error:?}");
+    assert_eq!(state.borrow().index, existing, "no new entries");
+    assert!(library_files_of(&state, &id_of(PAK_A)).is_empty());
+    assert!(library_files_of(&state, &id_of(PAK_B)).is_empty());
+    assert_eq!(
+        library_files_of(&state, &existing[0].id),
+        vec!["C.pak"],
+        "preexisting mods are preserved"
+    );
+    assert!(staging_leftovers(&state).is_empty());
+}
+
+#[test]
+fn zip_import_index_failure_removes_every_folder_published_by_the_import() {
+    let state = new_state();
+    put_archive(&state, "mods.zip", &[("A.pak", PAK_A), ("B.pak", PAK_B)]);
+    state.borrow_mut().fail_index_add = true;
+
+    assert!(service(&state).import(Path::new("mods.zip")).is_err());
+
+    assert!(state.borrow().index.is_empty());
+    assert!(library_files_of(&state, &id_of(PAK_A)).is_empty());
+    assert!(library_files_of(&state, &id_of(PAK_B)).is_empty());
+}
+
+#[test]
+fn failed_folder_deletion_keeps_the_entry_and_a_retry_succeeds() {
+    let state = new_state();
+    put_file(&state, "src/A.pak", PAK_A);
+    let service = service(&state);
+    let id = service.import(Path::new("src/A.pak")).unwrap()[0]
+        .id
+        .clone();
+    state.borrow_mut().fail_remove_dir = true;
+
+    let error = service.remove(&id).unwrap_err();
+
+    assert!(matches!(error, LibraryError::Storage(_)), "{error:?}");
+    assert_eq!(state.borrow().index.len(), 1, "the entry is kept");
+    assert_eq!(library_files_of(&state, &id), vec!["A.pak"]);
+
+    state.borrow_mut().fail_remove_dir = false;
+    service.remove(&id).unwrap();
+    assert!(state.borrow().index.is_empty());
+    assert!(library_files_of(&state, &id).is_empty());
+}
+
+#[test]
+fn remove_retries_when_the_folder_is_gone_but_the_entry_remains() {
+    let state = new_state();
+    put_file(&state, "src/A.pak", PAK_A);
+    let service = service(&state);
+    let id = service.import(Path::new("src/A.pak")).unwrap()[0]
+        .id
+        .clone();
+    FakeFiles(state.clone()).remove_mod_dir(&id).unwrap();
+
+    service.remove(&id).unwrap();
+
+    assert!(state.borrow().index.is_empty());
 }
