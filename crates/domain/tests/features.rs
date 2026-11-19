@@ -7,6 +7,8 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+#[path = "bdd/deploy_names.rs"]
+mod deploy_names;
 #[path = "bdd/mod_grouping.rs"]
 mod mod_grouping;
 #[path = "bdd/session_state.rs"]
@@ -17,6 +19,7 @@ type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 const FEATURES: &[(&str, Runner)] = &[
     ("mod_grouping", || Box::pin(mod_grouping::run())),
     ("session-state", || Box::pin(session_state::run())),
+    ("deploy_names", || Box::pin(deploy_names::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.
