@@ -3,8 +3,10 @@
 //! Traceability: docs/workflow-validacao.md.
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
-use motogp_application::{AppError, Clock, ProfileRepository, ProfileService, ProfileServiceError};
-use motogp_domain::{Profile, ProfileError};
+use motogp_application::{
+    AppError, Clock, ConfigRepository, ProfileRepository, ProfileService, ProfileServiceError,
+};
+use motogp_domain::{Config, Profile, ProfileError};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
@@ -26,6 +28,20 @@ impl ProfileRepository for SharedRepository {
     fn save(&self, profiles: &[Profile]) -> Result<(), AppError> {
         self.0.saves.set(self.0.saves.get() + 1);
         *self.0.profiles.borrow_mut() = profiles.to_vec();
+        Ok(())
+    }
+}
+
+/// Config port that never has an active profile and accepts every save.
+#[derive(Debug, Clone, Copy)]
+struct NoConfig;
+
+impl ConfigRepository for NoConfig {
+    fn load(&self) -> Result<Config, AppError> {
+        Ok(Config::default())
+    }
+
+    fn save(&self, _config: &Config) -> Result<(), AppError> {
         Ok(())
     }
 }
@@ -148,7 +164,7 @@ fn profile_other_than_vanilla(w: &mut ProfilesWorld) {
 
 #[when("I delete it")]
 fn delete_it(w: &mut ProfilesWorld) {
-    w.service().delete(&w.target()).unwrap();
+    w.service().delete(&w.target(), &NoConfig).unwrap();
 }
 
 #[then("it no longer appears in the persisted list")]
@@ -246,7 +262,7 @@ fn profile_with_id(w: &mut ProfilesWorld, id: String) {
 
 #[when("I try to delete it through the use case")]
 fn try_delete(w: &mut ProfilesWorld) {
-    let result = w.service().delete(&w.target());
+    let result = w.service().delete(&w.target(), &NoConfig);
     w.errors = result.err().into_iter().collect();
 }
 

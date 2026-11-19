@@ -149,6 +149,7 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use motogp_domain::Config;
     use std::cell::{Cell, RefCell};
 
     #[derive(Default)]
@@ -156,6 +157,45 @@ mod tests {
         stored: RefCell<Vec<Profile>>,
         saves: Cell<usize>,
         load_error: RefCell<Option<AppError>>,
+        save_error: RefCell<Option<AppError>>,
+    }
+
+    #[derive(Default)]
+    struct FakeConfigRepository {
+        stored: RefCell<Config>,
+        saves: Cell<usize>,
+        save_error: RefCell<Option<AppError>>,
+    }
+
+    impl ConfigRepository for FakeConfigRepository {
+        fn load(&self) -> Result<Config, AppError> {
+            Ok(self.stored.borrow().clone())
+        }
+
+        fn save(&self, config: &Config) -> Result<(), AppError> {
+            if let Some(error) = self.save_error.borrow().clone() {
+                return Err(error);
+            }
+            self.saves.set(self.saves.get() + 1);
+            *self.stored.borrow_mut() = config.clone();
+            Ok(())
+        }
+    }
+
+    fn config_with_active(active: Option<&str>) -> FakeConfigRepository {
+        let config = FakeConfigRepository::default();
+        *config.stored.borrow_mut() = Config {
+            game_dir: Some("C:/Game".into()),
+            active_profile: active.map(str::to_string),
+        };
+        config
+    }
+
+    fn write_failure() -> AppError {
+        AppError::Write {
+            location: "x.json".into(),
+            detail: "denied".into(),
+        }
     }
 
     impl ProfileRepository for FakeRepository {
@@ -167,6 +207,9 @@ mod tests {
         }
 
         fn save(&self, profiles: &[Profile]) -> Result<(), AppError> {
+            if let Some(error) = self.save_error.borrow().clone() {
+                return Err(error);
+            }
             self.saves.set(self.saves.get() + 1);
             *self.stored.borrow_mut() = profiles.to_vec();
             Ok(())
@@ -234,7 +277,9 @@ mod tests {
     fn delete_removes_profile() {
         let service = service();
         let created = service.create("A").unwrap();
-        service.delete(&created.id).unwrap();
+        service
+            .delete(&created.id, &FakeConfigRepository::default())
+            .unwrap();
         assert_eq!(stored(&service), vec![Profile::vanilla()]);
         assert_eq!(
             service.get(&created.id),
@@ -275,7 +320,7 @@ mod tests {
         let service = service();
         service.list().unwrap();
         assert_eq!(
-            service.delete("vanilla"),
+            service.delete("vanilla", &FakeConfigRepository::default()),
             Err(ProfileServiceError::Profile(ProfileError::VanillaProtected))
         );
         assert_eq!(stored(&service), vec![Profile::vanilla()]);
@@ -296,7 +341,8 @@ mod tests {
         let not_found = ProfileServiceError::Profile(ProfileError::NotFound);
         assert_eq!(service.get("nope"), Err(not_found.clone()));
         assert_eq!(service.rename("nope", "X"), Err(not_found.clone()));
-        assert_eq!(service.delete("nope"), Err(not_found.clone()));
+        let config = FakeConfigRepository::default();
+        assert_eq!(service.delete("nope", &config), Err(not_found.clone()));
         assert_eq!(service.set_mods("nope", mods(&["a"])), Err(not_found));
     }
 
@@ -323,6 +369,60 @@ mod tests {
         *service.repository.load_error.borrow_mut() = Some(corrupted.clone());
         assert_eq!(service.list(), Err(ProfileServiceError::Storage(corrupted)));
         assert_eq!(service.repository.saves.get(), 0);
+    }
+
+    #[test]
+    fn deleting_the_active_profile_falls_back_to_vanilla() {
+        let service = service();
+        let created = service.create("A").unwrap();
+        let config = config_with_active(Some(&created.id));
+        service.delete(&created.id, &config).unwrap();
+        let saved = config.stored.borrow().clone();
+        assert_eq!(saved.active_profile.as_deref(), Some("vanilla"));
+        assert_eq!(
+            saved.game_dir,
+            Some("C:/Game".into()),
+            "other settings kept"
+        );
+        assert_eq!(stored(&service), vec![Profile::vanilla()]);
+    }
+
+    #[test]
+    fn deleting_an_inactive_profile_leaves_the_config_untouched() {
+        let service = service();
+        let created = service.create("A").unwrap();
+        let config = config_with_active(Some("vanilla"));
+        service.delete(&created.id, &config).unwrap();
+        assert_eq!(config.saves.get(), 0);
+        let active = config.stored.borrow().active_profile.clone();
+        assert_eq!(active.as_deref(), Some("vanilla"));
+    }
+
+    #[test]
+    fn delete_propagates_profile_save_failure_without_touching_the_config() {
+        let service = service();
+        let created = service.create("A").unwrap();
+        let config = config_with_active(Some(&created.id));
+        *service.repository.save_error.borrow_mut() = Some(write_failure());
+        assert_eq!(
+            service.delete(&created.id, &config),
+            Err(ProfileServiceError::Storage(write_failure()))
+        );
+        let active = config.stored.borrow().active_profile.clone();
+        assert_eq!(active.as_deref(), Some(created.id.as_str()));
+    }
+
+    #[test]
+    fn delete_propagates_config_save_failure_and_keeps_the_profile() {
+        let service = service();
+        let created = service.create("A").unwrap();
+        let config = config_with_active(Some(&created.id));
+        *config.save_error.borrow_mut() = Some(write_failure());
+        assert_eq!(
+            service.delete(&created.id, &config),
+            Err(ProfileServiceError::Storage(write_failure()))
+        );
+        assert_eq!(stored(&service).len(), 2, "profile kept when config fails");
     }
 
     #[test]

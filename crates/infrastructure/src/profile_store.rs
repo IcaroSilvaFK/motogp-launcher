@@ -130,6 +130,32 @@ mod tests {
     }
 
     #[test]
+    fn blank_profile_name_is_corrupted_and_left_untouched() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("profiles.json");
+        let content = br#"[{"id":"p1","name":"   ","mod_ids":[]}]"#;
+        fs::write(&path, content).unwrap();
+        let store = JsonProfileStore::new(&path);
+        assert!(matches!(store.load(), Err(AppError::Corrupted { .. })));
+        let service = ProfileService::new(store, SystemClock);
+        assert!(service.list().is_err());
+        assert_eq!(fs::read(&path).unwrap(), content, "file never reseeded");
+    }
+
+    #[test]
+    fn duplicate_profile_ids_are_corrupted_and_left_untouched() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("profiles.json");
+        let content = br#"[{"id":"p1","name":"A"},{"id":"p1","name":"B"}]"#;
+        fs::write(&path, content).unwrap();
+        let store = JsonProfileStore::new(&path);
+        assert!(matches!(store.load(), Err(AppError::Corrupted { .. })));
+        let service = ProfileService::new(store, SystemClock);
+        assert!(service.list().is_err());
+        assert_eq!(fs::read(&path).unwrap(), content, "file never reseeded");
+    }
+
+    #[test]
     fn empty_collection_is_seeded_and_persisted() {
         let dir = tempdir().unwrap();
         let path = dir.path().join("profiles.json");
