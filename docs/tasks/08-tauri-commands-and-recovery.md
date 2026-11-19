@@ -110,5 +110,5 @@ Feature: Expose use cases and recover sessions through the launcher
 - [ ] Gate 6: thin commands; domain with no external production deps; application depends only on domain; frontend boundaries green.
 - [ ] Gate 7: `cargo llvm-cov` and `pnpm test --coverage` with ≥90% domain/application per layer/crate and ≥80% overall per stack.
 - [ ] Gate 8: criteria proven, including failures/compensation; **Rust core** and **Frontend** green in CI.
-- [ ] QA Haiku approved and Codex review applied; no session without an App ID leaves the game modified.
+- [ ] QA Haiku approved; no session without an App ID leaves the game modified.
 - [ ] Branch from `dev`; PR to `dev` with a real `Closes #<no>`; no direct commit to `dev/qas/main`.

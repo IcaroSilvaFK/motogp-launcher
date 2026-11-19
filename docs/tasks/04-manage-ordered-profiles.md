@@ -99,5 +99,5 @@ Preserve the six plan names in **crates/application**, use cases with a fake rep
 - [ ] Gate 6: Cargo dependencies inward and boundaries green; no real JSON/clock reads in application/domain tests.
 - [ ] Gate 7: `cargo llvm-cov` and `pnpm test --coverage` with ≥90% domain/application per layer/crate and ≥80% overall per stack.
 - [ ] Gate 8: criteria proven; **Rust core** and **Frontend** green in CI.
-- [ ] QA Haiku approved and Codex review applied before the PR.
+- [ ] QA Haiku approved before the PR.
 - [ ] Branch from `dev`; PR to `dev` with a real `Closes #<no>`; no direct commit to `dev/qas/main`.
