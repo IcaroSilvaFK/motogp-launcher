@@ -1,13 +1,14 @@
-import { createContext, useContext, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { en } from './en';
-import type { Locale, Messages } from './messages';
+import { DEFAULT_LOCALE, LOCALES } from '../../domain';
+import type { Locale } from '../../domain';
+import type { Messages } from './messages';
 import { ptBR } from './pt-BR';
 
-export type { Locale, Messages } from './messages';
-
-export const DEFAULT_LOCALE: Locale = 'pt-BR';
-export const LOCALES: readonly Locale[] = ['pt-BR', 'en'];
+export type { Messages } from './messages';
+export { DEFAULT_LOCALE, LOCALES };
+export type { Locale };
 
 const dictionaries: Record<Locale, Messages> = { 'pt-BR': ptBR, en };
 
@@ -23,9 +24,24 @@ const I18nContext = createContext<I18n>({
   setLocale: () => undefined,
 });
 
-export function I18nProvider({ locale: initial = DEFAULT_LOCALE, children }: { locale?: Locale; children: ReactNode }) {
-  const [locale, setLocale] = useState<Locale>(initial);
-  const value = useMemo<I18n>(() => ({ t: dictionaries[locale], locale, setLocale }), [locale]);
+export function I18nProvider({
+  locale: initial = DEFAULT_LOCALE,
+  onLocaleChange,
+  children,
+}: {
+  locale?: Locale;
+  onLocaleChange?: (locale: Locale) => void;
+  children: ReactNode;
+}) {
+  const [locale, setCurrent] = useState<Locale>(initial);
+  const setLocale = useCallback(
+    (next: Locale) => {
+      setCurrent(next);
+      onLocaleChange?.(next);
+    },
+    [onLocaleChange],
+  );
+  const value = useMemo<I18n>(() => ({ t: dictionaries[locale], locale, setLocale }), [locale, setLocale]);
   return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
 }
 

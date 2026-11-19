@@ -1,5 +1,5 @@
 import { act, render, renderHook, screen } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ERROR_CODES } from '../../../domain';
 import { en } from '../en';
 import { DEFAULT_LOCALE, formatSize, I18nProvider, useI18n } from '../index';
@@ -61,6 +61,20 @@ describe('I18nProvider', () => {
     act(() => result.current.setLocale('pt-BR'));
     expect(result.current.locale).toBe('pt-BR');
     expect(result.current.t).toBe(ptBR);
+  });
+
+  it('calls onLocaleChange with the chosen locale', () => {
+    const onLocaleChange = vi.fn();
+    const { result } = renderHook(() => useI18n(), {
+      wrapper: ({ children }) => (
+        <I18nProvider locale="en" onLocaleChange={onLocaleChange}>
+          {children}
+        </I18nProvider>
+      ),
+    });
+    act(() => result.current.setLocale('pt-BR'));
+    expect(onLocaleChange).toHaveBeenCalledExactlyOnceWith('pt-BR');
+    expect(result.current.locale).toBe('pt-BR');
   });
 
   it('renders children', () => {
