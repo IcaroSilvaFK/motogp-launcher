@@ -1,7 +1,7 @@
 //! BDD runner (cucumber, `harness = false`) for the scenarios in `tests/features/`.
 //! Scenario traceability: see `docs/validation-workflow.md` (Scaffold section).
 mod ipc_support;
-#[path = "interface_steps.rs"]
+#[path = "ipc_support/interface_steps.rs"]
 mod interface_steps;
 mod support;
 

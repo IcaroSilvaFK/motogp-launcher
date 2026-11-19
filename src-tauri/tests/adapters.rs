@@ -4,7 +4,7 @@ use motogp_application::{AppError, SessionEvent, SessionPublisher, SessionState,
 use motogp_launcher_lib::{is_steam_url, SessionEventDto, TauriEvents, TauriOpener};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
-use tauri::{Listener, Manager};
+use tauri::Listener;
 
 fn collect(app: &tauri::App<tauri::test::MockRuntime>, name: &str) -> Arc<Mutex<Vec<Value>>> {
     let seen = Arc::new(Mutex::new(Vec::new()));
