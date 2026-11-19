@@ -97,6 +97,7 @@ QA also checks:
 - [ ] Domain/application with no dependency on infra/Tauri
 - [ ] All gates green (local and CI)
 - [ ] QA approved
+- [ ] Rebased onto the current `dev` and integration gate green (CLAUDE.md, git flow step 6)
 
 The CI ([.github/workflows/validacao.yml](../.github/workflows/validacao.yml)) runs the same gates on every PR.
 
