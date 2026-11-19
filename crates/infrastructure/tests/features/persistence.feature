@@ -7,6 +7,7 @@ Feature: Persist local data safely
     Then I receive the default configuration
 
   Scenario: Save and read in a path with spaces and accents
+    # Non-ASCII on purpose: Windows user folders often contain accents (e.g. "Usuário Padrão").
     Given a directory named "Usuário Padrão"
     And a configuration with game_dir at "Program Files (x86)" and active_profile "p1"
     When I save and read config.json

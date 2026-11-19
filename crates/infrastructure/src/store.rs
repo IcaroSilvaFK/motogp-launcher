@@ -163,6 +163,7 @@ mod tests {
 
     #[test]
     fn roundtrip_in_path_with_accents() {
+        // Non-ASCII on purpose: Windows user folders often contain accents (e.g. "Usuário Padrão").
         let dir = tempdir().unwrap();
         let path = dir
             .path()

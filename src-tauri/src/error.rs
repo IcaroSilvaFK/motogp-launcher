@@ -55,6 +55,7 @@ mod tests {
     use super::*;
 
     fn err(kind: &str) -> AppError {
+        // Non-ASCII on purpose: Windows user folders often contain accents (e.g. "Usuário Padrão").
         let (location, detail) = ("Usuário Padrão/config.json".into(), "boom".into());
         match kind {
             "read" => AppError::Read { location, detail },

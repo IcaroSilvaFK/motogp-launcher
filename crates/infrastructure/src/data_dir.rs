@@ -43,6 +43,7 @@ mod tests {
 
     #[test]
     fn exposes_the_well_known_paths_under_the_root() {
+        // Non-ASCII on purpose: Windows user folders often contain accents (e.g. "Usuário Padrão").
         let data = DataDir::new("C:/Usuário Padrão/data");
         let root = Path::new("C:/Usuário Padrão/data");
         assert_eq!(data.root(), root);

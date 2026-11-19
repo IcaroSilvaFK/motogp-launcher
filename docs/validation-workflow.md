@@ -167,7 +167,7 @@ Gherkin: `crates/application/tests/features/profiles.feature` (fake repository a
 | Protect Vanilla in the backend | `vanilla_cannot_be_deleted` + cucumber |
 | Rename a profile and handle an unknown ID | `rename_persists_new_name`, `unknown_profile_returns_error` + cucumber |
 | Invalid storage is never reseeded | `invalid_storage_is_propagated_and_not_reseeded` (application), `invalid_profiles_json_is_not_reseeded` + cucumber ("Do not reseed invalid JSON", "Do not reseed a zero-byte file") |
-| Error mapping at the Tauri boundary | `src-tauri/src/error_profiles.rs` unit tests (`empty_profile_name`, `profile_not_found`, `vanilla_protected`; storage reuses `AppError` codes) |
+| Error mapping at the Tauri boundary | `error_profiles::tests::maps_business_rules_to_stable_codes_and_messages`, `error_profiles::tests::storage_errors_reuse_the_app_error_mapping` (`src-tauri/src/error_profiles.rs`) |
 ### Manual smoke: `pnpm tauri dev`
 
 Prerequisites: MSVC build tools, Rust stable (MSVC), Node 22, pnpm (corepack), WebView2 Runtime. Run `pnpm tauri dev` and confirm the "MotoGP Launcher" window opens with a 1100x700 client area (minimum 900x600) and shows the "MotoGP Launcher" heading. Verified on Windows 11 during issue #1.
