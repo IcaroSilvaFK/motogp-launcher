@@ -5,8 +5,12 @@ use std::path::{Path, PathBuf};
 /// Port: the library index (`library.json`).
 pub trait ModRepository {
     fn list(&self) -> Result<Vec<ModEntry>, LibraryError>;
-    /// Registers a completed import.
-    fn add(&self, entry: &ModEntry) -> Result<(), LibraryError>;
+    /// Registers completed imports with a single save: all entries or none.
+    fn add_all(&self, entries: &[ModEntry]) -> Result<(), LibraryError>;
+    /// Registers one completed import.
+    fn add(&self, entry: &ModEntry) -> Result<(), LibraryError> {
+        self.add_all(std::slice::from_ref(entry))
+    }
     /// Removes the entry; `true` when it existed.
     fn remove(&self, id: &str) -> Result<bool, LibraryError>;
 }

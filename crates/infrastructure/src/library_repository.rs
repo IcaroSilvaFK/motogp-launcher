@@ -61,9 +61,9 @@ impl ModRepository for JsonModRepository {
         Ok(library.mods.into_iter().map(ModEntry::from).collect())
     }
 
-    fn add(&self, entry: &ModEntry) -> Result<(), LibraryError> {
+    fn add_all(&self, entries: &[ModEntry]) -> Result<(), LibraryError> {
         let mut library = load_json::<LibraryDto>(&self.path)?;
-        library.mods.push(ModDto::from(entry));
+        library.mods.extend(entries.iter().map(ModDto::from));
         Ok(save_json(&self.path, &library)?)
     }
 

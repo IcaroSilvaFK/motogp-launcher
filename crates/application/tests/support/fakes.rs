@@ -81,11 +81,11 @@ impl ModRepository for FakeRepo {
         Ok(self.0.borrow().index.clone())
     }
 
-    fn add(&self, entry: &ModEntry) -> Result<(), LibraryError> {
+    fn add_all(&self, entries: &[ModEntry]) -> Result<(), LibraryError> {
         if self.0.borrow().fail_index_add {
             return Err(io_error(Path::new("library.json"), "index write failed"));
         }
-        self.0.borrow_mut().index.push(entry.clone());
+        self.0.borrow_mut().index.extend(entries.iter().cloned());
         Ok(())
     }
 

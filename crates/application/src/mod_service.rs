@@ -58,11 +58,17 @@ where
         if !is_valid_mod_id(id) {
             return Err(LibraryError::InvalidId { id: id.to_string() });
         }
-        // Index first: a leftover folder is harmless, an entry without files is not.
+        if !self.repository.list()?.iter().any(|entry| entry.id == id) {
+            return Err(LibraryError::NotFound { id: id.to_string() });
+        }
+        // Files first: if the folder cannot be deleted (for example a Windows
+        // sharing violation) the entry stays and the removal can be retried.
+        // Deleting a missing folder is not an error.
+        self.files.remove_mod_dir(id)?;
         if !self.repository.remove(id)? {
             return Err(LibraryError::NotFound { id: id.to_string() });
         }
-        self.files.remove_mod_dir(id)
+        Ok(())
     }
 
     fn stage_and_register(
@@ -83,13 +89,49 @@ where
             self.stage_siblings(source, file_name, staging)?
         };
 
+        self.publish_groups(&groups, staging)
+    }
+
+    /// Publishes every new group, then registers them all with one index save.
+    /// On any failure the folders published by this import are removed and the
+    /// index stays unchanged.
+    fn publish_groups(
+        &self,
+        groups: &[ModGroup],
+        staging: &Path,
+    ) -> Result<Vec<ModEntry>, LibraryError> {
         let mut known = self.repository.list()?;
         let mut entries = Vec::new();
-        for group in &groups {
-            let entry = self.register_group(group, staging, &mut known)?;
-            entries.push(entry);
+        let mut created: Vec<ModEntry> = Vec::new();
+        for group in groups {
+            match self.publish_group(group, staging, &known) {
+                Ok((entry, is_new)) => {
+                    if is_new {
+                        known.push(entry.clone());
+                        created.push(entry.clone());
+                    }
+                    entries.push(entry);
+                }
+                Err(error) => {
+                    self.rollback(&created);
+                    return Err(error);
+                }
+            }
+        }
+        if !created.is_empty() {
+            if let Err(error) = self.repository.add_all(&created) {
+                self.rollback(&created);
+                return Err(error);
+            }
         }
         Ok(entries)
+    }
+
+    /// Best effort: removes only the folders this import published.
+    fn rollback(&self, created: &[ModEntry]) {
+        for entry in created {
+            let _ = self.files.remove_mod_dir(&entry.id);
+        }
     }
 
     /// Copies the chosen file and its same-base-name siblings into `staging`.
@@ -117,16 +159,17 @@ where
     }
 
     /// Publishes one staged group unless the library already has its ID.
-    fn register_group(
+    /// Returns the entry and whether it is new (not yet indexed).
+    fn publish_group(
         &self,
         group: &ModGroup,
         staging: &Path,
-        known: &mut Vec<ModEntry>,
-    ) -> Result<ModEntry, LibraryError> {
+        known: &[ModEntry],
+    ) -> Result<(ModEntry, bool), LibraryError> {
         let pak = group.pak_file().unwrap_or_default();
         let id = mod_id_from_hash(&self.hasher.sha256_hex(&staging.join(pak))?);
         if let Some(existing) = known.iter().find(|entry| entry.id == id) {
-            return Ok(existing.clone());
+            return Ok((existing.clone(), false));
         }
 
         let mut size_bytes = 0;
@@ -139,14 +182,7 @@ where
             files: group.files.clone(),
             size_bytes,
         };
-
         self.files.publish(staging, &group.files, &entry.id)?;
-        if let Err(error) = self.repository.add(&entry) {
-            // Only completed imports stay: undo the published folder.
-            let _ = self.files.remove_mod_dir(&entry.id);
-            return Err(error);
-        }
-        known.push(entry.clone());
-        Ok(entry)
+        Ok((entry, true))
     }
 }
