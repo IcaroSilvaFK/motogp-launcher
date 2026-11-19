@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// One file the launcher deployed (or intends to deploy) into `~mods`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -67,9 +67,48 @@ pub fn is_safe_file_name(name: &str) -> bool {
         && !name.contains(['/', '\\', ':', '\0'])
 }
 
+/// `true` when the last component of `path` is `~mods`, compared
+/// case-insensitively (Windows). A defense-in-depth check that a folder about
+/// to be cleaned really is a game `~mods` folder. `""`, `/`, `..` and names
+/// such as `~mods.bak` are not.
+pub fn is_mods_dir(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("~mods"))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn mods_dir_is_recognized_by_its_last_component() {
+        for path in [
+            "~mods",
+            "~MODS",
+            "game/Content/Paks/~mods",
+            "game/Content/Paks/~mods/",
+        ] {
+            assert!(is_mods_dir(Path::new(path)), "{path:?} should match");
+        }
+        #[cfg(windows)]
+        assert!(is_mods_dir(Path::new("C:\\Game\\Content\\Paks\\~mods\\")));
+    }
+
+    #[test]
+    fn other_directories_are_not_mods_dirs() {
+        for path in [
+            "",
+            "/",
+            "..",
+            "game/~mods/..",
+            "game/~mods.bak",
+            "game/mods",
+            "~mods/sub",
+        ] {
+            assert!(!is_mods_dir(Path::new(path)), "{path:?} should not match");
+        }
+    }
 
     #[test]
     fn deploy_preserves_p_suffix() {
