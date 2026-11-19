@@ -298,3 +298,27 @@ Recovery protocol (write-ahead journal in `deployed.json`): the destination is v
 | Retry a partially failed cleanup | `failed_clean_keeps_pending_entries` (application), `failed_clean_on_disk_keeps_pending_entries_for_a_retry` (infra) + cucumber |
 | Reject a path outside the authorized directory | `invalid_manifest_path_is_rejected` (application), `invalid_manifest_path_on_disk_is_rejected`, `adapter_rejects_names_that_could_escape_the_directory` (infra) + cucumber |
 | Hard link, with copy fallback | `hard_link_is_used_when_it_succeeds`, `hard_link_failure_falls_back_to_copy`, `a_failed_copy_leaves_no_partial_destination` (infra, controlled link failure) |
+
+### Issue #9: scenario traceability
+
+Gherkin: `tests/features/frontend/interface.feature`. Each scenario is covered at three levels: the use case against fake ports (`src/application/__tests__/controller.test.tsx`), the screens against a fake controller (`src/ui/__tests__/launcher.test.tsx`) and end to end over the real controller with the in-memory fakes of `src/application/__tests__/fakes.ts` (`src/ui/__tests__/interface.feature.test.tsx`, one `describe`/`it` per scenario, named with the Gherkin wording). Only `src/main.tsx` wires the Tauri adapters (`src/infrastructure`) into the controller.
+
+| Scenario | Tests |
+|----------|-------|
+| Configure an Unreal folder without Steam | `loads_launcher_state` (application), `settings_accepts_fake_unreal_directory` (ui), e2e "Given the fake folder ..." |
+| Use a detected game | `selects_detected_game` (ui), `game is configured and detection works` (application), e2e "Given detection returns a MotoGP with an App ID" |
+| Import through the dialog without duplicating | `imports_and_refreshes_library`, `reimport_keeps_single_mod` (application), `library_shows_mod_metadata` (ui), e2e "Given a test pak not yet in the library" |
+| Import by drag and drop | `drop_imports_supported_paths` (application), `imports_from_dialog_and_drop` (ui), e2e "Given the Library screen open" |
+| Cancel the selection and remove the listener | `cancelled_dialog_does_not_import`, `listeners_are_released_on_dispose` (application), `cancelled_dialog_does_not_import` (ui), e2e "Given an open dialog and active listeners on the screen" (React StrictMode, `activeListeners()` is 0 after unmount) |
+| Create a profile and order mods | `saves_profile_mod_order` (application), `profile_order_can_be_changed_with_keyboard` (ui), e2e "Given mods A and B in the library" (saved `mod_ids` B, A and kept after a reload) |
+| Rename, delete and protect profiles | `creates_renames_and_deletes_profile`, `vanilla_delete_is_unavailable` (ui), e2e "Given a regular profile and Vanilla" |
+| Remove a mod from the library and from profiles | `remove_mod_refreshes_profiles` (application), `library_shows_mod_metadata` (ui), e2e "Given a listed mod referenced in a profile" |
+| Warn of an error when playing without an App ID | `play_refuses_without_app_id` (application), `missing_app_id_error_is_visible` (ui), e2e "Given the profile \"Teste\" active ..." (the fake `deployed` stays empty). `~mods` untouched is proven by the Rust application test of #8 |
+| Control Play availability | `can_play_rules` (application), `play_is_disabled_without_game_or_during_session` (ui), e2e "Given the app without a configured game" |
+| Show session events | `handles_session_events`, `session_error_does_not_announce_cleanup` (application), `session_status_uses_cleaned_count` (ui), e2e "Given a requested session" (started, ended) |
+| Show that the game did not open | `handles_session_events` (application), `never_started_status_is_visible` (ui), e2e "Given a requested session" (never-started) |
+| Show operation errors | `operation_error_is_exposed` (application), `error_notice_is_announced`, `success_notice_has_status_role` (ui), e2e "Given an operation whose port returns an error" |
+| Subscribe before `recovery_status` | `subscribes_before_recovery_status` (application), e2e "Given the launcher starts" (shared event log); a start after dispose (StrictMode remount) keeps a single set of listeners (application "started again after dispose") |
+| Carried-over error codes (`game_still_running`, `process_inspection_failed`, `session_thread_failed`, `archive_too_large`) | `has specific messages for the carried-over codes` and `have a message for every error code in both locales` (`src/ui/i18n/__tests__/i18n.test.tsx`) |
+| Tauri adapters | `src/infrastructure/__tests__`: `errors_are_normalized` (gateway), `dialog_filters_supported_mod_extensions`, `cancelled_dialog_returns_null`, `single_selection_is_wrapped` (picker), `session_and_drop_adapters_unsubscribe`, `late_unsubscribe_releases_listener`, `drop_ignores_non_drop_events` (events) |
+| Internationalization | `defaults to pt-BR`, `uses the given initial locale and switches with setLocale` (i18n), `default_locale_is_pt_br`, `language_select_switches_locale` (ui); the e2e suite runs in `en` |
