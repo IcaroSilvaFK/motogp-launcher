@@ -30,5 +30,5 @@ pub use ports::ConfigRepository;
 pub use profile_ports::{Clock, ProfileRepository};
 pub use profile_service::{ProfileService, ProfileServiceError};
 pub use session_error::SessionError;
-pub use session_ports::{ProcessInspector, SessionClock, UrlOpener, POLL};
+pub use session_ports::{ProcessInspector, SessionClock, TrackOutcome, UrlOpener, POLL};
 pub use session_service::SessionService;

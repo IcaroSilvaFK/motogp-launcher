@@ -91,18 +91,36 @@ mod tests {
     #[test]
     fn dot_dot_segments_are_resolved_before_comparing() {
         let root = Path::new("C:/Jogos/MotoGP25");
-        assert!(is_inside_root(Path::new("C:/Jogos/MotoGP25/bin/../game.exe"), root));
-        assert!(!is_inside_root(Path::new("C:/Jogos/MotoGP25/../Other/a.exe"), root));
-        assert!(is_inside_root(Path::new("C:/Jogos/Other/../MotoGP25/a.exe"), root));
+        assert!(is_inside_root(
+            Path::new("C:/Jogos/MotoGP25/bin/../game.exe"),
+            root
+        ));
+        assert!(!is_inside_root(
+            Path::new("C:/Jogos/MotoGP25/../Other/a.exe"),
+            root
+        ));
+        assert!(is_inside_root(
+            Path::new("C:/Jogos/Other/../MotoGP25/a.exe"),
+            root
+        ));
     }
 
     #[cfg(windows)]
     #[test]
     fn verbatim_prefix_matches_the_plain_path() {
         let root = Path::new("C:/Jogos/MotoGP25");
-        assert!(is_inside_root(Path::new(r"\?C:JogosMotoGP25game.exe"), root));
-        assert!(is_inside_root(Path::new("C:/Jogos/MotoGP25/game.exe"), Path::new(r"\?C:JogosMotoGP25")));
-        assert!(!is_inside_root(Path::new(r"\?C:JogosMotoGP25Backup.exe"), root));
+        assert!(is_inside_root(
+            Path::new(r"\?C:JogosMotoGP25game.exe"),
+            root
+        ));
+        assert!(is_inside_root(
+            Path::new("C:/Jogos/MotoGP25/game.exe"),
+            Path::new(r"\?C:JogosMotoGP25")
+        ));
+        assert!(!is_inside_root(
+            Path::new(r"\?C:JogosMotoGP25Backup.exe"),
+            root
+        ));
     }
 
     #[cfg(windows)]

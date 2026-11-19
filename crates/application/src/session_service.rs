@@ -26,11 +26,23 @@ impl<O: UrlOpener, P: ProcessInspector, C: SessionClock> SessionService<O, P, C>
         self.opener.open(&url).map_err(SessionError::Opener)
     }
 
-    /// Polls every `POLL` until a terminal event; each event goes to `emit`.
-    pub fn track(&self, root: &Path, mut emit: impl FnMut(WatchEvent)) -> Result<(), AppError> {
+    /// Polls every `POLL` on a fixed schedule (inspection time never drifts it)
+    /// until a terminal event; each event goes to `emit`. `cancel` is checked
+    /// before every inspection (so also after every wait); when it fires the
+    /// tracking stops with `TrackOutcome::Cancelled` and no game event.
+    pub fn track(
+        &self,
+        root: &Path,
+        cancel: impl Fn() -> bool,
+        mut emit: impl FnMut(WatchEvent),
+    ) -> Result<TrackOutcome, AppError> {
         let start = self.clock.now();
+        let mut deadline = start;
         let mut state = WatchState::default();
         loop {
+            if cancel() {
+                return Ok(TrackOutcome::Cancelled);
+            }
             let running = self.inspector.game_running(root)?;
             let elapsed = self.clock.now().saturating_sub(start);
             let (next, event) = watch_step(state, running, elapsed);
@@ -39,9 +51,13 @@ impl<O: UrlOpener, P: ProcessInspector, C: SessionClock> SessionService<O, P, C>
                 emit(event);
             }
             if state.is_finished() {
-                return Ok(());
+                return Ok(TrackOutcome::Finished);
             }
-            self.clock.sleep(POLL);
+            deadline += POLL;
+            let remaining = deadline.saturating_sub(self.clock.now());
+            if !remaining.is_zero() {
+                self.clock.sleep(remaining);
+            }
         }
     }
 }
@@ -215,7 +231,9 @@ mod tests {
         inspector.fail = true;
         let opener = FakeOpener::default();
         let service = SessionService::new(&opener, &inspector, clock);
-        let error = service.track(Path::new("root"), || false, |_| {}).unwrap_err();
+        let error = service
+            .track(Path::new("root"), || false, |_| {})
+            .unwrap_err();
         assert_eq!(error.location(), "processes");
     }
 

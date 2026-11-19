@@ -23,3 +23,12 @@ pub trait SessionClock {
     /// Blocks (or advances a fake clock) for `duration`.
     fn sleep(&self, duration: Duration);
 }
+
+/// How a `track` call ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrackOutcome {
+    /// The watcher reached a terminal game event (`Ended` / `NeverStarted`).
+    Finished,
+    /// The caller cancelled the tracking; no game event was fabricated.
+    Cancelled,
+}
