@@ -191,7 +191,7 @@ mod tests {
     impl Read for FlakyReader {
         fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
             if self.sent {
-                return Err(io::Error::new(io::ErrorKind::Other, "read failed"));
+                return Err(io::Error::other("read failed"));
             }
             self.sent = true;
             buf[..4].copy_from_slice(b"part");
