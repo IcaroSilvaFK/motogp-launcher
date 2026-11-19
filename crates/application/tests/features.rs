@@ -20,6 +20,8 @@ mod profiles;
 
 #[path = "bdd/session_tracking.rs"]
 mod session_tracking;
+#[path = "bdd/stale_manifest.rs"]
+mod stale_manifest;
 
 #[path = "support/config_fakes.rs"]
 pub mod config_fakes;
@@ -41,6 +43,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("commands-and-recovery", || {
         Box::pin(commands_and_recovery::run())
     }),
+    ("stale-manifest", || Box::pin(stale_manifest::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

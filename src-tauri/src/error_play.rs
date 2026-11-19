@@ -9,6 +9,7 @@ fn deploy_code(error: &DeployError) -> &'static str {
         DeployError::Io { .. } => "deploy_io_failed",
         DeployError::AlreadyExists { .. } => "deploy_already_exists",
         DeployError::InvalidPath { .. } => "deploy_invalid_path",
+        DeployError::SessionNotStale { .. } => "deploy_session_not_stale",
         DeployError::UnauthorizedDirectory { .. } => "deploy_unauthorized_directory",
         DeployError::CleanIncomplete { .. } => "deploy_cleanup_incomplete",
     }
@@ -163,6 +164,10 @@ mod tests {
             (
                 DeployError::InvalidPath { path: "p".into() },
                 "deploy_invalid_path",
+            ),
+            (
+                DeployError::SessionNotStale { path: "p".into() },
+                "deploy_session_not_stale",
             ),
             (
                 DeployError::UnauthorizedDirectory { path: "p".into() },

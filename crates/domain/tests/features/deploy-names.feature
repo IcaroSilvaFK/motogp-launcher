@@ -20,3 +20,13 @@ Feature: Name the deployed files of a session
     Given a file name "..\evil.pak"
     When I check whether the name is safe
     Then the name is rejected
+
+  Scenario: Recognize the game mods folder
+    Given a folder path "C:\Game\Content\Paks\~MODS"
+    When I check whether the folder is a mods folder
+    Then the folder is accepted
+
+  Scenario: Reject a folder that is not named mods
+    Given a folder path "C:\Game\Content\Paks\~mods.bak"
+    When I check whether the folder is a mods folder
+    Then the folder is rejected
