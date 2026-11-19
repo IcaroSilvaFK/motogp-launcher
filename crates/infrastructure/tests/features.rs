@@ -16,6 +16,8 @@ mod file_deploy;
 mod file_import;
 #[path = "bdd/processes.rs"]
 mod processes;
+#[path = "bdd/stale_manifest.rs"]
+mod stale_manifest;
 
 #[path = "bdd/persistence.rs"]
 mod persistence;
@@ -33,6 +35,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("steam", || Box::pin(steam::run())),
     ("file_import", || Box::pin(file_import::run())),
     ("file_deploy", || Box::pin(file_deploy::run())),
+    ("stale-manifest", || Box::pin(stale_manifest::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

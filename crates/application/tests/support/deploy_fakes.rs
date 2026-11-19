@@ -32,6 +32,10 @@ pub struct DeployState {
     pub fail_save_at: Option<usize>,
     /// Ordered log of "materialize <name>" / "remove <name>".
     pub log: Vec<String>,
+    /// Directories that do not exist (a manifest pointing there is `Missing`).
+    pub missing_dirs: Vec<PathBuf>,
+    /// Number of `owns` calls (a recovery that must not touch files asserts 0).
+    pub owns_calls: usize,
     /// Source file contents by path.
     pub sources: BTreeMap<PathBuf, Vec<u8>>,
 }
@@ -110,6 +114,9 @@ impl DeployFiles for FakeFiles {
 
     fn check_dir(&self, manifest_dir: &Path, authorized: &Path) -> Result<DirCheck, DeployError> {
         let state = self.0.borrow();
+        if state.missing_dirs.iter().any(|d| d == manifest_dir) {
+            return Ok(DirCheck::Missing);
+        }
         if manifest_dir != authorized {
             return Ok(DirCheck::Foreign);
         }
@@ -125,7 +132,8 @@ impl DeployFiles for FakeFiles {
     /// Fakes have no inode identity: a file is ours when its bytes equal the
     /// library source (what a hard link or a faithful copy looks like).
     fn owns(&self, dir: &Path, name: &str, source: &Path) -> Result<bool, DeployError> {
-        let state = self.0.borrow();
+        let mut state = self.0.borrow_mut();
+        state.owns_calls += 1;
         if state.dead {
             return Err(io_error("process is dead"));
         }
@@ -261,4 +269,40 @@ pub fn put_sources(state: &Shared, mods: &[DeployMod]) {
             put_source(state, &m.id, f, f.as_bytes());
         }
     }
+}
+
+/// The folder of a previous game install (the user switched installs).
+pub fn old_mods_dir() -> PathBuf {
+    PathBuf::from("oldgame/~mods")
+}
+
+pub fn put_disk_in(state: &Shared, dir: &Path, name: &str, content: &[u8]) {
+    state
+        .borrow_mut()
+        .disk
+        .insert((dir.to_path_buf(), name.to_string()), content.to_vec());
+}
+
+pub fn disk_has_in(state: &Shared, dir: &Path, name: &str) -> bool {
+    state
+        .borrow()
+        .disk
+        .contains_key(&(dir.to_path_buf(), name.to_string()))
+}
+
+/// A manifest tracking `names` (sources `lib/old/<name>`, content = name bytes)
+/// inside `dir`, with the files present on the fake disk.
+pub fn stale_manifest(state: &Shared, dir: &Path, names: &[&str]) {
+    let mut manifest = Deployed {
+        mods_dir: dir.to_path_buf(),
+        ..Deployed::default()
+    };
+    for name in names {
+        let source = put_source(state, "old", name, name.as_bytes());
+        put_disk_in(state, dir, name, name.as_bytes());
+        manifest
+            .files
+            .push(motogp_domain::DeployedFile::new(*name, source));
+    }
+    state.borrow_mut().manifest = manifest;
 }

@@ -12,7 +12,7 @@ mod profile;
 mod session;
 
 pub use config::Config;
-pub use deploy::{deployed_name, is_safe_file_name, Deployed, DeployedFile};
+pub use deploy::{deployed_name, is_mods_dir, is_safe_file_name, Deployed, DeployedFile};
 pub use game::{
     find_app_id, install_dir_matches, is_engine_folder, is_motogp_folder, mods_dir_for, GameInfo,
     SteamManifest,
