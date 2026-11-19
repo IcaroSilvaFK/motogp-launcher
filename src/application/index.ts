@@ -6,7 +6,8 @@ export type {
   SelectCanPlay,
   SessionPhase,
 } from './controller';
-export type { DropEvents, FilePicker, LauncherGateway, SessionEvents, Unsubscribe } from './ports';
+export type { DropEvents, FilePicker, LauncherGateway, LocaleStore, SessionEvents, Unsubscribe } from './ports';
+export { loadLocale, saveLocale } from './localePreference';
 export { createLauncherController } from './createLauncherController';
 export { selectCanPlay } from './selectCanPlay';
 export { useLauncherState } from './useLauncherState';

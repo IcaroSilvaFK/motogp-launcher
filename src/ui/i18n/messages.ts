@@ -1,6 +1,4 @@
-import type { ErrorCode } from '../../domain';
-
-export type Locale = 'pt-BR' | 'en';
+import type { ErrorCode, Locale } from '../../domain';
 
 export interface Messages {
   appName: string;

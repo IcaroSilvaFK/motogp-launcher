@@ -2,8 +2,9 @@
 // infrastructure together (Tauri adapters are injected into the controller here).
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createLauncherController } from './application';
+import { createLauncherController, loadLocale, saveLocale } from './application';
 import {
+  createLocalStorageLocaleStore,
   createTauriDropEvents,
   createTauriGateway,
   createTauriPicker,
@@ -23,8 +24,14 @@ const controller = createLauncherController({
   drop: createTauriDropEvents(),
 });
 
+const localeStore = createLocalStorageLocaleStore();
+
 createRoot(container).render(
   <StrictMode>
-    <App controller={controller} />
+    <App
+      controller={controller}
+      locale={loadLocale(localeStore)}
+      onLocaleChange={(locale) => saveLocale(localeStore, locale)}
+    />
   </StrictMode>,
 );

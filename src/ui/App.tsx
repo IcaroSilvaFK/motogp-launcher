@@ -62,9 +62,17 @@ function Shell({ controller }: { controller: LauncherController }) {
   );
 }
 
-export function App({ controller, locale }: { controller: LauncherController; locale?: Locale }) {
+export function App({
+  controller,
+  locale,
+  onLocaleChange,
+}: {
+  controller: LauncherController;
+  locale?: Locale;
+  onLocaleChange?: (locale: Locale) => void;
+}) {
   return (
-    <I18nProvider locale={locale}>
+    <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
       <Shell controller={controller} />
     </I18nProvider>
   );
