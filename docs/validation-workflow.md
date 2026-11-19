@@ -209,7 +209,41 @@ Gherkin: `crates/domain/tests/features/session-state.feature` (steps `tests/bdd/
 | Poll on a fixed schedule, no drift from inspection time | `inspection_time_does_not_drift_the_poll_schedule`, `never_started_still_triggers_at_120_seconds_with_slow_inspections`, `overrunning_poll_runs_the_next_one_immediately_without_drift` (application) |
 | Cancel tracking without a fake game event | `cancelled_before_start_never_inspects_nor_emits`, `cancelled_while_running_stops_without_a_fake_ended` (`TrackOutcome::Cancelled`) |
 
-Deviation: the `UrlOpener`, `ProcessInspector` and `Clock` ports are defined in `application/src/session_ports.rs`. The real opener (Tauri opener plugin) is wired in issue #8.
+Deviation: the `UrlOpener`, `ProcessInspector` and `Clock` ports are defined in `application/src/session_ports.rs`. The real opener (Tauri opener plugin, restricted to `steam://`) is wired in issue #8 (`src-tauri/src/adapters.rs`).
+
+### Issue #8: scenario traceability
+
+Gherkin: `crates/application/tests/features/commands-and-recovery.feature` (12 scenarios, steps `tests/bdd/commands_and_recovery.rs`, fake ports; the deploy side is the real `DeployService` over the in-memory deploy ports) and `src-tauri/tests/features/tauri-interface.feature` (5 scenarios, steps `tests/ipc_support/interface_steps.rs`, real commands over the Tauri mock runtime with a temp data dir and controlled opener, process, runner and event ports). No test starts a real game, opens Steam or sleeps.
+
+| Scenario | Test |
+|----------|------|
+| Resolve mods in order ignoring missing references | `resolve_profile_mods_keeps_order_and_skips_missing` (`tests/commands.rs`) |
+| Recover a previous deployment on startup | `startup_recovers_previous_deployment`, `startup_recovery_failure_is_visible_and_blocks_new_deploys`, `play_before_startup_recovery_is_rejected` (`tests/play_service.rs`); `setup_runs_recovery_before_accepting_play`, `a_recovery_failure_is_visible_and_blocks_play` (`src-tauri/tests/commands_contract.rs`) |
+| Prevent a simultaneous session | `concurrent_play_is_rejected` (`tests/play_service.rs`), `concurrent_play_through_ipc_reports_the_running_game`; `only_one_thread_wins_a_race_for_the_lock` (infrastructure) |
+| Validate prerequisites before deploy | `play_without_game_does_not_deploy`, `play_without_app_id_does_not_deploy` |
+| Finish a session with cleanup and event | `ended_session_cleans_and_emits_count`, `never_started_session_cleans_and_releases_lock` |
+| Emit start without cleaning prematurely | `started_event_does_not_clean` |
+| Compensate a failure to open Steam | `opener_failure_rolls_back_deployment`, `opener_failure_keeps_manual_files_untouched`, `failed_compensation_is_reported_and_blocks_new_deploys` |
+| Do not hide a recovery failure | `cleanup_failure_keeps_recovery_pending`, `tracking_failure_is_reported_without_a_false_success` |
+| Keep profiles consistent when removing data | `remove_mod_clears_profile_references`, `deleting_active_profile_selects_vanilla`, `set_active_profile_validates_the_profile`, `remove_mod_reports_library_failures_and_keeps_references` |
+| Batch import contract | `batch_import_stops_at_first_error_and_keeps_completed_imports`, `import_mods_reports_the_first_failure_and_keeps_completed_imports` (IPC) |
+| Game configuration | `set_game_dir_inspects_before_saving`, `get_game_is_none_only_when_unconfigured`, `get_game_surfaces_inspection_errors_of_a_configured_path` |
+| Never clean or redeploy while the game is still running | `restart_with_the_game_running_keeps_files_and_resumes_tracking`, `startup_inspection_failure_blocks_and_deletes_nothing`, `play_is_refused_while_the_game_is_running`, `play_inspection_failure_blocks_deployment`, `tracking_failure_with_the_game_running_never_redeploys_until_it_ends`, `tracking_failure_then_inspection_failure_deletes_nothing` (`tests/play_recovery.rs`) |
+| Release the session lock when the worker fails | `panic_while_tracking_releases_the_lock_and_marks_recovery_pending`, `panic_while_preparing_releases_the_lock_and_marks_recovery_pending`, `spawn_failure_keeps_files_marks_recovery_pending_and_reports_an_error` (`tests/play_recovery.rs`); `runner_executes_the_task_on_another_thread` (infrastructure) |
+| Keep the startup recovery result readable | `recovery_status_keeps_a_startup_failure_retrievable`, `recovery_status_reports_the_cleaned_count` (application); `startup_recovery_failure_stays_retrievable_through_recovery_status`, `successful_recovery_is_reported_with_its_cleaned_count` (IPC) |
+| Keep the interface responsive and consistent | `concurrent_imports_do_not_lose_updates`, `new_play_errors_have_stable_codes` (`src-tauri/tests/commands_contract.rs`) |
+| Allow a single launcher instance | `a_second_acquisition_fails_while_the_first_is_held`, `an_unwritable_location_is_an_error_not_a_silent_success` (`crates/infrastructure/src/instance_lock.rs`); strict CSP in `production_csp_is_strict_and_dev_csp_only_adds_what_vite_needs` (`src-tauri/tests/adapters.rs`) |
+| Preserve the command contract | `commands_preserve_camel_case_arguments_and_snake_case_dtos` (all 14 commands), `snake_case_arguments_are_not_accepted_from_javascript`, `errors_are_presented_as_code_and_message_without_business_rules`; event serialization and the error channel in `src-tauri/tests/adapters.rs`; capabilities (opener restricted to `steam://*`, no unrestricted URL/shell/process permission) in `capabilities_are_minimal_and_open_only_steam_urls` |
+
+Design notes:
+
+- `application` owns the orchestration (`PlayService`) behind narrow traits (`PlayGame`, `ModPlanner`, `Deployer`, `SessionRuntime`) and the ports `SessionLock`, `BackgroundRunner`, `SessionPublisher`; the real services implement them. Infrastructure adds `AtomicSessionLock` and `ThreadRunner`. The Tauri opener and event adapters live in `src-tauri/src/adapters.rs` (`AppHandle` only appears there).
+- Review hardening: a still-running game is never cleaned or deployed over (`GameStillRunning`; an inspection failure blocks too and nothing is deleted); the session lock is an RAII guard (a panic or a failed worker spawn marks the cleanup pending before releasing); `recovery_status` keeps the startup result readable; the Tauri commands that write are `async` on the blocking pool and serialized by `AppState::write_lock`; a `FileInstanceLock` (`instance.lock` in the app data dir) is taken before the recovery so only one launcher process runs; the CSP is strict (`devCsp` adds only what Vite needs).
+- The lock is held from the Play request until the cleanup finished (released before the final event is published, so the UI can start a new session right after `ended`).
+- A failed cleanup (startup, compensation or end of session) keeps the manifest, reports on the `session-error` event and blocks new deploys; the next Play retries the cleanup first and continues only when it succeeds. The lock is released in those cases so the retry is possible.
+- `session` payload: `{ state: "started" | "ended" | "never-started", cleaned }`; `session-error` payload: `{ message }`. Command errors serialize as `{ code, message }` (`CommandError`).
+- `src-tauri/build.rs` embeds `windows-test.manifest` (Common Controls v6) into the Rust test executables; without it any test that links Tauri fails with `STATUS_ENTRYPOINT_NOT_FOUND` on Windows.
+- Manual smoke (not in the gates): with a real game, press Play, confirm the `~mods` files appear, Steam opens and, after closing the game, the files are removed and the `session` event reports the count.
 
 ### Manual smoke: Steam registry (Windows)
 

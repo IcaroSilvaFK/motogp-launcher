@@ -5,10 +5,9 @@ use motogp_application::{
     AppError, DeployError, DeployFiles, DeployMod, DeployService, DeployedRepository, DirCheck,
 };
 use motogp_domain::Deployed;
-use std::cell::RefCell;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[derive(Debug, Default)]
 pub struct DeployState {
@@ -37,10 +36,24 @@ pub struct DeployState {
     pub sources: BTreeMap<PathBuf, Vec<u8>>,
 }
 
-pub type Shared = Rc<RefCell<DeployState>>;
+/// Thread-safe cell with a `RefCell`-like API, so the same fakes serve the
+/// threaded session tests (issue #8) and the single-threaded deploy tests.
+#[derive(Debug, Default)]
+pub struct Locked<T>(RwLock<T>);
+
+impl<T> Locked<T> {
+    pub fn borrow(&self) -> RwLockReadGuard<'_, T> {
+        self.0.read().expect("fake state lock")
+    }
+    pub fn borrow_mut(&self) -> RwLockWriteGuard<'_, T> {
+        self.0.write().expect("fake state lock")
+    }
+}
+
+pub type Shared = Arc<Locked<DeployState>>;
 
 pub fn new_state() -> Shared {
-    Rc::new(RefCell::new(DeployState::default()))
+    Arc::new(Locked::default())
 }
 
 pub fn mods_dir() -> PathBuf {

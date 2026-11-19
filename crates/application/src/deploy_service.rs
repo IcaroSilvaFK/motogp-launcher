@@ -100,6 +100,11 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
         Ok(())
     }
 
+    /// `true` when the manifest tracks nothing (nothing to clean).
+    pub fn is_clean(&self) -> Result<bool, DeployError> {
+        Ok(self.repository.load()?.is_empty())
+    }
+
     /// Removes the tracked files that are provably the launcher's own and
     /// returns how many were actually removed. Tracked entries whose file is
     /// missing or no longer ours (replaced by the user) are untracked without
