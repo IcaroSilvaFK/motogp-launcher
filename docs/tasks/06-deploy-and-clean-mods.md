@@ -108,5 +108,5 @@ Preserve the seven plan names:
 - [ ] Gate 6: Cargo dependencies inward and boundaries green; rules with no I/O and adapters not deciding profile order.
 - [ ] Gate 7: `cargo llvm-cov` and `pnpm test --coverage` with ≥90% domain/application per layer/crate and ≥80% overall per stack.
 - [ ] Gate 8: criteria and disk/interruption failures proven; **Rust core** and **Frontend** green in CI.
-- [ ] QA Haiku approved and Codex review applied; foreign files never overwritten/deleted and pending items not discarded.
+- [ ] QA Haiku approved; foreign files never overwritten/deleted and pending items not discarded.
 - [ ] Branch from `dev`; PR to `dev` with a real `Closes #<no>`; no direct commit to `dev/qas/main`.

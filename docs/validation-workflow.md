@@ -6,7 +6,7 @@ Stack: Tauri 2 + Rust (core), React + TypeScript + Vite (frontend), pnpm.
 
 ---
 
-## 1. BDD: specify the behavior (Codex, in the issue)
+## 1. BDD: specify the behavior (Coordinator, in the issue)
 
 Every issue carries the acceptance criteria in **Gherkin**:
 
@@ -22,7 +22,7 @@ Feature: Install mod
 - Scenarios become `.feature` files in the repo:
   - Rust: `tests/features/*.feature`, run with the [`cucumber`](https://crates.io/crates/cucumber) crate.
   - Frontend: scenarios become `describe("Given…") / it("When… Then…")` in Vitest + Testing Library.
-- If a scenario cannot be tested, the issue is poorly defined. It goes back to Codex.
+- If a scenario cannot be tested, the issue is poorly defined. It goes back to the Coordinator.
 
 ## 2. TDD: Red → Green → Refactor (Dev, Sonnet)
 
@@ -67,7 +67,7 @@ src/
 
 - Boundaries validated with `eslint-plugin-boundaries` (or `dependency-cruiser`): `ui` does not import `infrastructure` directly, and `domain` imports nothing from outside.
 
-## 4. Validation gates (QA Haiku → Codex)
+## 4. Validation gates (QA Haiku)
 
 **QA (Haiku)** runs and checks, in order:
 
@@ -82,13 +82,12 @@ src/
 | 7 | Coverage | `cargo llvm-cov` · `pnpm test --coverage` (targets above) |
 | 8 | Acceptance criteria | every Gherkin scenario in the issue has a matching, passing test |
 
-If any gate fails, the delivery goes back to the dev with the QA report.
+If any gate fails, QA sends its report to the Coordinator, who dispatches a new dev with the fix. When every gate passes, QA notifies the PO, who commits, opens the PR and closes the issue.
 
-**Codex** then reviews:
-- whether the TDD order is visible in the commits;
+QA also checks:
+- whether every rule and scenario has a test written for it (TDD), not code without tests;
 - whether the dependency rule and the per-layer responsibilities were respected;
-- whether the tests are good: behavior instead of implementation, no excessive mocks;
-- suggested improvements and refactors, which are applied before the PR.
+- whether the tests are good: behavior instead of implementation, no excessive mocks.
 
 ## 5. PR checklist
 
@@ -97,7 +96,7 @@ If any gate fails, the delivery goes back to the dev with the QA report.
 - [ ] BDD scenarios implemented and passing
 - [ ] Domain/application with no dependency on infra/Tauri
 - [ ] All gates green (local and CI)
-- [ ] QA approved + Codex review applied
+- [ ] QA approved
 
 The CI ([.github/workflows/validacao.yml](../.github/workflows/validacao.yml)) runs the same gates on every PR.
 

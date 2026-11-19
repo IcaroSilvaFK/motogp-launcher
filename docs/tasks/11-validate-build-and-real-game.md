@@ -102,5 +102,5 @@ The plan did not name tests for this stage. Before adding validation logic or fi
 - [ ] Gate 7: `cargo llvm-cov` and `pnpm test --coverage` with ≥90% domain/application per layer/crate and ≥80% overall per stack.
 - [ ] Gate 8: criteria traced and build/game/crash/external-file/updater evidence recorded; **Rust core** and **Frontend** green in CI.
 - [ ] Executable <15 MB; NSIS/MSI produced; installer sizes/limitations documented and evaluated by QA.
-- [ ] QA Haiku approved and Codex review applied; a pending item for hardware, game, feed or signature prevents declaring this issue complete.
+- [ ] QA Haiku approved; a pending item for hardware, game, feed or signature prevents declaring this issue complete.
 - [ ] Branch from `dev`; PR to `dev` with a real `Closes #<no>`; promotion only `dev → qas → main`, no direct commit to those branches.

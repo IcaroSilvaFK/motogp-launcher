@@ -38,6 +38,6 @@ Read [CLAUDE.md](../../CLAUDE.md), [validation workflow](../validation-workflow.
 
 Publish each body as an issue later, apply labels and replace local references with real links/numbers when available. `NN` is the plan order and matches the GitHub issue number. The `branch: feat/<N>-<slug>` field uses the issue number without the leading zero; if the GitHub numbering ever differs, explicitly link the real issue in the branch/PR and use `Closes #<real-no>`, without assuming NN matches it.
 
-Task branches come from `dev`. Developers follow TDD, QA Haiku runs the eight gates and Codex reviews/applies improvements before the PR to `dev` is opened. Promotion happens via PR `dev → qas → main`; hotfixes follow the CLAUDE.md flow. Do not create direct commits on those branches nor promote without the Rust core and Frontend checks.
+Task branches come from `dev`. Developers follow TDD, QA Haiku runs the eight gates (failures go back to the Coordinator) and the PO opens the PR to `dev` once QA passes. Promotion happens via PR `dev → qas → main`; hotfixes follow the CLAUDE.md flow. Do not create direct commits on those branches nor promote without the Rust core and Frontend checks.
 
 This batch contains Markdown specifications only. It does not run scaffolding, product tests, Git/gh commands, issue publication, secrets configuration or releases.

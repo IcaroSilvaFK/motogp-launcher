@@ -78,5 +78,5 @@ The plan did not name tests for this task. Write the scaffold checks first, with
 - [ ] Gate 6: Cargo metadata and boundaries confirm inward dependencies; only dev-dependencies may contain the core BDD tooling.
 - [ ] Gate 7: `cargo llvm-cov` and `pnpm test --coverage` enforce ≥90% domain/application and ≥80% overall; initial absence of core lines made explicit, with no bypass once there is an implementation.
 - [ ] Gate 8: acceptance criteria traced to tests; **Rust core** and **Frontend** green in CI, no skips.
-- [ ] QA Haiku approved and Codex review applied before opening the PR.
+- [ ] QA Haiku approved before opening the PR.
 - [ ] Branch from `dev`; PR to `dev` with `Closes #<no>` using the real number after publication. Promotions only `dev → qas → main`; no direct commits on those branches.

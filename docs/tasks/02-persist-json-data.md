@@ -81,5 +81,5 @@ Preserve the three plan names in **crates/infrastructure**, in the store module;
 - [ ] Gate 6: domain with no external production deps; application depends only on domain; no rule imports fs, serde or Tauri; frontend boundaries green.
 - [ ] Gate 7: `cargo llvm-cov` and `pnpm test --coverage` demonstrate ≥90% domain/application per layer/crate and ≥80% overall per stack, per issue 01.
 - [ ] Gate 8: all criteria proven; **Rust core** and **Frontend** checks green in CI.
-- [ ] QA Haiku approved and Codex review applied before the PR; persistence failures do not cause silent loss.
+- [ ] QA Haiku approved before the PR; persistence failures do not cause silent loss.
 - [ ] Branch from `dev`; PR to `dev` with a real `Closes #<no>`; no direct commit to `dev/qas/main`.
