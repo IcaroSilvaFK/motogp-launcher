@@ -66,7 +66,7 @@ fn track(w: &mut TrackingWorld) {
     let service = SessionService::new(NoOpener, w.inspector.clone(), clock);
     let mut events = Vec::new();
     service
-        .track(Path::new("root"), |e| events.push(e))
+        .track(Path::new("root"), || false, |e| events.push(e))
         .expect("track");
     w.events = events;
 }

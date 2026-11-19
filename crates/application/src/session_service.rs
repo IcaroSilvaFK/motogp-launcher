@@ -1,4 +1,6 @@
-use crate::{AppError, ProcessInspector, SessionClock, SessionError, UrlOpener, POLL};
+use crate::{
+    AppError, ProcessInspector, SessionClock, SessionError, TrackOutcome, UrlOpener, POLL,
+};
 use motogp_domain::{launch_url, watch_step, GameInfo, WatchEvent, WatchState};
 use std::path::Path;
 
@@ -70,6 +72,7 @@ mod tests {
         script: Vec<bool>,
         queries: RefCell<Vec<Duration>>,
         fail: bool,
+        cost: Duration,
     }
     impl FakeInspector {
         fn new(clock: &FakeClock, script: Vec<bool>) -> Self {
@@ -78,6 +81,7 @@ mod tests {
                 script,
                 queries: RefCell::default(),
                 fail: false,
+                cost: Duration::ZERO,
             }
         }
     }
@@ -92,6 +96,7 @@ mod tests {
             let mut q = self.queries.borrow_mut();
             let i = q.len();
             q.push(self.clock.now());
+            self.clock.0.set(self.clock.0.get() + self.cost);
             Ok(self.script.get(i).copied().unwrap_or(false))
         }
     }
@@ -119,16 +124,27 @@ mod tests {
     }
 
     fn track(script: Vec<bool>) -> (Vec<WatchEvent>, Vec<Duration>) {
+        let (events, queries, outcome) = track_with(script, Duration::ZERO, || false);
+        assert_eq!(outcome, TrackOutcome::Finished);
+        (events, queries)
+    }
+
+    fn track_with(
+        script: Vec<bool>,
+        cost: Duration,
+        cancel: impl Fn() -> bool,
+    ) -> (Vec<WatchEvent>, Vec<Duration>, TrackOutcome) {
         let clock = FakeClock::default();
-        let inspector = FakeInspector::new(&clock, script);
+        let mut inspector = FakeInspector::new(&clock, script);
+        inspector.cost = cost;
         let opener = FakeOpener::default();
         let service = SessionService::new(&opener, &inspector, clock);
         let mut events = Vec::new();
-        service
-            .track(Path::new("root"), |e| events.push(e))
+        let outcome = service
+            .track(Path::new("root"), cancel, |e| events.push(e))
             .expect("track");
         let queries = inspector.queries.borrow().clone();
-        (events, queries)
+        (events, queries, outcome)
     }
 
     #[test]
@@ -147,6 +163,51 @@ mod tests {
         assert_eq!(queries.len(), 61);
     }
 
+    const INSPECTION: Duration = Duration::from_millis(250);
+
+    #[test]
+    fn inspection_time_does_not_drift_the_poll_schedule() {
+        let (_, queries, _) = track_with(vec![true; 5], INSPECTION, || false);
+        let millis: Vec<u128> = queries.iter().map(Duration::as_millis).collect();
+        assert_eq!(&millis[..4], &[0, 2000, 4000, 6000]);
+    }
+
+    #[test]
+    fn never_started_still_triggers_at_120_seconds_with_slow_inspections() {
+        let (events, queries, _) = track_with(vec![], INSPECTION, || false);
+        assert_eq!(events, vec![WatchEvent::NeverStarted]);
+        assert_eq!(queries.last().map(Duration::as_secs), Some(120));
+    }
+
+    #[test]
+    fn overrunning_poll_runs_the_next_one_immediately_without_drift() {
+        let slow = Duration::from_secs(3);
+        let (_, queries, _) = track_with(vec![true; 4], slow, || false);
+        let secs: Vec<u64> = queries.iter().map(Duration::as_secs).collect();
+        assert_eq!(&secs[..3], &[0, 3, 6]);
+    }
+
+    #[test]
+    fn cancelled_before_start_never_inspects_nor_emits() {
+        let (events, queries, outcome) = track_with(vec![true], Duration::ZERO, || true);
+        assert_eq!(outcome, TrackOutcome::Cancelled);
+        assert!(events.is_empty());
+        assert!(queries.is_empty());
+    }
+
+    #[test]
+    fn cancelled_while_running_stops_without_a_fake_ended() {
+        let checks = Cell::new(0);
+        let cancel = || {
+            checks.set(checks.get() + 1);
+            checks.get() > 3
+        };
+        let (events, queries, outcome) = track_with(vec![true; 10], Duration::ZERO, cancel);
+        assert_eq!(outcome, TrackOutcome::Cancelled);
+        assert_eq!(events, vec![WatchEvent::Started]);
+        assert_eq!(queries.len(), 3);
+    }
+
     #[test]
     fn watcher_propagates_inspector_errors() {
         let clock = FakeClock::default();
@@ -154,7 +215,7 @@ mod tests {
         inspector.fail = true;
         let opener = FakeOpener::default();
         let service = SessionService::new(&opener, &inspector, clock);
-        let error = service.track(Path::new("root"), |_| {}).unwrap_err();
+        let error = service.track(Path::new("root"), || false, |_| {}).unwrap_err();
         assert_eq!(error.location(), "processes");
     }
 

@@ -89,6 +89,60 @@ mod tests {
     }
 
     #[test]
+    fn dot_dot_segments_are_resolved_before_comparing() {
+        let root = Path::new("C:/Jogos/MotoGP25");
+        assert!(is_inside_root(Path::new("C:/Jogos/MotoGP25/bin/../game.exe"), root));
+        assert!(!is_inside_root(Path::new("C:/Jogos/MotoGP25/../Other/a.exe"), root));
+        assert!(is_inside_root(Path::new("C:/Jogos/Other/../MotoGP25/a.exe"), root));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn verbatim_prefix_matches_the_plain_path() {
+        let root = Path::new("C:/Jogos/MotoGP25");
+        assert!(is_inside_root(Path::new(r"\?C:JogosMotoGP25game.exe"), root));
+        assert!(is_inside_root(Path::new("C:/Jogos/MotoGP25/game.exe"), Path::new(r"\?C:JogosMotoGP25")));
+        assert!(!is_inside_root(Path::new(r"\?C:JogosMotoGP25Backup.exe"), root));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn executable_under_a_junction_to_the_root_is_inside_it() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let real = dir.path().join("real");
+        let sibling = dir.path().join("real2");
+        let link = dir.path().join("link");
+        std::fs::create_dir_all(&real).expect("real");
+        std::fs::create_dir_all(&sibling).expect("sibling");
+        std::fs::write(real.join("game.exe"), b"").expect("exe");
+        std::fs::write(sibling.join("game.exe"), b"").expect("exe");
+        let made = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(&link)
+            .arg(&real)
+            .output()
+            .map(|o| o.status.success())
+            .unwrap_or(false);
+        if !made {
+            eprintln!("SKIPPED: could not create a junction with mklink /J");
+            return;
+        }
+        assert!(is_inside_root(&link.join("game.exe"), &real));
+        assert!(is_inside_root(&real.join("game.exe"), &link));
+        assert!(!is_inside_root(&sibling.join("game.exe"), &real));
+        assert!(!is_inside_root(&sibling.join("game.exe"), &link));
+    }
+
+    #[test]
+    fn real_inspector_reuses_its_state_and_finds_the_current_process() {
+        let exe = std::env::current_exe().expect("current exe");
+        let root = exe.parent().expect("parent");
+        let inspector = SysinfoProcesses::default();
+        assert_eq!(inspector.game_running(root), Ok(true));
+        assert_eq!(inspector.game_running(root), Ok(true));
+    }
+
+    #[test]
     fn real_inspector_does_not_find_a_game_in_an_unused_root() {
         let root = Path::new("Z:/definitely/not/a/real/game/root");
         assert_eq!(SysinfoProcesses.game_running(root), Ok(false));
