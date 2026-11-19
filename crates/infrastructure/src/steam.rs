@@ -39,13 +39,30 @@ pub fn parse_app_manifest(acf: &str) -> Option<SteamManifest> {
     let tokens = tokenize(acf);
     let mut app_id: Option<u32> = None;
     let mut install_dir: Option<String> = None;
-    for pair in tokens.windows(2) {
-        if let [Token::Str(key), Token::Str(value)] = pair {
-            if key.eq_ignore_ascii_case("appid") && app_id.is_none() {
-                app_id = value.trim().parse().ok();
-            } else if key.eq_ignore_ascii_case("installdir") && install_dir.is_none() {
-                install_dir = Some(value.clone());
+    let mut depth = 0usize;
+    let mut i = 0;
+    while i < tokens.len() {
+        match (&tokens[i], tokens.get(i + 1)) {
+            // Non-overlapping key/value pair; only the `AppState` level counts.
+            (Token::Str(key), Some(Token::Str(value))) => {
+                if depth == 1 {
+                    if key.eq_ignore_ascii_case("appid") && app_id.is_none() {
+                        app_id = value.trim().parse().ok();
+                    } else if key.eq_ignore_ascii_case("installdir") && install_dir.is_none() {
+                        install_dir = Some(value.clone());
+                    }
+                }
+                i += 2;
             }
+            (Token::Open, _) => {
+                depth += 1;
+                i += 1;
+            }
+            (Token::Close, _) => {
+                depth = depth.saturating_sub(1);
+                i += 1;
+            }
+            _ => i += 1,
         }
     }
     Some(SteamManifest {
@@ -65,9 +82,17 @@ enum Token {
 /// An unterminated string ends tokenization.
 fn tokenize(text: &str) -> Vec<Token> {
     let mut tokens = Vec::new();
-    let mut chars = text.chars();
+    let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
         match c {
+            // `//` comment outside a string: skip to the end of the line.
+            '/' if chars.peek() == Some(&'/') => {
+                for next in chars.by_ref() {
+                    if next == '\n' {
+                        break;
+                    }
+                }
+            }
             '{' => tokens.push(Token::Open),
             '}' => tokens.push(Token::Close),
             '"' => {
