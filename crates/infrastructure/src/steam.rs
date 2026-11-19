@@ -222,6 +222,36 @@ mod tests {
     }
 
     #[test]
+    fn parse_app_manifest_ignores_overlapping_pairs() {
+        let acf = r#""AppState" { "appid" "123" "name" "installdir" "installdir" "MotoGP25" }"#;
+        assert_eq!(
+            parse_app_manifest(acf),
+            Some(SteamManifest {
+                app_id: 123,
+                install_dir: "MotoGP25".into()
+            })
+        );
+    }
+
+    #[test]
+    fn parse_app_manifest_skips_comments() {
+        let acf = "\"AppState\"\r\n{\r\n// \"appid\" \"999\"\r\n\"appid\" \"123\"\r\n\"installdir\" \"MotoGP25\" // \"installdir\" \"Wrong\"\r\n}";
+        assert_eq!(
+            parse_app_manifest(acf),
+            Some(SteamManifest {
+                app_id: 123,
+                install_dir: "MotoGP25".into()
+            })
+        );
+    }
+
+    #[test]
+    fn parse_library_folders_skips_comments() {
+        let vdf = "\"libraryfolders\"\r\n{\r\n\"0\"\r\n{\r\n// \"path\" \"C:\\\\Commented\"\r\n\"path\" \"D:\\\\Real\" // { \"path\" \"E:\\\\Nope\"\r\n}\r\n}";
+        assert_eq!(parse_library_folders(vdf), vec![PathBuf::from(r"D:\Real")]);
+    }
+
+    #[test]
     fn steam_libraries_without_steam_path_is_empty() {
         assert_eq!(SteamLibraries::new(None).library_folders(), Ok(vec![]));
     }
