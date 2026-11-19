@@ -7,7 +7,8 @@ pub use crate::deploy_fakes as deploy;
 use deploy::{mod_of, mods_dir, put_sources, service, Shared, ID_A};
 use motogp_application::{
     AppError, BackgroundRunner, DeployMod, Deployer, ModPlanner, PlayError, PlayGame, PlayService,
-    SessionError, SessionEvent, SessionLock, SessionPublisher, SessionRuntime, TrackOutcome,
+    SessionError, SessionEvent, SessionLock, SessionPublisher, SessionRuntime, SpawnError,
+    TrackOutcome,
 };
 use motogp_domain::{GameInfo, WatchEvent};
 use std::path::{Path, PathBuf};
@@ -33,10 +34,14 @@ impl PlayGame for FakeGame {
 pub struct FakePlanner {
     pub mods: Mutex<Vec<DeployMod>>,
     pub requested: Mutex<Vec<String>>,
+    pub panics: AtomicBool,
 }
 
 impl ModPlanner for FakePlanner {
     fn plan(&self, profile_id: &str) -> Result<Vec<DeployMod>, PlayError> {
+        if self.panics.load(Ordering::SeqCst) {
+            panic!("planner exploded");
+        }
         self.requested.lock().unwrap().push(profile_id.to_string());
         Ok(self.mods.lock().unwrap().clone())
     }
@@ -47,6 +52,9 @@ pub struct FakeRuntime {
     pub launches: AtomicUsize,
     pub events: Mutex<Vec<WatchEvent>>,
     pub outcome: Mutex<Result<TrackOutcome, AppError>>,
+    /// What the process inspection answers (`game_running`).
+    pub running: Mutex<Result<bool, AppError>>,
+    pub track_panics: AtomicBool,
 }
 
 impl SessionRuntime for FakeRuntime {
@@ -55,11 +63,18 @@ impl SessionRuntime for FakeRuntime {
         self.launch_result.lock().unwrap().clone()
     }
 
+    fn game_running(&self, _root: &Path) -> Result<bool, AppError> {
+        self.running.lock().unwrap().clone()
+    }
+
     fn track(
         &self,
         _root: &Path,
         emit: &mut dyn FnMut(WatchEvent),
     ) -> Result<TrackOutcome, AppError> {
+        if self.track_panics.load(Ordering::SeqCst) {
+            panic!("tracking exploded");
+        }
         for event in self.events.lock().unwrap().iter() {
             emit(*event);
         }
@@ -83,20 +98,32 @@ type Task = Box<dyn FnOnce() + Send + 'static>;
 
 /// Queues the background work so tests decide when the session "runs".
 #[derive(Default)]
-pub struct ManualRunner(Mutex<Vec<Task>>);
+pub struct ManualRunner {
+    tasks: Mutex<Vec<Task>>,
+    /// When set, `spawn` fails and drops the task (like a failed thread).
+    pub fail_spawn: AtomicBool,
+}
 
 impl BackgroundRunner for ManualRunner {
-    fn spawn(&self, task: Task) {
-        self.0.lock().unwrap().push(task);
+    fn spawn(&self, task: Task) -> Result<(), SpawnError> {
+        if self.fail_spawn.load(Ordering::SeqCst) {
+            return Err(SpawnError("no threads left".into()));
+        }
+        self.tasks.lock().unwrap().push(task);
+        Ok(())
     }
 }
 
 impl ManualRunner {
     pub fn run_pending(&self) {
-        let tasks: Vec<Task> = self.0.lock().unwrap().drain(..).collect();
+        let tasks: Vec<Task> = self.tasks.lock().unwrap().drain(..).collect();
         for task in tasks {
             task();
         }
+    }
+
+    pub fn pending(&self) -> usize {
+        self.tasks.lock().unwrap().len()
     }
 }
 
@@ -145,12 +172,15 @@ impl Rig {
         let planner = Arc::new(FakePlanner {
             mods: Mutex::new(mods),
             requested: Mutex::default(),
+            panics: AtomicBool::new(false),
         });
         let runtime = Arc::new(FakeRuntime {
             launch_result: Mutex::new(Ok(())),
             launches: AtomicUsize::new(0),
             events: Mutex::new(vec![WatchEvent::Started, WatchEvent::Ended]),
             outcome: Mutex::new(Ok(TrackOutcome::Finished)),
+            running: Mutex::new(Ok(false)),
+            track_panics: AtomicBool::new(false),
         });
         let lock = Arc::new(AtomicLock::default());
         let runner = Arc::new(ManualRunner::default());
