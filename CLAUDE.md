@@ -37,8 +37,19 @@ Rule: the chat does not implement directly. Development request → Codex genera
 - **Codex sandbox:** it can only write in the main checkout, not in `.worktrees/`, and it cannot run `git add`/commit or esbuild/Vitest. Use Codex for **read-only reviews** of worktree branches; a Sonnet dev applies the findings, and the orchestrator commits when needed.
 - **Node:** the system default is 18. Use Node 22 (`/c/Users/whyy/AppData/Local/nvm/v22.18.0` first on `PATH`) and `corepack pnpm`.
 - **gh** credentials live in the Windows keyring, so `gh` and git network commands must run outside the sandbox.
-- **Disk:** a Rust build directory is about 11 GB and disk D: is small, so never build into a worktree's own `target/`. Before any cargo command in a worktree, `export CARGO_TARGET_DIR=/c/Users/whyy/.cache/motogp-target/<issue>` (on C:, one folder per worktree so parallel builds don't block each other). Delete that folder and remove the worktree as soon as its PR merges.
-- **Coverage inside worktrees:** until the coverage-gate fix is merged, the local gate ignores every path containing `.worktrees` and passes vacuously. QA must read the real per-crate numbers from the llvm-cov JSON instead.
+- **Coverage inside worktrees:** fixed in #19; the local gate now measures the checkout it runs in.
+
+### Machine guardrails (mandatory: the user's PC must stay usable, e.g. for Teams calls)
+
+Parallelism applies to **agents**, never to heavy local processes. The limits below win over "parallelize by default".
+
+- **Rust builds: one at a time, 2 jobs.** `~/.cargo/config.toml` sets one shared `target-dir` on C: (`C:/Users/whyy/.cache/motogp-target/shared`), `jobs = 2` and `RUST_TEST_THREADS = 2`. Cargo locks the shared dir, so concurrent builds queue ("Blocking waiting for file lock" = wait). **Never set `CARGO_TARGET_DIR`**: run `unset CARGO_TARGET_DIR` before cargo. A stale-rlib doctest error (`unresolved import motogp_domain::...`) is fixed with `cargo clean -p motogp-domain -p motogp-application`.
+- **Process watchdog:** `C:\Users\whyy\.claude\motogp-guard.ps1` runs in the background during agent work. Every 5 s it gives cargo, rustc, linker, llvm-cov, Codex, project Node and rust-analyzer processes below-normal priority, and pins them to logical cores 0–7, leaving 8–15 free. Start it at the beginning of every session (`& "C:\Users\whyy\.claude\motogp-guard.ps1"` in a background PowerShell).
+- **Codex: one run at a time**, read-only reviews only, started directly by the orchestrator (`codex-companion.mjs task`), never several in parallel. Each run starts the `impar-skill-hub` MCP inside WSL, and those processes stay behind. Don't start a new Codex run while one is still running.
+- **Devs iterate narrowly:** use `cargo test -p <crate>` while working; run the full workspace gates once at the end. No clippy or llvm-cov during rebases or conflict fixes, because CI runs everything.
+- **Coverage (`cargo llvm-cov`) only in QA**, once per issue. It rebuilds everything with instrumentation and is the heaviest step.
+- **Stop stale work:** when an issue's code is about to change (for example after a Codex review), stop its running QA. Remove a merged issue's worktree right away.
+- **Prefer CI over local:** PR validation, rebases with no code changes and installer builds rely on GitHub Actions, not local builds.
 
 **One branch per unit of work, always.** Every task, fix, translation or doc change gets its own branch from `dev` and its own PR; never mix unrelated changes in the same branch. Parallel work uses separate `git worktree`s inside the repo, under `.worktrees/<issue>` (git-ignored), so branches don't step on each other.
 
