@@ -1,7 +1,7 @@
 //! Steps for `tests/features/deploy-names.feature` (issue #6). Pure rules only.
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
-use motogp_domain::{deployed_name, is_safe_file_name};
+use motogp_domain::{deployed_name, is_mods_dir, is_safe_file_name};
 
 #[derive(Debug, Default, World)]
 struct NamesWorld {
@@ -11,6 +11,28 @@ struct NamesWorld {
     unsafe_candidate: String,
     result: Vec<String>,
     safe: Option<bool>,
+    folder: String,
+    is_mods: Option<bool>,
+}
+
+#[given(expr = "a folder path {string}")]
+fn folder_path(w: &mut NamesWorld, path: String) {
+    w.folder = path;
+}
+
+#[when("I check whether the folder is a mods folder")]
+fn check_mods_dir(w: &mut NamesWorld) {
+    w.is_mods = Some(is_mods_dir(std::path::Path::new(&w.folder)));
+}
+
+#[then("the folder is accepted")]
+fn folder_accepted(w: &mut NamesWorld) {
+    assert_eq!(w.is_mods, Some(true));
+}
+
+#[then("the folder is rejected")]
+fn folder_rejected(w: &mut NamesWorld) {
+    assert_eq!(w.is_mods, Some(false));
 }
 
 #[given(expr = "the mods {string} and {string} in that order, with the IDs {string} and {string}")]

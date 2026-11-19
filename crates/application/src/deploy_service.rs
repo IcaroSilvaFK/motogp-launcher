@@ -1,5 +1,7 @@
-use crate::{DeployError, DeployFiles, DeployedRepository, DirCheck};
-use motogp_domain::{deployed_name, is_safe_file_name, is_valid_mod_id, Deployed, DeployedFile};
+use crate::{DeployError, DeployFiles, DeploySession, DeployedRepository, DirCheck};
+use motogp_domain::{
+    deployed_name, is_mods_dir, is_safe_file_name, is_valid_mod_id, Deployed, DeployedFile,
+};
 use std::path::{Path, PathBuf};
 
 /// One already-ordered mod of the profile, ready to be deployed. The position
@@ -112,18 +114,9 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
     /// processed stay tracked and an error is returned. `authorized_mods_dir`
     /// must come from the configured game install, not from the manifest.
     pub fn clean(&self, authorized_mods_dir: &Path) -> Result<usize, DeployError> {
-        let manifest = self.repository.load()?;
+        let manifest = self.load_validated()?;
         if manifest.is_empty() {
             return Ok(0);
-        }
-        // Validate everything first so a tampered manifest removes nothing.
-        if manifest.mods_dir.as_os_str().is_empty() {
-            return Err(DeployError::InvalidPath {
-                path: String::new(),
-            });
-        }
-        if let Some(bad) = manifest.tracked().find(|name| !is_safe_file_name(name)) {
-            return Err(DeployError::InvalidPath { path: bad.into() });
         }
         match self
             .files
@@ -140,7 +133,115 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
                 })
             }
         }
+        self.remove_tracked(&manifest)
+    }
 
+    /// Read-only: how the manifest relates to `authorized_mods_dir` (derived
+    /// from the configured game install). Never saves, removes or creates.
+    pub fn session(&self, authorized_mods_dir: &Path) -> Result<DeploySession, DeployError> {
+        let manifest = self.repository.load()?;
+        if manifest.is_empty() {
+            return Ok(DeploySession::None);
+        }
+        let tracked = manifest.files.len() + manifest.pending.len();
+        Ok(
+            match self
+                .files
+                .check_dir(&manifest.mods_dir, authorized_mods_dir)?
+            {
+                DirCheck::Authorized => DeploySession::Current { tracked },
+                DirCheck::Foreign => DeploySession::Stale {
+                    mods_dir: manifest.mods_dir,
+                    tracked,
+                },
+                DirCheck::Missing => DeploySession::Vanished {
+                    mods_dir: manifest.mods_dir,
+                },
+            },
+        )
+    }
+
+    /// Recovery: drops a manifest of a previous game install without touching
+    /// any file (no ownership proof is needed because nothing is removed).
+    /// Refuses the current session (`SessionNotStale`): forgetting it would
+    /// orphan files in the live `~mods`; use [`clean`](Self::clean) instead.
+    pub fn forget_stale_session(&self, authorized_mods_dir: &Path) -> Result<(), DeployError> {
+        let manifest = self.repository.load()?;
+        if manifest.is_empty() {
+            return Ok(());
+        }
+        match self
+            .files
+            .check_dir(&manifest.mods_dir, authorized_mods_dir)?
+        {
+            DirCheck::Authorized => Err(DeployError::SessionNotStale {
+                path: manifest.mods_dir.display().to_string(),
+            }),
+            DirCheck::Foreign | DirCheck::Missing => {
+                self.repository.save(&Deployed::default())?;
+                Ok(())
+            }
+        }
+    }
+
+    /// Recovery: cleans the folder of a previous game install after the user
+    /// explicitly confirmed it. `confirmed` must resolve to exactly the folder
+    /// recorded in the manifest and that folder must be named `~mods`,
+    /// otherwise `UnauthorizedDirectory` and nothing is removed. Removal is the
+    /// same as [`clean`](Self::clean): only files `DeployFiles::owns` proves
+    /// are ours. A manifest of the current install is handled by `clean`.
+    pub fn clean_stale_session(
+        &self,
+        authorized_mods_dir: &Path,
+        confirmed: &Path,
+    ) -> Result<usize, DeployError> {
+        let manifest = self.load_validated()?;
+        if manifest.is_empty() {
+            return Ok(0);
+        }
+        match self
+            .files
+            .check_dir(&manifest.mods_dir, authorized_mods_dir)?
+        {
+            DirCheck::Authorized => return self.remove_tracked(&manifest),
+            DirCheck::Missing => {
+                self.repository.save(&Deployed::default())?;
+                return Ok(0);
+            }
+            DirCheck::Foreign => {}
+        }
+        let unauthorized = || DeployError::UnauthorizedDirectory {
+            path: manifest.mods_dir.display().to_string(),
+        };
+        if self.files.check_dir(&manifest.mods_dir, confirmed)? != DirCheck::Authorized
+            || !is_mods_dir(&manifest.mods_dir)
+        {
+            return Err(unauthorized());
+        }
+        self.remove_tracked(&manifest)
+    }
+
+    /// Loads the manifest and validates it before anything is removed, so a
+    /// tampered manifest removes nothing. An empty manifest is returned as is.
+    fn load_validated(&self) -> Result<Deployed, DeployError> {
+        let manifest = self.repository.load()?;
+        if manifest.is_empty() {
+            return Ok(manifest);
+        }
+        if manifest.mods_dir.as_os_str().is_empty() {
+            return Err(DeployError::InvalidPath {
+                path: String::new(),
+            });
+        }
+        if let Some(bad) = manifest.tracked().find(|name| !is_safe_file_name(name)) {
+            return Err(DeployError::InvalidPath { path: bad.into() });
+        }
+        Ok(manifest)
+    }
+
+    /// The single removal loop: the manifest's directory has already been
+    /// authorized by the caller. Entries that fail stay tracked.
+    fn remove_tracked(&self, manifest: &Deployed) -> Result<usize, DeployError> {
         let mut removed = 0;
         let mut first_error: Option<DeployError> = None;
         let mut remaining = Deployed {
