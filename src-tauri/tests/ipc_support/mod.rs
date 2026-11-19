@@ -43,8 +43,9 @@ type Task = Box<dyn FnOnce() + Send + 'static>;
 pub struct ManualRunner(pub Mutex<Vec<Task>>);
 
 impl BackgroundRunner for ManualRunner {
-    fn spawn(&self, task: Task) {
+    fn spawn(&self, task: Task) -> Result<(), motogp_application::SpawnError> {
         self.0.lock().unwrap().push(task);
+        Ok(())
     }
 }
 

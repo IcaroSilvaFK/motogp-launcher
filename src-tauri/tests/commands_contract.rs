@@ -181,6 +181,79 @@ fn import_mods_reports_the_first_failure_and_keeps_completed_imports() {
 }
 
 #[test]
+fn startup_recovery_failure_stays_retrievable_through_recovery_status() {
+    let h = Harness::new();
+    assert_eq!(
+        h.invoke("recovery_status", json!({})).unwrap(),
+        json!({ "state": "not-run", "error": null, "cleaned_count": 0 })
+    );
+    // The recovery ran (and failed) before any listener could exist.
+    fs::write(h.data_dir().join("deployed.json"), "not json").unwrap();
+    h.recover().unwrap_err();
+
+    let status = h.invoke("recovery_status", json!({})).unwrap();
+
+    assert_eq!(status["state"], "failed");
+    assert!(status["error"].as_str().unwrap().len() > 3);
+    assert_eq!(status["cleaned_count"], 0);
+    // Reading it again gives the same answer: the status is not consumed.
+    assert_eq!(h.invoke("recovery_status", json!({})).unwrap(), status);
+}
+
+#[test]
+fn successful_recovery_is_reported_with_its_cleaned_count() {
+    let h = Harness::new();
+    h.recover().unwrap();
+
+    assert_eq!(
+        h.invoke("recovery_status", json!({})).unwrap(),
+        json!({ "state": "recovered", "error": null, "cleaned_count": 0 })
+    );
+}
+
+#[test]
+fn concurrent_imports_do_not_lose_updates() {
+    let h = Harness::new();
+    h.recover().unwrap();
+    let sources: Vec<_> = (0..4)
+        .map(|n| h.write_mod_source(&format!("Mod{n}_P.pak"), format!("content {n}").as_bytes()))
+        .collect();
+
+    std::thread::scope(|scope| {
+        for source in &sources {
+            let h = &h;
+            scope.spawn(move || {
+                h.invoke("import_mods", json!({ "paths": [source.to_string_lossy()] }))
+                    .expect("import");
+            });
+        }
+    });
+
+    let mods = h.invoke("list_mods", json!({})).unwrap();
+    assert_eq!(mods.as_array().unwrap().len(), 4, "every import is indexed");
+}
+
+#[test]
+fn new_play_errors_have_stable_codes() {
+    use motogp_application::PlayError;
+    use motogp_launcher_lib::CommandError;
+    let cases = [
+        (PlayError::GameStillRunning, "game_still_running"),
+        (
+            PlayError::ProcessInspection { detail: "x".into() },
+            "process_inspection_failed",
+        ),
+        (
+            PlayError::SessionThread { detail: "x".into() },
+            "session_thread_failed",
+        ),
+    ];
+    for (error, code) in cases {
+        assert_eq!(CommandError::from(error).code, code);
+    }
+}
+
+#[test]
 fn setup_runs_recovery_before_accepting_play() {
     let h = Harness::new();
     let root = h.create_game();

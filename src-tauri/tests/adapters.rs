@@ -109,3 +109,29 @@ fn capabilities_are_minimal_and_open_only_steam_urls() {
         .expect("scoped open-url permission");
     assert_eq!(open_url["allow"], json!([{ "url": "steam://*" }]));
 }
+
+#[test]
+fn production_csp_is_strict_and_dev_csp_only_adds_what_vite_needs() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tauri.conf.json");
+    let config: Value = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let security = &config["app"]["security"];
+    let csp = security["csp"].as_str().expect("a CSP string, not null");
+
+    for directive in [
+        "default-src 'self'",
+        "script-src 'self'",
+        "style-src 'self'",
+        "img-src 'self' data:",
+        "connect-src ipc: http://ipc.localhost",
+        "object-src 'none'",
+        "base-uri 'none'",
+    ] {
+        assert!(csp.contains(directive), "missing `{directive}` in `{csp}`");
+    }
+    assert!(!csp.contains("unsafe-eval"));
+    assert!(!csp.contains("unsafe-inline"));
+    assert!(!csp.contains('*'));
+    let dev = security["devCsp"].as_str().expect("a dev CSP for Vite");
+    assert!(dev.contains("ws://localhost:1420"), "HMR socket: {dev}");
+    assert!(dev.contains("object-src 'none'"));
+}
