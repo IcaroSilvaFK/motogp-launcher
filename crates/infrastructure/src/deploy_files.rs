@@ -107,3 +107,72 @@ impl DeployFiles for FsDeployFiles {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Read;
+
+    /// Yields some bytes, then fails like a disk or network read error.
+    struct FlakyReader {
+        sent: bool,
+    }
+
+    impl Read for FlakyReader {
+        fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+            if self.sent {
+                return Err(io::Error::new(io::ErrorKind::Other, "read failed"));
+            }
+            self.sent = true;
+            buf[..4].copy_from_slice(b"part");
+            Ok(4)
+        }
+    }
+
+    fn failing_remove(_: &Path) -> io::Result<()> {
+        Err(io::Error::new(io::ErrorKind::PermissionDenied, "locked"))
+    }
+
+    #[test]
+    fn a_copy_that_fails_midway_removes_the_destination_it_created() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("x.pak");
+
+        let error = copy_into_new(&mut FlakyReader { sent: false }, &dest, "x.pak", |p| {
+            fs::remove_file(p)
+        })
+        .unwrap_err();
+
+        assert!(matches!(error, DeployError::Io { .. }), "{error}");
+        assert!(error.to_string().contains("read failed"), "{error}");
+        assert!(!dest.exists(), "the partial destination must be removed");
+    }
+
+    #[test]
+    fn a_failed_removal_leaves_the_partial_file_and_still_reports_the_copy_error() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("x.pak");
+
+        let error =
+            copy_into_new(&mut FlakyReader { sent: false }, &dest, "x.pak", failing_remove)
+                .unwrap_err();
+
+        // The error stays the copy failure; the file is left for the journal
+        // entry (which the service keeps) to recover.
+        assert!(error.to_string().contains("read failed"), "{error}");
+        assert!(dest.exists());
+    }
+
+    #[test]
+    fn a_copy_never_overwrites_an_existing_destination() {
+        let dir = tempfile::tempdir().unwrap();
+        let dest = dir.path().join("x.pak");
+        fs::write(&dest, b"user").unwrap();
+
+        let error = copy_into_new(&mut &b"new"[..], &dest, "x.pak", |p| fs::remove_file(p))
+            .unwrap_err();
+
+        assert!(matches!(error, DeployError::AlreadyExists { .. }));
+        assert_eq!(fs::read(&dest).unwrap(), b"user");
+    }
+}

@@ -3,7 +3,7 @@
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
 use motogp_application::{DeployError, DeployMod, DeployService, DeployedRepository};
-use motogp_domain::Deployed;
+use motogp_domain::{Deployed, DeployedFile};
 use motogp_infrastructure::{FsDeployFiles, JsonDeployedRepository};
 use std::fs;
 use std::io;
@@ -76,7 +76,8 @@ impl FileWorld {
     }
 
     fn clean(&mut self) -> Result<usize, DeployError> {
-        DeployService::new(self.repo(), FsDeployFiles::new()).clean()
+        let mods = self.mods_dir();
+        DeployService::new(self.repo(), FsDeployFiles::new()).clean(&mods)
     }
 
     fn two_mods(&mut self) -> [DeployMod; 2] {
@@ -129,7 +130,7 @@ fn destinations(w: &mut FileWorld, a: String, b: String) {
 #[then("each deployed file has a recoverable persisted record")]
 fn persisted(w: &mut FileWorld) {
     let manifest = w.manifest();
-    assert_eq!(manifest.files, w.deployed);
+    assert_eq!(names_of(&manifest.files), w.deployed);
     assert_eq!(manifest.mods_dir, w.mods_dir());
 }
 
@@ -208,7 +209,7 @@ fn get_error(w: &mut FileWorld) {
 #[then("the second file remains tracked for recovery")]
 fn second_tracked(w: &mut FileWorld) {
     let manifest = w.manifest();
-    assert_eq!(manifest.files, vec![w.deployed[1].clone()]);
+    assert_eq!(names_of(&manifest.files), vec![w.deployed[1].clone()]);
 }
 
 // ---------- Clean previous session ----------
@@ -319,12 +320,16 @@ fn interruption(w: &mut FileWorld) {
     fs::write(dir.join("meu_mod.pak"), b"manual-bytes").unwrap();
     fs::write(dir.join("000_bbbbbbbbbbbb_B.pak"), b"B").unwrap();
     fs::write(dir.join("001_aaaaaaaaaaaa_A.pak"), b"A").unwrap();
+    let lib = w.root().join("lib");
+    fs::create_dir_all(&lib).unwrap();
+    fs::write(lib.join("B.pak"), b"B").unwrap();
+    fs::write(lib.join("A.pak"), b"A").unwrap();
     let manifest = Deployed {
         mods_dir: dir,
-        files: vec!["000_bbbbbbbbbbbb_B.pak".into()],
+        files: vec![DeployedFile::new("000_bbbbbbbbbbbb_B.pak", lib.join("B.pak"))],
         pending: vec![
-            "001_aaaaaaaaaaaa_A.pak".into(),
-            "002_cccccccccccc_C.pak".into(),
+            DeployedFile::new("001_aaaaaaaaaaaa_A.pak", lib.join("A.pak")),
+            DeployedFile::new("002_cccccccccccc_C.pak", lib.join("C.pak")),
         ],
     };
     w.repo().save(&manifest).unwrap();
@@ -356,7 +361,7 @@ fn tampered(w: &mut FileWorld, fragment: String) {
     fs::write(&external, b"external").unwrap();
     let manifest = Deployed {
         mods_dir: dir,
-        files: vec![format!("{fragment}/evil.pak")],
+        files: vec![DeployedFile::new(format!("{fragment}/evil.pak"), "x")],
         pending: vec![],
     };
     w.repo().save(&manifest).unwrap();
@@ -388,4 +393,8 @@ pub async fn run() -> bool {
         .run(crate::feature("file-deploy.feature"))
         .await;
     !writer.execution_has_failed()
+}
+
+fn names_of(files: &[DeployedFile]) -> Vec<String> {
+    files.iter().map(|f| f.name.clone()).collect()
 }

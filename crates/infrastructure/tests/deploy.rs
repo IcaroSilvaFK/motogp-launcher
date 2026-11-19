@@ -1,8 +1,8 @@
 //! Adapter contracts of deploy/clean against a temporary file system.
 use motogp_application::{
-    AppError, DeployError, DeployFiles, DeployMod, DeployService, DeployedRepository,
+    AppError, DeployError, DeployFiles, DeployMod, DeployService, DeployedRepository, DirCheck,
 };
-use motogp_domain::Deployed;
+use motogp_domain::{Deployed, DeployedFile};
 use motogp_infrastructure::{FsDeployFiles, JsonDeployedRepository};
 use std::fs;
 use std::io::{self, Write};
@@ -89,7 +89,7 @@ fn clean_removes_only_deployed_files() {
     deploy_two(&env);
     fs::write(env.mods.join("meu_mod.pak"), b"manual").unwrap();
 
-    let removed = env.service().clean().unwrap();
+    let removed = env.service().clean(&env.mods).unwrap();
 
     assert_eq!(removed, 2);
     assert_eq!(env.names(), vec!["meu_mod.pak"]);
@@ -103,7 +103,7 @@ fn clean_tolerates_already_missing_file() {
     let names = deploy_two(&env);
     fs::remove_file(env.mods.join(&names[0])).unwrap();
 
-    assert_eq!(env.service().clean().unwrap(), 1);
+    assert_eq!(env.service().clean(&env.mods).unwrap(), 1);
     assert!(env.repo().load().unwrap().is_empty());
 }
 
@@ -113,7 +113,7 @@ fn clean_tolerates_a_missing_mods_directory() {
     deploy_two(&env);
     fs::remove_dir_all(&env.mods).unwrap();
 
-    assert_eq!(env.service().clean().unwrap(), 0);
+    assert_eq!(env.service().clean(&env.mods).unwrap(), 0);
     assert!(env.repo().load().unwrap().is_empty());
 }
 
@@ -280,7 +280,7 @@ fn deploy_writes_files_in_profile_order_with_prefix_on_disk() {
         vec!["000_bbbbbbbbbbbb_B.pak", "001_aaaaaaaaaaaa_A.pak"]
     );
     assert_eq!(env.names(), names);
-    assert_eq!(env.repo().load().unwrap().files, names);
+    assert_eq!(names_of(&env.repo().load().unwrap().files), names);
 }
 
 #[test]
@@ -301,12 +301,12 @@ fn failed_clean_on_disk_keeps_pending_entries_for_a_retry() {
     fs::create_dir(&second).unwrap();
     fs::write(second.join("inner"), b"x").unwrap();
 
-    let error = env.service().clean().unwrap_err();
+    let error = env.service().clean(&env.mods).unwrap_err();
 
     assert!(matches!(error, DeployError::CleanIncomplete { .. }));
-    assert_eq!(env.repo().load().unwrap().files, vec![names[1].clone()]);
+    assert_eq!(names_of(&env.repo().load().unwrap().files), vec![names[1].clone()]);
     fs::remove_dir_all(&second).unwrap();
-    assert_eq!(env.service().clean().unwrap(), 0);
+    assert_eq!(env.service().clean(&env.mods).unwrap(), 0);
     assert!(env.repo().load().unwrap().is_empty());
 }
 
@@ -319,12 +319,12 @@ fn invalid_manifest_path_on_disk_is_rejected() {
     env.repo()
         .save(&Deployed {
             mods_dir: env.mods.clone(),
-            files: vec!["../evil.pak".into()],
+            files: vec![DeployedFile::new("../evil.pak", "x")],
             pending: vec![],
         })
         .unwrap();
 
-    let error = env.service().clean().unwrap_err();
+    let error = env.service().clean(&env.mods).unwrap_err();
 
     assert!(matches!(error, DeployError::InvalidPath { .. }));
     assert_eq!(fs::read(outside).unwrap(), b"external");
@@ -343,8 +343,8 @@ fn manifest_roundtrips_files_and_pending_entries() {
     let env = env();
     let deployed = Deployed {
         mods_dir: env.mods.clone(),
-        files: vec!["a".into()],
-        pending: vec!["b".into()],
+        files: vec![DeployedFile::new("a", "src-a")],
+        pending: vec![DeployedFile::new("b", "src-b")],
     };
 
     env.repo().save(&deployed).unwrap();
@@ -365,4 +365,185 @@ fn corrupted_manifest_is_an_error_and_is_not_overwritten() {
         DeployError::Storage(AppError::Corrupted { .. })
     ));
     assert_eq!(fs::read(&env.manifest).unwrap(), b"{ not json");
+}
+
+fn names_of(files: &[DeployedFile]) -> Vec<String> {
+    files.iter().map(|f| f.name.clone()).collect()
+}
+
+// ---------- ownership proof (issue #6 review, finding 1) ----------
+
+#[test]
+fn owns_a_hard_linked_destination() {
+    let env = env();
+    let source = env.source(ID_A, "A.pak", b"content");
+    fs::create_dir_all(&env.mods).unwrap();
+    let files = FsDeployFiles::new();
+    files.materialize(&source, &env.mods, "x.pak").unwrap();
+
+    assert!(files.owns(&env.mods, "x.pak", &source).unwrap());
+}
+
+#[test]
+fn owns_a_faithful_copy() {
+    let env = env();
+    let source = env.source(ID_A, "A.pak", b"content");
+    fs::create_dir_all(&env.mods).unwrap();
+    let files = FsDeployFiles::with_link(failing_link);
+    files.materialize(&source, &env.mods, "x.pak").unwrap();
+
+    assert!(files.owns(&env.mods, "x.pak", &source).unwrap());
+}
+
+#[test]
+fn does_not_own_a_different_file_or_a_missing_one() {
+    let env = env();
+    let source = env.source(ID_A, "A.pak", b"content");
+    fs::create_dir_all(&env.mods).unwrap();
+    fs::write(env.mods.join("user.pak"), b"other bytes").unwrap();
+    fs::write(env.mods.join("short.pak"), b"con").unwrap();
+    let files = FsDeployFiles::new();
+
+    assert!(!files.owns(&env.mods, "user.pak", &source).unwrap());
+    assert!(!files.owns(&env.mods, "short.pak", &source).unwrap());
+    assert!(!files.owns(&env.mods, "missing.pak", &source).unwrap());
+    // A directory under the tracked name is never ours.
+    fs::create_dir(env.mods.join("dir.pak")).unwrap();
+    assert!(!files.owns(&env.mods, "dir.pak", &source).unwrap());
+    // Without the library file there is no proof.
+    assert!(!files
+        .owns(&env.mods, "user.pak", &env.lib.join("gone.pak"))
+        .unwrap());
+}
+
+#[test]
+fn clean_leaves_a_replaced_file_on_disk() {
+    let env = env();
+    let names = deploy_two(&env);
+    fs::remove_file(env.mods.join(&names[0])).unwrap();
+    fs::write(env.mods.join(&names[0]), b"a user file").unwrap();
+
+    let removed = env.service().clean(&env.mods).unwrap();
+
+    assert_eq!(removed, 1);
+    assert_eq!(fs::read(env.mods.join(&names[0])).unwrap(), b"a user file");
+    assert!(env.repo().load().unwrap().is_empty());
+}
+
+#[test]
+fn recovery_leaves_a_user_file_under_a_journaled_name() {
+    let env = env();
+    fs::create_dir_all(&env.mods).unwrap();
+    let source = env.source(ID_A, "A.pak", b"A.pak");
+    fs::write(env.mods.join("000_aaaaaaaaaaaa_A.pak"), b"user").unwrap();
+    env.repo()
+        .save(&Deployed {
+            mods_dir: env.mods.clone(),
+            files: vec![],
+            pending: vec![DeployedFile::new("000_aaaaaaaaaaaa_A.pak", source)],
+        })
+        .unwrap();
+
+    assert_eq!(env.service().clean(&env.mods).unwrap(), 0);
+
+    assert_eq!(
+        fs::read(env.mods.join("000_aaaaaaaaaaaa_A.pak")).unwrap(),
+        b"user"
+    );
+    assert!(env.repo().load().unwrap().is_empty());
+}
+
+// ---------- authorized directory (issue #6 review, finding 2) ----------
+
+fn save_manifest_for(env: &Env, dir: &Path, name: &str) {
+    env.repo()
+        .save(&Deployed {
+            mods_dir: dir.to_path_buf(),
+            files: vec![DeployedFile::new(name, env.lib.join("any.pak"))],
+            pending: vec![],
+        })
+        .unwrap();
+}
+
+fn documents(env: &Env) -> PathBuf {
+    fs::create_dir_all(&env.mods).unwrap();
+    let docs = env.mods.parent().unwrap().join("Documents");
+    fs::create_dir_all(&docs).unwrap();
+    fs::write(docs.join("notes.txt"), b"mine").unwrap();
+    docs
+}
+
+#[test]
+fn clean_refuses_an_arbitrary_directory_in_the_manifest() {
+    let env = env();
+    let docs = documents(&env);
+    save_manifest_for(&env, &docs, "notes.txt");
+
+    let error = env.service().clean(&env.mods).unwrap_err();
+
+    assert!(
+        matches!(error, DeployError::UnauthorizedDirectory { .. }),
+        "{error}"
+    );
+    assert_eq!(fs::read(docs.join("notes.txt")).unwrap(), b"mine");
+    assert_eq!(env.repo().load().unwrap().files.len(), 1);
+}
+
+#[test]
+fn clean_refuses_a_traversal_out_of_the_mods_directory() {
+    let env = env();
+    let docs = documents(&env);
+    save_manifest_for(&env, &env.mods.join("..").join("Documents"), "notes.txt");
+
+    let error = env.service().clean(&env.mods).unwrap_err();
+
+    assert!(
+        matches!(error, DeployError::UnauthorizedDirectory { .. }),
+        "{error}"
+    );
+    assert_eq!(fs::read(docs.join("notes.txt")).unwrap(), b"mine");
+}
+
+#[cfg(windows)]
+#[test]
+fn clean_refuses_a_junction_that_redirects_outside() {
+    let env = env();
+    let docs = documents(&env);
+    let junction = env.mods.parent().unwrap().join("~mods_link");
+    let made = std::process::Command::new("cmd")
+        .args(["/C", "mklink", "/J"])
+        .arg(&junction)
+        .arg(&docs)
+        .output();
+    match made {
+        Ok(out) if out.status.success() => {}
+        other => {
+            eprintln!("skipped: junction creation unavailable ({other:?})");
+            return;
+        }
+    }
+    save_manifest_for(&env, &junction, "notes.txt");
+
+    let error = env.service().clean(&env.mods).unwrap_err();
+
+    assert!(
+        matches!(error, DeployError::UnauthorizedDirectory { .. }),
+        "{error}"
+    );
+    assert_eq!(fs::read(docs.join("notes.txt")).unwrap(), b"mine");
+}
+
+#[test]
+fn check_dir_accepts_the_authorized_directory_and_reports_a_missing_one() {
+    let env = env();
+    let files = FsDeployFiles::new();
+    assert_eq!(
+        files.check_dir(&env.mods, &env.mods).unwrap(),
+        DirCheck::Missing
+    );
+    fs::create_dir_all(&env.mods).unwrap();
+    assert_eq!(
+        files.check_dir(&env.mods, &env.mods).unwrap(),
+        DirCheck::Authorized
+    );
 }
