@@ -44,9 +44,14 @@ fn send_arguments(w: &mut InterfaceWorld) {
         .invoke("set_game_dir", json!({ "path": root.to_string_lossy() }))
         .unwrap();
     let imported = h
-        .invoke("import_mods", json!({ "paths": [source.to_string_lossy()] }))
+        .invoke(
+            "import_mods",
+            json!({ "paths": [source.to_string_lossy()] }),
+        )
         .unwrap();
-    let profile = h.invoke("create_profile", json!({ "name": "Race" })).unwrap();
+    let profile = h
+        .invoke("create_profile", json!({ "name": "Race" }))
+        .unwrap();
     let mod_id = imported[0]["id"].clone();
     let profile = h
         .invoke(
@@ -54,7 +59,8 @@ fn send_arguments(w: &mut InterfaceWorld) {
             json!({ "id": profile["id"], "modIds": [mod_id] }),
         )
         .unwrap();
-    h.invoke("play", json!({ "profileId": profile["id"] })).unwrap();
+    h.invoke("play", json!({ "profileId": profile["id"] }))
+        .unwrap();
     w.game = game;
     w.imported = imported;
     w.profile = profile;
@@ -79,9 +85,15 @@ fn snake_case(w: &mut InterfaceWorld) {
 
 #[then("errors are presented without business rules in the command")]
 fn errors_presented(w: &mut InterfaceWorld) {
-    let error = w.h().invoke("play", json!({ "profileId": "vanilla" })).unwrap_err();
+    let error = w
+        .h()
+        .invoke("play", json!({ "profileId": "vanilla" }))
+        .unwrap_err();
     assert_eq!(error["code"], "already_running");
-    let error = w.h().invoke("delete_profile", json!({ "id": "vanilla" })).unwrap_err();
+    let error = w
+        .h()
+        .invoke("delete_profile", json!({ "id": "vanilla" }))
+        .unwrap_err();
     assert_eq!(error["code"], "vanilla_protected");
 }
 
@@ -103,7 +115,9 @@ fn crash_leftover(w: &mut InterfaceWorld) {
         "pending": [],
     });
     fs::write(h.data_dir().join("deployed.json"), manifest.to_string()).unwrap();
-    w.early_error = h.invoke("play", json!({ "profileId": "vanilla" })).unwrap_err();
+    w.early_error = h
+        .invoke("play", json!({ "profileId": "vanilla" }))
+        .unwrap_err();
     w.game = json!(mods);
     w.harness = Some(h);
 }
@@ -118,7 +132,9 @@ fn cleaned_before_play(w: &mut InterfaceWorld) {
     assert_eq!(w.early_error["code"], "recovery_pending");
     let mods = std::path::PathBuf::from(w.game.as_str().unwrap());
     assert!(!mods.join("000_aaaaaaaaaaaa_A.pak").exists());
-    w.h().invoke("play", json!({ "profileId": "vanilla" })).unwrap();
+    w.h()
+        .invoke("play", json!({ "profileId": "vanilla" }))
+        .unwrap();
 }
 
 #[then("the cleaned amount is recorded")]
@@ -130,7 +146,10 @@ fn amount_recorded(w: &mut InterfaceWorld) {
 pub async fn run() -> bool {
     let writer = InterfaceWorld::cucumber()
         .fail_on_skipped()
-        .run(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/features/tauri-interface.feature"))
+        .run(
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("tests/features/tauri-interface.feature"),
+        )
         .await;
     !writer.execution_has_failed()
 }

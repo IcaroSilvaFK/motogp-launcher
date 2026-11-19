@@ -46,7 +46,10 @@ fn tauri_events_publish_session_and_report_errors_on_a_separate_channel() {
     });
     events.report_error("cleanup incomplete");
 
-    assert_eq!(*sessions.lock().unwrap(), vec![json!({ "state": "ended", "cleaned": 2 })]);
+    assert_eq!(
+        *sessions.lock().unwrap(),
+        vec![json!({ "state": "ended", "cleaned": 2 })]
+    );
     assert_eq!(
         *errors.lock().unwrap(),
         vec![json!({ "message": "cleanup incomplete" })]
@@ -90,7 +93,10 @@ fn capabilities_are_minimal_and_open_only_steam_urls() {
         .collect();
 
     assert!(identifiers.contains(&"dialog:allow-open"));
-    assert!(!identifiers.contains(&"opener:default"), "unrestricted opener");
+    assert!(
+        !identifiers.contains(&"opener:default"),
+        "unrestricted opener"
+    );
     for forbidden in ["shell", "process", "fs:", "http"] {
         assert!(
             identifiers.iter().all(|i| !i.starts_with(forbidden)),

@@ -24,14 +24,21 @@ fn entry(id: &str, file: &str) -> ModEntry {
 #[test]
 fn resolve_profile_mods_keeps_order_and_skips_missing() {
     let mut profile = Profile::new("p1", "Race").unwrap();
-    profile.mod_ids = vec!["bbbbbbbbbbbb".into(), "gone00000000".into(), "aaaaaaaaaaaa".into()];
+    profile.mod_ids = vec![
+        "bbbbbbbbbbbb".into(),
+        "gone00000000".into(),
+        "aaaaaaaaaaaa".into(),
+    ];
     let library = vec![entry("aaaaaaaaaaaa", "A"), entry("bbbbbbbbbbbb", "B")];
 
     let resolved = resolve_profile_mods(&profile, &library, Path::new("lib"));
 
     let ids: Vec<&str> = resolved.iter().map(|m| m.id.as_str()).collect();
     assert_eq!(ids, vec!["bbbbbbbbbbbb", "aaaaaaaaaaaa"]);
-    assert_eq!(resolved[0].source_dir, Path::new("lib").join("bbbbbbbbbbbb"));
+    assert_eq!(
+        resolved[0].source_dir,
+        Path::new("lib").join("bbbbbbbbbbbb")
+    );
     assert_eq!(resolved[0].files, vec!["B.pak"]);
 }
 
@@ -43,7 +50,11 @@ fn set_game_dir_inspects_before_saving() {
     let error = settings.set_game_dir(Path::new("not-a-game")).unwrap_err();
 
     assert!(matches!(error, GameError::NotUnrealGame { .. }));
-    assert_eq!(config.0.borrow().saves, 0, "nothing saved for an invalid folder");
+    assert_eq!(
+        config.0.borrow().saves,
+        0,
+        "nothing saved for an invalid folder"
+    );
     assert_eq!(config.0.borrow().config.game_dir, None);
 }
 
@@ -71,9 +82,14 @@ fn set_game_dir_keeps_the_active_profile() {
         ..Default::default()
     };
 
-    settings(&config, files).set_game_dir(&valid_root()).unwrap();
+    settings(&config, files)
+        .set_game_dir(&valid_root())
+        .unwrap();
 
-    assert_eq!(config.0.borrow().config.active_profile.as_deref(), Some("p1"));
+    assert_eq!(
+        config.0.borrow().config.active_profile.as_deref(),
+        Some("p1")
+    );
 }
 
 #[test]
@@ -127,7 +143,10 @@ fn set_active_profile_validates_the_profile() {
     service.set_active(&created.id, &config).unwrap();
     assert_eq!(config.0.borrow().config.active_profile, Some(created.id));
     service.set_active(VANILLA_ID, &config).unwrap();
-    assert_eq!(config.0.borrow().config.active_profile.as_deref(), Some(VANILLA_ID));
+    assert_eq!(
+        config.0.borrow().config.active_profile.as_deref(),
+        Some(VANILLA_ID)
+    );
 }
 
 #[test]
@@ -140,7 +159,10 @@ fn deleting_active_profile_selects_vanilla() {
 
     service.delete(&created.id, &config).unwrap();
 
-    assert_eq!(config.0.borrow().config.active_profile.as_deref(), Some(VANILLA_ID));
+    assert_eq!(
+        config.0.borrow().config.active_profile.as_deref(),
+        Some(VANILLA_ID)
+    );
     assert!(profiles.0.borrow().iter().all(|p| p.id != created.id));
     assert_eq!(
         service.delete(VANILLA_ID, &config).unwrap_err(),
@@ -158,14 +180,20 @@ fn remove_mod_clears_profile_references() {
     let service = profile_service(&profiles);
     let first = service.create("One").unwrap();
     let second = service.create("Two").unwrap();
-    service.set_mods(&first.id, vec![id.clone(), "other0000000".into()]).unwrap();
+    service
+        .set_mods(&first.id, vec![id.clone(), "other0000000".into()])
+        .unwrap();
     service.set_mods(&second.id, vec![id.clone()]).unwrap();
 
     remove_mod(&mods, &service, &id).unwrap();
 
     assert!(state.borrow().index.is_empty());
     for profile in profiles.0.borrow().iter() {
-        assert!(!profile.mod_ids.contains(&id), "{} still references the mod", profile.name);
+        assert!(
+            !profile.mod_ids.contains(&id),
+            "{} still references the mod",
+            profile.name
+        );
     }
     let first = service.get(&first.id).unwrap();
     assert_eq!(first.mod_ids, vec!["other0000000"], "other mods are kept");
@@ -185,8 +213,15 @@ fn remove_mod_reports_library_failures_and_keeps_references() {
 
     let error = remove_mod(&mods, &service, &id).unwrap_err();
 
-    assert!(matches!(error, RemoveModError::Library(LibraryError::Storage(_))));
-    assert_eq!(service.get(&profile.id).unwrap().mod_ids, vec![id], "references stay");
+    assert!(matches!(
+        error,
+        RemoveModError::Library(LibraryError::Storage(_))
+    ));
+    assert_eq!(
+        service.get(&profile.id).unwrap().mod_ids,
+        vec![id],
+        "references stay"
+    );
 }
 
 #[test]
@@ -197,7 +232,10 @@ fn remove_unknown_mod_reports_not_found() {
 
     let error = remove_mod(&mods, &service, "aaaaaaaaaaaa").unwrap_err();
 
-    assert!(matches!(error, RemoveModError::Library(LibraryError::NotFound { .. })));
+    assert!(matches!(
+        error,
+        RemoveModError::Library(LibraryError::NotFound { .. })
+    ));
 }
 
 #[test]
@@ -207,7 +245,11 @@ fn batch_import_returns_every_entry_in_order() {
     fakes::put_file(&state, "src/B.pak", b"BBBBBB-pak");
     let mods = fakes::service(&state);
 
-    let entries = import_mods(&mods, &[PathBuf::from("src/A.pak"), PathBuf::from("src/B.pak")]).unwrap();
+    let entries = import_mods(
+        &mods,
+        &[PathBuf::from("src/A.pak"), PathBuf::from("src/B.pak")],
+    )
+    .unwrap();
 
     let names: Vec<&str> = entries.iter().map(|e| e.name.as_str()).collect();
     assert_eq!(names, vec!["A", "B"]);
@@ -229,10 +271,17 @@ fn batch_import_stops_at_first_error_and_keeps_completed_imports() {
     let error = import_mods(&mods, &paths).unwrap_err();
 
     assert_eq!(error.failed, PathBuf::from("src/notes.txt"));
-    assert!(matches!(error.error, LibraryError::UnsupportedFormat { .. }));
+    assert!(matches!(
+        error.error,
+        LibraryError::UnsupportedFormat { .. }
+    ));
     assert_eq!(error.completed.len(), 1);
     assert_eq!(error.completed[0].name, "A");
     let index = state.borrow().index.clone();
-    assert_eq!(index.len(), 1, "A stays in the library, C was never imported");
+    assert_eq!(
+        index.len(),
+        1,
+        "A stays in the library, C was never imported"
+    );
     assert_eq!(index[0].name, "A");
 }

@@ -9,12 +9,7 @@ use motogp_application::{
 use motogp_domain::{Deployed, DeployedFile, LaunchError, ModEntry, Profile, WatchEvent};
 use std::path::Path;
 
-#[path = "../support/config_fakes.rs"]
-mod config_fakes;
-#[path = "../support/fakes.rs"]
-mod library_fakes;
-#[path = "../support/play_fakes.rs"]
-mod play_fakes;
+use crate::{config_fakes, library_fakes, play_fakes};
 
 use play_fakes::deploy::{disk_has, disk_names, put_disk, put_source, ID_A};
 use play_fakes::{game, Rig, DEPLOYED_A};
@@ -113,7 +108,10 @@ fn recovery_cleans_only_ours(w: &mut CommandsWorld) {
 fn records_amount(w: &mut CommandsWorld) {
     assert_eq!(w.recovered, Some(1));
     assert_eq!(w.rig().play.recovered_count(), Some(1));
-    w.rig().play.play("p1").expect("play is accepted afterwards");
+    w.rig()
+        .play
+        .play("p1")
+        .expect("play is accepted afterwards");
 }
 
 // ---------- Concurrent session ----------
@@ -350,7 +348,9 @@ fn mod_in_profiles(w: &mut CommandsWorld) {
     let first = service.create("One").unwrap();
     let second = service.create("Two").unwrap();
     service.set_mods(&first.id, vec![w.mod_id.clone()]).unwrap();
-    service.set_mods(&second.id, vec![w.mod_id.clone()]).unwrap();
+    service
+        .set_mods(&second.id, vec![w.mod_id.clone()])
+        .unwrap();
     service.set_active(&second.id, &config).unwrap();
     w.parts = Some((mods, service, profiles, config, second.id));
 }

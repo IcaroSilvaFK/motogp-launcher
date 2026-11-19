@@ -1,6 +1,8 @@
 //! Use-case tests of the Play orchestrator and startup recovery (issue #8):
 //! fake game/profile/session ports over the real `DeployService` on in-memory
 //! deploy ports. Nothing touches the real fs, Steam or processes.
+#[path = "support/deploy_fakes.rs"]
+pub mod deploy_fakes;
 #[path = "support/play_fakes.rs"]
 mod fakes;
 
@@ -102,7 +104,10 @@ fn play_resolves_the_requested_profile_and_deploys_before_opening() {
     assert_eq!(*rig.planner.requested.lock().unwrap(), vec!["p9"]);
     assert!(disk_has(&rig.disk, DEPLOYED_A));
     assert_eq!(rig.launches(), 1);
-    assert!(rig.events().is_empty(), "nothing is published before tracking");
+    assert!(
+        rig.events().is_empty(),
+        "nothing is published before tracking"
+    );
 }
 
 #[test]
@@ -123,7 +128,9 @@ fn startup_recovers_previous_deployment() {
     assert_eq!(rig.play.recovered_count(), Some(1));
     assert_eq!(disk_names(&rig.disk), vec!["manual.pak"]);
     assert!(rig.disk.borrow().manifest.is_empty());
-    rig.play.play("p1").expect("play is accepted after recovery");
+    rig.play
+        .play("p1")
+        .expect("play is accepted after recovery");
 }
 
 #[test]
@@ -145,7 +152,11 @@ fn startup_recovery_failure_is_visible_and_blocks_new_deploys() {
         PlayError::Deploy(DeployError::CleanIncomplete { .. })
     ));
     assert_eq!(rig.errors().len(), 1);
-    assert_eq!(rig.disk.borrow().manifest.files.len(), 1, "still recoverable");
+    assert_eq!(
+        rig.disk.borrow().manifest.files.len(),
+        1,
+        "still recoverable"
+    );
     let materialized = rig.materialized();
 
     let blocked = rig.play.play("p1").unwrap_err();
@@ -172,7 +183,9 @@ fn ended_session_cleans_and_emits_count() {
     assert!(disk_names(&rig.disk).is_empty());
     assert!(rig.disk.borrow().manifest.is_empty());
     assert!(rig.errors().is_empty());
-    rig.play.play("p1").expect("a new session after the cleanup");
+    rig.play
+        .play("p1")
+        .expect("a new session after the cleanup");
 }
 
 #[test]
@@ -224,7 +237,10 @@ fn opener_failure_rolls_back_deployment() {
     let error = rig.play.play("p1").unwrap_err();
 
     assert_eq!(error, PlayError::Session(failure));
-    assert!(disk_names(&rig.disk).is_empty(), "only this session's files were removed");
+    assert!(
+        disk_names(&rig.disk).is_empty(),
+        "only this session's files were removed"
+    );
     assert!(rig.disk.borrow().manifest.is_empty());
     assert!(rig.events().is_empty());
 
@@ -236,7 +252,8 @@ fn opener_failure_rolls_back_deployment() {
 fn opener_failure_keeps_manual_files_untouched() {
     let rig = Rig::ready();
     put_disk(&rig.disk, "manual.pak", b"user file");
-    *rig.runtime.launch_result.lock().unwrap() = Err(SessionError::Launch(LaunchError::MissingAppId));
+    *rig.runtime.launch_result.lock().unwrap() =
+        Err(SessionError::Launch(LaunchError::MissingAppId));
 
     let _ = rig.play.play("p1");
 
@@ -246,14 +263,22 @@ fn opener_failure_keeps_manual_files_untouched() {
 #[test]
 fn failed_compensation_is_reported_and_blocks_new_deploys() {
     let rig = Rig::ready();
-    *rig.runtime.launch_result.lock().unwrap() = Err(SessionError::Launch(LaunchError::MissingAppId));
+    *rig.runtime.launch_result.lock().unwrap() =
+        Err(SessionError::Launch(LaunchError::MissingAppId));
     rig.disk.borrow_mut().fail_remove = vec![DEPLOYED_A.to_string()];
 
     let error = rig.play.play("p1").unwrap_err();
 
-    assert_eq!(error, PlayError::Session(SessionError::Launch(LaunchError::MissingAppId)));
+    assert_eq!(
+        error,
+        PlayError::Session(SessionError::Launch(LaunchError::MissingAppId))
+    );
     assert_eq!(rig.errors().len(), 1);
-    assert_eq!(rig.disk.borrow().manifest.files.len(), 1, "kept for recovery");
+    assert_eq!(
+        rig.disk.borrow().manifest.files.len(),
+        1,
+        "kept for recovery"
+    );
     assert!(matches!(
         rig.play.play("p1").unwrap_err(),
         PlayError::RecoveryPending { .. }
@@ -268,7 +293,11 @@ fn cleanup_failure_keeps_recovery_pending() {
 
     rig.runner.run_pending();
 
-    assert_eq!(rig.events(), vec![started()], "no ended event on a failed cleanup");
+    assert_eq!(
+        rig.events(),
+        vec![started()],
+        "no ended event on a failed cleanup"
+    );
     assert_eq!(rig.errors().len(), 1);
     assert!(rig.errors()[0].contains("cleanup incomplete"));
     assert_eq!(rig.disk.borrow().manifest.files.len(), 1, "manifest kept");
@@ -281,7 +310,9 @@ fn cleanup_failure_keeps_recovery_pending() {
     assert_eq!(rig.materialized(), materialized, "no unsafe new deploy");
 
     rig.disk.borrow_mut().fail_remove.clear();
-    rig.play.play("p1").expect("retry succeeds once cleanup works");
+    rig.play
+        .play("p1")
+        .expect("retry succeeds once cleanup works");
 }
 
 #[test]
@@ -298,5 +329,8 @@ fn tracking_failure_is_reported_without_a_false_success() {
 
     assert!(rig.events().is_empty());
     assert_eq!(rig.errors().len(), 1);
-    assert!(disk_has(&rig.disk, DEPLOYED_A), "files stay for a later cleanup");
+    assert!(
+        disk_has(&rig.disk, DEPLOYED_A),
+        "files stay for a later cleanup"
+    );
 }

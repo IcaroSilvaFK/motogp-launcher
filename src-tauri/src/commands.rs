@@ -55,12 +55,7 @@ pub fn remove_mod(state: State<'_, AppState>, id: String) -> CommandResult<()> {
 
 #[tauri::command]
 pub fn list_profiles(state: State<'_, AppState>) -> CommandResult<Vec<ProfileDto>> {
-    Ok(state
-        .profiles
-        .list()?
-        .into_iter()
-        .map(Into::into)
-        .collect())
+    Ok(state.profiles.list()?.into_iter().map(Into::into).collect())
 }
 
 #[tauri::command]

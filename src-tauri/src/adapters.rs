@@ -23,7 +23,10 @@ impl<R: Runtime> TauriEvents<R> {
 
 impl<R: Runtime> SessionPublisher for TauriEvents<R> {
     fn publish(&self, event: SessionEvent) {
-        if let Err(error) = self.handle.emit(SESSION_EVENT, SessionEventDto::from(event)) {
+        if let Err(error) = self
+            .handle
+            .emit(SESSION_EVENT, SessionEventDto::from(event))
+        {
             eprintln!("could not emit the session event: {error}");
         }
     }

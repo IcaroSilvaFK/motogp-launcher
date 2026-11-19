@@ -1,13 +1,13 @@
 //! Play orchestrator and startup recovery. It sequences ports; every rule it
 //! applies (ownership, authorized directory, App ID) lives in the services and
 //! the domain it delegates to.
+use crate::ProcessInspector;
 use crate::{
     AppError, BackgroundRunner, DeployError, DeployFiles, DeployMod, DeployService,
     DeployedRepository, Deployer, ModPlanner, PlayError, PlayGame, SessionClock, SessionError,
     SessionEvent, SessionLock, SessionPublisher, SessionRuntime, SessionService, SessionState,
     TrackOutcome, UrlOpener,
 };
-use crate::ProcessInspector;
 use motogp_domain::{launch_url, GameInfo, WatchEvent};
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -264,6 +264,6 @@ where
         root: &Path,
         emit: &mut dyn FnMut(WatchEvent),
     ) -> Result<TrackOutcome, AppError> {
-        SessionService::track(self, root, || false, |event| emit(event))
+        SessionService::track(self, root, || false, emit)
     }
 }

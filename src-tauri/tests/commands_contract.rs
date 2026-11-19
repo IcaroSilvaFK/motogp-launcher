@@ -37,7 +37,10 @@ fn commands_preserve_camel_case_arguments_and_snake_case_dtos() {
 
     // Library.
     let imported = h
-        .invoke("import_mods", json!({ "paths": [source.to_string_lossy()] }))
+        .invoke(
+            "import_mods",
+            json!({ "paths": [source.to_string_lossy()] }),
+        )
         .unwrap();
     let entry = &imported[0];
     assert_eq!(keys(entry), ["files", "id", "name", "size_bytes"]);
@@ -67,10 +70,17 @@ fn commands_preserve_camel_case_arguments_and_snake_case_dtos() {
     assert_eq!(config["active_profile"], json!(id));
 
     // Play: camelCase `profileId`; deploys, then opens Steam, session pending.
-    assert_eq!(h.invoke("play", json!({ "profileId": id })).unwrap(), Value::Null);
+    assert_eq!(
+        h.invoke("play", json!({ "profileId": id })).unwrap(),
+        Value::Null
+    );
     assert_eq!(*h.opened.lock().unwrap(), vec!["steam://rungameid/123"]);
     assert_eq!(fs::read_dir(h.mods_dir(&root)).unwrap().count(), 1);
-    assert_eq!(h.runner.0.lock().unwrap().len(), 1, "tracking was scheduled");
+    assert_eq!(
+        h.runner.0.lock().unwrap().len(),
+        1,
+        "tracking was scheduled"
+    );
 
     // Removal commands keep the data consistent.
     h.invoke("delete_profile", json!({ "id": id })).unwrap();
@@ -86,7 +96,10 @@ fn snake_case_arguments_are_not_accepted_from_javascript() {
     h.recover().unwrap();
 
     let error = h
-        .invoke("set_profile_mods", json!({ "id": "vanilla", "mod_ids": [] }))
+        .invoke(
+            "set_profile_mods",
+            json!({ "id": "vanilla", "mod_ids": [] }),
+        )
         .unwrap_err();
 
     assert!(error.to_string().contains("modIds"), "{error}");
@@ -102,12 +115,17 @@ fn errors_are_presented_as_code_and_message_without_business_rules() {
         .unwrap_err();
     assert_eq!(vanilla["code"], "vanilla_protected");
 
-    let no_game = h.invoke("play", json!({ "profileId": "vanilla" })).unwrap_err();
+    let no_game = h
+        .invoke("play", json!({ "profileId": "vanilla" }))
+        .unwrap_err();
     assert_eq!(no_game["code"], "game_not_configured");
     assert!(no_game["message"].as_str().unwrap().len() > 5);
 
     let not_a_game = h
-        .invoke("set_game_dir", json!({ "path": h.tmp.path().to_string_lossy() }))
+        .invoke(
+            "set_game_dir",
+            json!({ "path": h.tmp.path().to_string_lossy() }),
+        )
         .unwrap_err();
     assert_eq!(not_a_game["code"], "not_unreal_game");
 
@@ -126,7 +144,9 @@ fn concurrent_play_through_ipc_reports_the_running_game() {
         .unwrap();
     h.invoke("play", json!({ "profileId": "vanilla" })).unwrap();
 
-    let error = h.invoke("play", json!({ "profileId": "vanilla" })).unwrap_err();
+    let error = h
+        .invoke("play", json!({ "profileId": "vanilla" }))
+        .unwrap_err();
 
     assert_eq!(error["code"], "already_running");
     assert_eq!(error["message"], "the game is already running");
@@ -148,9 +168,16 @@ fn import_mods_reports_the_first_failure_and_keeps_completed_imports() {
         .unwrap_err();
 
     assert_eq!(error["code"], "unsupported_format");
-    assert!(error["message"].as_str().unwrap().contains("1 import(s) completed"));
+    assert!(error["message"]
+        .as_str()
+        .unwrap()
+        .contains("1 import(s) completed"));
     let mods = h.invoke("list_mods", json!({})).unwrap();
-    assert_eq!(mods.as_array().unwrap().len(), 1, "the completed import remains");
+    assert_eq!(
+        mods.as_array().unwrap().len(),
+        1,
+        "the completed import remains"
+    );
 }
 
 #[test]
@@ -175,7 +202,9 @@ fn setup_runs_recovery_before_accepting_play() {
     fs::write(h.data_dir().join("deployed.json"), manifest.to_string()).unwrap();
 
     // Before the recovery ran, Play is refused and nothing is touched.
-    let early = h.invoke("play", json!({ "profileId": "vanilla" })).unwrap_err();
+    let early = h
+        .invoke("play", json!({ "profileId": "vanilla" }))
+        .unwrap_err();
     assert_eq!(early["code"], "recovery_pending");
     assert!(h.opened.lock().unwrap().is_empty());
     assert!(mods.join("000_aaaaaaaaaaaa_A.pak").exists());
@@ -183,7 +212,10 @@ fn setup_runs_recovery_before_accepting_play() {
     // The startup hook cleans only the launcher's files and records the count.
     assert_eq!(h.recover().unwrap(), 1);
     assert!(!mods.join("000_aaaaaaaaaaaa_A.pak").exists());
-    assert!(mods.join("manual.pak").exists(), "manual files are never touched");
+    assert!(
+        mods.join("manual.pak").exists(),
+        "manual files are never touched"
+    );
 
     // Now Play is accepted.
     h.invoke("play", json!({ "profileId": "vanilla" })).unwrap();
@@ -208,8 +240,14 @@ fn a_recovery_failure_is_visible_and_blocks_play() {
     let error = h.recover().unwrap_err();
 
     assert_eq!(error["code"], "deploy_unauthorized_directory");
-    assert_eq!(h.recorder.errors.lock().unwrap().len(), 1, "visible on the error channel");
-    let blocked = h.invoke("play", json!({ "profileId": "vanilla" })).unwrap_err();
+    assert_eq!(
+        h.recorder.errors.lock().unwrap().len(),
+        1,
+        "visible on the error channel"
+    );
+    let blocked = h
+        .invoke("play", json!({ "profileId": "vanilla" }))
+        .unwrap_err();
     assert_eq!(blocked["code"], "recovery_pending");
     assert!(h.opened.lock().unwrap().is_empty());
 }

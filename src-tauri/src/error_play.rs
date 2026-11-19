@@ -1,9 +1,7 @@
 //! Tauri-boundary mapping for the Play, import and removal use-case errors.
 //! Only presentation: stable codes plus the application's own messages.
 use crate::CommandError;
-use motogp_application::{
-    DeployError, ImportBatchError, PlayError, RemoveModError, SessionError,
-};
+use motogp_application::{DeployError, ImportBatchError, PlayError, RemoveModError, SessionError};
 
 fn deploy_code(error: &DeployError) -> &'static str {
     match error {
@@ -102,9 +100,14 @@ mod tests {
     fn play_errors_have_stable_codes() {
         assert_eq!(code(PlayError::AlreadyRunning), "already_running");
         assert_eq!(code(PlayError::GameNotConfigured), "game_not_configured");
-        assert_eq!(code(PlayError::Launch(LaunchError::MissingAppId)), "missing_app_id");
         assert_eq!(
-            code(PlayError::Session(SessionError::Launch(LaunchError::MissingAppId))),
+            code(PlayError::Launch(LaunchError::MissingAppId)),
+            "missing_app_id"
+        );
+        assert_eq!(
+            code(PlayError::Session(SessionError::Launch(
+                LaunchError::MissingAppId
+            ))),
             "missing_app_id"
         );
         assert_eq!(
@@ -128,22 +131,46 @@ mod tests {
         assert_eq!(code(PlayError::Game(not_unreal)), "not_unreal_game");
         let missing = LibraryError::NotFound { id: "a".into() };
         assert_eq!(code(PlayError::Library(missing)), "mod_not_found");
-        let profile = motogp_application::ProfileServiceError::Profile(
-            motogp_domain::ProfileError::NotFound,
-        );
+        let profile =
+            motogp_application::ProfileServiceError::Profile(motogp_domain::ProfileError::NotFound);
         assert_eq!(code(PlayError::Profile(profile)), "profile_not_found");
     }
 
     #[test]
     fn deploy_errors_map_every_variant() {
         let cases = [
-            (DeployError::Storage(AppError::Read { location: "l".into(), detail: "d".into() }), "deploy_storage_failed"),
-            (DeployError::Io { location: "l".into(), detail: "d".into() }, "deploy_io_failed"),
-            (DeployError::AlreadyExists { name: "n".into() }, "deploy_already_exists"),
-            (DeployError::InvalidPath { path: "p".into() }, "deploy_invalid_path"),
-            (DeployError::UnauthorizedDirectory { path: "p".into() }, "deploy_unauthorized_directory"),
             (
-                DeployError::CleanIncomplete { removed: 0, remaining: 1, detail: "d".into() },
+                DeployError::Storage(AppError::Read {
+                    location: "l".into(),
+                    detail: "d".into(),
+                }),
+                "deploy_storage_failed",
+            ),
+            (
+                DeployError::Io {
+                    location: "l".into(),
+                    detail: "d".into(),
+                },
+                "deploy_io_failed",
+            ),
+            (
+                DeployError::AlreadyExists { name: "n".into() },
+                "deploy_already_exists",
+            ),
+            (
+                DeployError::InvalidPath { path: "p".into() },
+                "deploy_invalid_path",
+            ),
+            (
+                DeployError::UnauthorizedDirectory { path: "p".into() },
+                "deploy_unauthorized_directory",
+            ),
+            (
+                DeployError::CleanIncomplete {
+                    removed: 0,
+                    remaining: 1,
+                    detail: "d".into(),
+                },
                 "deploy_cleanup_incomplete",
             ),
         ];

@@ -2,8 +2,7 @@
 //! uses the real `DeployService` over the in-memory `deploy_fakes` ports, so
 //! ownership and authorized-directory rules are exercised for real.
 #![allow(dead_code)]
-#[path = "deploy_fakes.rs"]
-pub mod deploy;
+pub use crate::deploy_fakes as deploy;
 
 use deploy::{mod_of, mods_dir, put_sources, service, Shared, ID_A};
 use motogp_application::{
@@ -127,6 +126,7 @@ pub struct Rig {
     pub play: PlayService,
 }
 
+#[allow(clippy::new_without_default)]
 impl Rig {
     /// A configured game with an App ID, one mod `A.pak` in the profile and a
     /// session that starts and then ends. Startup recovery has already run.

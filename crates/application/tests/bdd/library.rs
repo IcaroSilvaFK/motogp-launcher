@@ -6,8 +6,7 @@ use motogp_application::LibraryError;
 use motogp_domain::ModEntry;
 use std::path::PathBuf;
 
-#[path = "../support/fakes.rs"]
-mod fakes;
+use crate::library_fakes as fakes;
 use fakes::{
     id_of, library_files_of, new_state, put_archive, put_file, service, staging_leftovers, Shared,
 };

@@ -12,9 +12,9 @@ mod library_repository;
 mod mod_library;
 mod processes;
 mod profile_store;
+mod session_runtime;
 mod sha256_hasher;
 mod steam;
-mod session_runtime;
 mod store;
 mod system_clock;
 #[cfg(windows)]
@@ -30,9 +30,9 @@ pub use library_repository::JsonModRepository;
 pub use mod_library::{mod_library, ModLibrary};
 pub use processes::{any_inside_root, is_inside_root, SysinfoProcesses};
 pub use profile_store::{JsonProfileStore, SystemClock};
+pub use session_runtime::{AtomicSessionLock, ThreadRunner};
 pub use sha256_hasher::Sha256Hasher;
 pub use steam::{parse_app_manifest, parse_library_folders, SteamLibraries};
-pub use session_runtime::{AtomicSessionLock, ThreadRunner};
 pub use store::{load_json, save_json, JsonConfigStore};
 pub use system_clock::MonotonicClock;
 #[cfg(windows)]

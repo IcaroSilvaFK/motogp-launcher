@@ -6,8 +6,7 @@ use motogp_application::{DeployError, DeployMod};
 use motogp_domain::{Deployed, DeployedFile};
 use std::path::PathBuf;
 
-#[path = "../support/deploy_fakes.rs"]
-mod fakes;
+use crate::deploy_fakes as fakes;
 use fakes::{
     disk_has, disk_names, manifest_names, mod_of, mods_dir, new_state, put_disk, put_sources,
     service, Shared, ID_A, ID_B,
