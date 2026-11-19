@@ -160,7 +160,10 @@ fn copy_fallback_never_overwrites_existing_file() {
         .materialize(&source, &env.mods, "x.pak")
         .unwrap_err();
 
-    assert!(matches!(error, DeployError::AlreadyExists { .. }), "{error}");
+    assert!(
+        matches!(error, DeployError::AlreadyExists { .. }),
+        "{error}"
+    );
     assert_eq!(fs::read(env.mods.join("x.pak")).unwrap(), b"manual");
 }
 

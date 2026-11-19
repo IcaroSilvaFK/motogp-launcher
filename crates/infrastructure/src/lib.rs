@@ -5,6 +5,8 @@
 
 mod data_dir;
 mod game_files;
+mod deploy_files;
+mod deployed_repository;
 mod library_files;
 mod library_repository;
 mod mod_library;
@@ -20,6 +22,8 @@ mod zip_archive;
 
 pub use data_dir::DataDir;
 pub use game_files::FsGameFiles;
+pub use deploy_files::{FsDeployFiles, LinkFn};
+pub use deployed_repository::JsonDeployedRepository;
 pub use library_files::FsLibraryFiles;
 pub use library_repository::JsonModRepository;
 pub use mod_library::{mod_library, ModLibrary};

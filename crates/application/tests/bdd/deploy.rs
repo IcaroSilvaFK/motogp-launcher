@@ -128,7 +128,11 @@ fn count_only_removed(w: &mut DeployWorld) {
 
 #[then("I get an error")]
 fn get_error(w: &mut DeployWorld) {
-    assert!(matches!(w.clean_result, Some(Err(_))), "{:?}", w.clean_result);
+    assert!(
+        matches!(w.clean_result, Some(Err(_))),
+        "{:?}",
+        w.clean_result
+    );
 }
 
 #[then("the second file remains tracked for recovery")]

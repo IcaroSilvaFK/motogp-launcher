@@ -15,10 +15,7 @@ struct NamesWorld {
 
 #[given(expr = "the mods {string} and {string} in that order, with the IDs {string} and {string}")]
 fn two_mods(w: &mut NamesWorld, a: String, b: String, id_a: String, id_b: String) {
-    w.inputs = vec![
-        (0, id_a, format!("{a}.pak")),
-        (1, id_b, format!("{b}.pak")),
-    ];
+    w.inputs = vec![(0, id_a, format!("{a}.pak")), (1, id_b, format!("{b}.pak"))];
 }
 
 #[given(expr = "an original file {string}")]

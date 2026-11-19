@@ -4,6 +4,9 @@
 //! that need them.
 
 mod config_service;
+mod deploy_error;
+mod deploy_ports;
+mod deploy_service;
 mod error;
 mod game_error;
 mod game_ports;
@@ -19,6 +22,9 @@ mod session_ports;
 mod session_service;
 
 pub use config_service::ConfigService;
+pub use deploy_error::DeployError;
+pub use deploy_ports::{DeployFiles, DeployedRepository};
+pub use deploy_service::{DeployMod, DeployService};
 pub use error::AppError;
 pub use game_error::GameError;
 pub use game_ports::{GameFiles, SteamLocator};

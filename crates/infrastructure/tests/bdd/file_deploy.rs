@@ -25,7 +25,6 @@ struct FileWorld {
     tmp: Option<TempDir>,
     deployed: Vec<String>,
     deploy_errors: Vec<String>,
-    deploy_ok: bool,
     clean_result: Option<Result<usize, DeployError>>,
     log_order: Vec<String>,
 }
@@ -199,7 +198,11 @@ fn count(w: &mut FileWorld) {
 
 #[then("I get an error")]
 fn get_error(w: &mut FileWorld) {
-    assert!(matches!(w.clean_result, Some(Err(_))), "{:?}", w.clean_result);
+    assert!(
+        matches!(w.clean_result, Some(Err(_))),
+        "{:?}",
+        w.clean_result
+    );
 }
 
 #[then("the second file remains tracked for recovery")]
@@ -319,7 +322,10 @@ fn interruption(w: &mut FileWorld) {
     let manifest = Deployed {
         mods_dir: dir,
         files: vec!["000_bbbbbbbbbbbb_B.pak".into()],
-        pending: vec!["001_aaaaaaaaaaaa_A.pak".into(), "002_cccccccccccc_C.pak".into()],
+        pending: vec![
+            "001_aaaaaaaaaaaa_A.pak".into(),
+            "002_cccccccccccc_C.pak".into(),
+        ],
     };
     w.repo().save(&manifest).unwrap();
 }

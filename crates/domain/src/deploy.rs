@@ -1,3 +1,52 @@
+use std::path::PathBuf;
+
+/// Manifest of the files deployed into the game `~mods` folder (the source for
+/// session recovery). Pure data: no I/O.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Deployed {
+    /// Directory the files were deployed into.
+    pub mods_dir: PathBuf,
+    /// File names (never paths) proven deployed by this launcher.
+    pub files: Vec<String>,
+    /// Journal: names recorded *before* their materialization. An entry here
+    /// was absent from `mods_dir` when it was recorded, so the launcher owns
+    /// whatever exists under that name; recovery treats it like `files`.
+    pub pending: Vec<String>,
+}
+
+impl Deployed {
+    /// `true` when nothing is tracked.
+    pub fn is_empty(&self) -> bool {
+        self.files.is_empty() && self.pending.is_empty()
+    }
+
+    /// Every tracked name: deployed files first, then journal entries.
+    pub fn tracked(&self) -> impl Iterator<Item = &str> {
+        self.files
+            .iter()
+            .chain(self.pending.iter())
+            .map(String::as_str)
+    }
+}
+
+/// Destination name `NNN_<modId>_<original>`; `index` is the position of the
+/// mod in the profile (from zero), shared by all files of that mod. The
+/// original name, including a `_P` before the extension, is kept intact.
+pub fn deployed_name(index: usize, mod_id: &str, original: &str) -> String {
+    format!("{index:03}_{mod_id}_{original}")
+}
+
+/// `true` for a simple relative file name: no separators, no drive prefix, no
+/// `.`/`..`, no NUL and no trailing dot or space (which Windows would trim).
+pub fn is_safe_file_name(name: &str) -> bool {
+    !name.is_empty()
+        && name != "."
+        && name != ".."
+        && !name.ends_with('.')
+        && !name.ends_with(' ')
+        && !name.contains(['/', '\\', ':', '\0'])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
