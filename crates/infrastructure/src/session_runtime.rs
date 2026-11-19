@@ -1,5 +1,5 @@
 //! Adapters for the session lock and background execution (plain std).
-use motogp_application::{BackgroundRunner, SessionLock};
+use motogp_application::{BackgroundRunner, SessionLock, SpawnError};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// `SessionLock` backed by an atomic flag.
@@ -23,13 +23,12 @@ impl SessionLock for AtomicSessionLock {
 pub struct ThreadRunner;
 
 impl BackgroundRunner for ThreadRunner {
-    fn spawn(&self, task: Box<dyn FnOnce() + Send + 'static>) {
-        // A failure to create the thread is a resource exhaustion we cannot
-        // recover from here; the task (and its lock) would never run.
+    fn spawn(&self, task: Box<dyn FnOnce() + Send + 'static>) -> Result<(), SpawnError> {
         std::thread::Builder::new()
             .name("motogp-session".into())
             .spawn(task)
-            .expect("could not start the session thread");
+            .map(|_| ())
+            .map_err(|error| SpawnError(error.to_string()))
     }
 }
 
@@ -68,9 +67,11 @@ mod tests {
     fn runner_executes_the_task_on_another_thread() {
         let (sender, receiver) = mpsc::channel();
         let caller = std::thread::current().id();
-        ThreadRunner.spawn(Box::new(move || {
-            sender.send(std::thread::current().id()).unwrap();
-        }));
+        ThreadRunner
+            .spawn(Box::new(move || {
+                sender.send(std::thread::current().id()).unwrap();
+            }))
+            .expect("the thread started");
         let worker = receiver
             .recv_timeout(std::time::Duration::from_secs(5))
             .expect("the task ran");
