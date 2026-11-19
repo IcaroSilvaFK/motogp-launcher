@@ -22,6 +22,7 @@ mod tests {
 
     #[test]
     fn config_keeps_values_with_spaces_and_accents() {
+        // Non-ASCII on purpose: Windows user folders often contain accents (e.g. "Usuário Padrão").
         let config = Config {
             game_dir: Some(PathBuf::from("Usuário Padrão/Program Files (x86)")),
             active_profile: Some("p1".to_string()),

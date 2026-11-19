@@ -4,7 +4,9 @@
 //! in the core (`domain`/`application`).
 
 mod data_dir;
+mod profile_store;
 mod store;
 
 pub use data_dir::DataDir;
+pub use profile_store::{JsonProfileStore, SystemClock};
 pub use store::{load_json, save_json, JsonConfigStore};

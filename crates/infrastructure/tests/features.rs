@@ -9,10 +9,17 @@ use std::pin::Pin;
 
 #[path = "bdd/persistence.rs"]
 mod persistence;
+#[path = "bdd/profile_persistence.rs"]
+mod profile_persistence;
 
 type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
-const FEATURES: &[(&str, Runner)] = &[("persistence", || Box::pin(persistence::run()))];
+const FEATURES: &[(&str, Runner)] = &[
+    ("persistence", || Box::pin(persistence::run())),
+    ("profile-persistence", || {
+        Box::pin(profile_persistence::run())
+    }),
+];
 
 /// Absolute path of a `.feature` file in `tests/features/`.
 pub fn feature(file: &str) -> PathBuf {

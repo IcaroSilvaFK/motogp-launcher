@@ -152,6 +152,22 @@ Gherkin: `crates/infrastructure/tests/features/persistence.feature`, run by `cra
 | Domain defaults | `default_config_has_no_game_dir_and_no_active_profile` (domain) |
 | Error mapping at the Tauri boundary | `src-tauri/src/error.rs` unit tests (`CommandError { code, message }`) |
 
+### Issue #4: scenario traceability
+
+Gherkin: `crates/application/tests/features/profiles.feature` (fake repository and fake clock, run by `crates/application/tests/bdd/profiles.rs`) and `crates/infrastructure/tests/features/profile-persistence.feature` (temp dirs, run by `crates/infrastructure/tests/bdd/profile_persistence.rs`).
+
+| Scenario | Test |
+|----------|------|
+| Seed missing or empty profiles | `empty_store_seeds_vanilla` (application) + cucumber; infrastructure: `empty_collection_is_seeded_and_persisted` + "Seed a missing profiles file" / "Seed a valid empty collection" |
+| Create and list a profile | `create_then_list` + cucumber; `profile_ids_do_not_collide`, `rapid_creations_with_the_real_clock_do_not_collide` |
+| Preserve the mod order | `set_mods_preserves_order` + cucumber; infrastructure: `profiles_roundtrip_preserves_order` + "Roundtrip preserves the mod order" |
+| Delete an ordinary profile | `delete_removes_profile` + cucumber |
+| Remove references from all profiles | `remove_mod_everywhere_strips_from_all_profiles` (+ domain `remove_mod_strips_every_occurrence_and_keeps_order`) + cucumber |
+| Reject a blank name | `blank_name_is_rejected` (+ domain `normalize_name_trims_and_rejects_blank`) + cucumber |
+| Protect Vanilla in the backend | `vanilla_cannot_be_deleted` + cucumber |
+| Rename a profile and handle an unknown ID | `rename_persists_new_name`, `unknown_profile_returns_error` + cucumber |
+| Invalid storage is never reseeded | `invalid_storage_is_propagated_and_not_reseeded` (application), `invalid_profiles_json_is_not_reseeded` + cucumber ("Do not reseed invalid JSON", "Do not reseed a zero-byte file") |
+| Error mapping at the Tauri boundary | `error_profiles::tests::maps_business_rules_to_stable_codes_and_messages`, `error_profiles::tests::storage_errors_reuse_the_app_error_mapping` (`src-tauri/src/error_profiles.rs`) |
 ### Manual smoke: `pnpm tauri dev`
 
 Prerequisites: MSVC build tools, Rust stable (MSVC), Node 22, pnpm (corepack), WebView2 Runtime. Run `pnpm tauri dev` and confirm the "MotoGP Launcher" window opens with a 1100x700 client area (minimum 900x600) and shows the "MotoGP Launcher" heading. Verified on Windows 11 during issue #1.
