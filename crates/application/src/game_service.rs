@@ -82,9 +82,14 @@ mod tests {
     struct FakeFiles {
         dirs: BTreeSet<PathBuf>,
         manifests: Vec<SteamManifest>,
+        failing_libraries: Vec<PathBuf>,
     }
 
     impl FakeFiles {
+        fn with_failing_library(mut self, path: &str) -> Self {
+            self.failing_libraries.push(PathBuf::from(path));
+            self
+        }
         fn with_dir(mut self, path: &str) -> Self {
             let mut p = PathBuf::from(path);
             loop {
@@ -113,6 +118,12 @@ mod tests {
 
     impl GameFiles for FakeFiles {
         fn common_dirs(&self, library: &Path) -> Result<Vec<PathBuf>, AppError> {
+            if self.failing_libraries.iter().any(|l| l == library) {
+                return Err(AppError::Read {
+                    location: library.display().to_string(),
+                    detail: "denied".into(),
+                });
+            }
             Ok(self.children(&library.join("steamapps").join("common")))
         }
         fn subdirs(&self, dir: &Path) -> Result<Vec<String>, AppError> {
@@ -196,6 +207,16 @@ mod tests {
             .with_dir("lib/steamapps/common/OtherGame/Other/Content/Paks")
             .with_dir("lib/steamapps/common/MotoGPBroken/Nothing");
         let games = service(&["lib"], files).detect_games().unwrap();
+        assert_eq!(games.len(), 1);
+        assert_eq!(games[0].name, "MotoGP25");
+    }
+
+    #[test]
+    fn detect_games_skips_unreadable_libraries_and_keeps_scanning() {
+        let files = FakeFiles::default()
+            .with_failing_library("bad")
+            .with_dir("lib/steamapps/common/MotoGP25/MotoGP25/Content/Paks");
+        let games = service(&["bad", "lib"], files).detect_games().unwrap();
         assert_eq!(games.len(), 1);
         assert_eq!(games[0].name, "MotoGP25");
     }
