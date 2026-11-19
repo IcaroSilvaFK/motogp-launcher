@@ -4,6 +4,8 @@
 //! in the core (`domain`/`application`).
 
 mod data_dir;
+mod deploy_files;
+mod deployed_repository;
 mod game_files;
 mod library_files;
 mod library_repository;
@@ -19,6 +21,8 @@ mod windows_registry;
 mod zip_archive;
 
 pub use data_dir::DataDir;
+pub use deploy_files::{FsDeployFiles, LinkFn};
+pub use deployed_repository::JsonDeployedRepository;
 pub use game_files::FsGameFiles;
 pub use library_files::FsLibraryFiles;
 pub use library_repository::JsonModRepository;

@@ -10,6 +10,8 @@ use std::pin::Pin;
 #[path = "bdd/steam.rs"]
 mod steam;
 
+#[path = "bdd/file_deploy.rs"]
+mod file_deploy;
 #[path = "bdd/file_import.rs"]
 mod file_import;
 #[path = "bdd/processes.rs"]
@@ -30,6 +32,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("processes", || Box::pin(processes::run())),
     ("steam", || Box::pin(steam::run())),
     ("file_import", || Box::pin(file_import::run())),
+    ("file_deploy", || Box::pin(file_deploy::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

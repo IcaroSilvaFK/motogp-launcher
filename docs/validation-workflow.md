@@ -245,3 +245,23 @@ Gherkin: `crates/domain/tests/features/mod-grouping.feature` (pure rules), `crat
 | Case-insensitive extensions, unrelated extensions ignored, display name | `group_accepts_case_insensitive_extensions`, `group_ignores_unrelated_extensions`, `display_name_strips_only_the_final_p_suffix` (domain) + cucumber |
 | Remove only validated IDs | `remove_rejects_ids_that_are_not_twelve_lowercase_hex` (application), `remove_rejects_ids_that_could_escape_the_library` (infra), `remove_mod_dir_deletes_only_the_validated_id_folder` (fs adapter) |
 | Error mapping at the Tauri boundary | `src-tauri/src/error_library.rs` unit tests (`From<LibraryError> for CommandError`) |
+
+### Scenario traceability (issue #6)
+
+Gherkin: `crates/domain/tests/features/deploy-names.feature` (pure naming and name safety), `crates/application/tests/features/deploy.feature` (in-memory fakes with injected failures and a simulated process death, `crates/application/tests/support/deploy_fakes.rs`) and `crates/infrastructure/tests/features/file-deploy.feature` (real fs and `deployed.json` in temp dirs). Step modules: `tests/bdd/deploy_names.rs`, `tests/bdd/deploy.rs`, `tests/bdd/file_deploy.rs`. Use-case tests: `crates/application/tests/deploy_service.rs`; adapter contracts: `crates/infrastructure/tests/deploy.rs`.
+
+Recovery protocol (write-ahead journal in `deployed.json`): the destination is verified absent, journaled in `pending` together with its library source, created exclusively (hard link, copy fallback with `create_new`), then moved to `files`. Cleanup processes `files` + `pending` only (never by name or prefix scan) and retains what it could not process. **Ownership is proven, never assumed:** a journal entry only records an intent. A file under a tracked name is deleted only if `DeployFiles::owns` proves it is the launcher's: the same file as its library source (hard link, via `same-file`) or a byte-identical copy of it. A missing, replaced or user-created file is untracked and left untouched (so a race, a failed untrack save or a crash before creation can never delete a user file). **Authorized directory:** `clean`/`deploy` receive the `~mods` derived from the configured game install; the manifest's directory is canonicalized (resolving `..`, symlinks and junctions) and must equal it, otherwise `UnauthorizedDirectory` is returned and nothing is removed. Accepted limits: a library file that was deleted leaves its deployed copy untracked but in place, and a user file byte-identical to the library source counts as ours.
+
+| Scenario | Test |
+|----------|------|
+| Deploy in the profile order | `deploy_writes_files_in_profile_order_with_prefix` (application), `deploy_writes_files_in_profile_order_with_prefix_on_disk` (infra), `every_deployed_file_has_a_persisted_record_before_it_exists` + cucumber in all three features |
+| Preserve the patch suffix | `deploy_preserves_p_suffix` (domain) + cucumber in `deploy-names.feature` |
+| Clean only what was deployed | `clean_removes_only_deployed_files` (infra), `clean_removes_only_registered_files_and_reports_the_count` (application) + cucumber |
+| Tolerate an already-missing deployed file | `clean_tolerates_already_missing_file` (infra), `clean_tolerates_an_already_missing_file_and_counts_only_removed_ones` (application) + cucumber |
+| Clean the previous session before redeploying | `deploy_cleans_previous_session_first`, `deploy_does_not_proceed_when_cleaning_the_previous_session_fails` (application) + cucumber |
+| Refuse a collision with a user file | `deploy_refuses_to_overwrite_foreign_file`, `copy_fallback_never_overwrites_existing_file`, `adapter_refuses_to_overwrite_an_existing_destination_by_hard_link` (infra), `deploy_refuses_a_destination_that_already_exists_and_leaves_it_alone` (application) + cucumber |
+| Deploy an empty profile without creating a directory | `deploy_empty_profile_leaves_dir_untouched` (application), `deploy_empty_profile_does_not_create_the_directory` (infra) + cucumber |
+| Recover from an interruption during deploy | `interrupted_deploy_remains_recoverable` (application, four crash points) + cucumber (application and infra, journal left on disk) |
+| Retry a partially failed cleanup | `failed_clean_keeps_pending_entries` (application), `failed_clean_on_disk_keeps_pending_entries_for_a_retry` (infra) + cucumber |
+| Reject a path outside the authorized directory | `invalid_manifest_path_is_rejected` (application), `invalid_manifest_path_on_disk_is_rejected`, `adapter_rejects_names_that_could_escape_the_directory` (infra) + cucumber |
+| Hard link, with copy fallback | `hard_link_is_used_when_it_succeeds`, `hard_link_failure_falls_back_to_copy`, `a_failed_copy_leaves_no_partial_destination` (infra, controlled link failure) |

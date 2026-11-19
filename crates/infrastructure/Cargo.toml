@@ -11,6 +11,7 @@ motogp-domain = { path = "../domain" }
 motogp-application = { path = "../application" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+same-file = "1"
 sha2 = "0.10"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
