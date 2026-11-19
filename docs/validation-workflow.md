@@ -168,6 +168,32 @@ Gherkin: `crates/application/tests/features/profiles.feature` (fake repository a
 | Rename a profile and handle an unknown ID | `rename_persists_new_name`, `unknown_profile_returns_error` + cucumber |
 | Invalid storage is never reseeded | `invalid_storage_is_propagated_and_not_reseeded` (application), `invalid_profiles_json_is_not_reseeded` + cucumber ("Do not reseed invalid JSON", "Do not reseed a zero-byte file") |
 | Error mapping at the Tauri boundary | `error_profiles::tests::maps_business_rules_to_stable_codes_and_messages`, `error_profiles::tests::storage_errors_reuse_the_app_error_mapping` (`src-tauri/src/error_profiles.rs`) |
+
+### Issue #5: scenario traceability
+
+Gherkin: `crates/application/tests/features/game-detection.feature` (fake `SteamLocator`/`GameFiles` ports, no disk; steps in `tests/bdd/game_detection.rs`) and `crates/infrastructure/tests/features/steam.feature` (temporary Steam tree; steps in `tests/bdd/steam.rs`). Both are registered in their crate's `tests/features.rs` dispatcher.
+
+| Scenario | Test |
+|----------|------|
+| Parse Steam libraries with escaped backslashes | `parse_library_folders_unescapes_backslashes`, `parse_library_folders_supports_the_legacy_format` (infrastructure `steam.rs`) + `steam.feature` |
+| Read the App ID and the install directory | `parse_app_manifest_reads_id_and_installdir`, `parse_app_manifest_rejects_incomplete_or_invalid_input` + `steam.feature` |
+| Inspect a valid Unreal game | `inspect_game_finds_mods_dir_and_app_id` (infrastructure `game_files.rs`), `manifest_match_is_case_insensitive` (application) + both features |
+| Reject a root without project Paks | `inspect_game_without_paks_errors`, `root_without_paks_is_not_an_unreal_game`, `error_display_says_content_paks_not_found` + both features |
+| Detect only MotoGP | `detect_games_only_returns_motogp_folders`, `detect_games_returns_only_valid_motogp_folders`, `motogp_prefix_is_case_insensitive` (domain) + both features |
+| Ignore the Engine folder | `engine_folder_is_not_selected` (application), `engine_folder_is_skipped_on_disk`, `engine_folder_ignores_case` (domain) + both features |
+| Allow a manual folder without a Steam manifest | `manual_game_without_manifest_has_no_app_id` + both features |
+| Steam not found in the registry | `missing_steam_returns_empty_list`, `steam_libraries_without_steam_path_is_empty` + both features |
+| Ignore `//` comments in VDF/ACF | `parse_library_folders_skips_comments`, `parse_app_manifest_skips_comments` (infrastructure `steam.rs`) |
+| Read non-overlapping ACF key/value pairs | `parse_app_manifest_ignores_overlapping_pairs` (infrastructure `steam.rs`) |
+| Skip unreadable libraries during automatic detection | `detect_games_skips_unreadable_libraries_and_keeps_scanning` (application, fake port) |
+| Registry precedence and HKLM fallback | `hkcu_wins_over_hklm`, `falls_back_to_hklm_when_hkcu_is_missing`, `falls_back_to_hklm_when_hkcu_is_blank`, `no_steam_anywhere_is_none` (infrastructure `windows_registry.rs`, injectable `RegistryReader`) |
+| Inspection has no write effects | `inspection_does_not_create_mods_directory` (infrastructure) |
+| Error mapping at the Tauri boundary | `src-tauri/src/error_game.rs` unit tests (`not_unreal_game` code) |
+
+### Manual smoke: Steam registry (Windows)
+
+The precedence/fallback logic is unit-tested through the injectable `RegistryReader`; only the real `winreg` reader (`read_steam_path`, `SteamLibraries::from_registry`) is verified by this smoke. With Steam installed, `HKCU\Software\Valve\Steam` must have a `SteamPath` value (otherwise `HKLM\SOFTWARE\WOW6432Node\Valve\Steam` `InstallPath` is used); call `SteamLibraries::from_registry().library_folders()` (or the future detect command) and confirm it lists the Steam install and every library in `libraryfolders.vdf`. With the value missing, the result must be an empty list.
+
 ### Manual smoke: `pnpm tauri dev`
 
 Prerequisites: MSVC build tools, Rust stable (MSVC), Node 22, pnpm (corepack), WebView2 Runtime. Run `pnpm tauri dev` and confirm the "MotoGP Launcher" window opens with a 1100x700 client area (minimum 900x600) and shows the "MotoGP Launcher" heading. Verified on Windows 11 during issue #1.

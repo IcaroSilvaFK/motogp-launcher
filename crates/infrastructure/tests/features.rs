@@ -7,6 +7,9 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+#[path = "bdd/steam.rs"]
+mod steam;
+
 #[path = "bdd/persistence.rs"]
 mod persistence;
 #[path = "bdd/profile_persistence.rs"]
@@ -19,6 +22,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("profile-persistence", || {
         Box::pin(profile_persistence::run())
     }),
+    ("steam", || Box::pin(steam::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

@@ -3,6 +3,7 @@
 
 mod bootstrap;
 mod error;
+mod error_game;
 mod error_profiles;
 
 pub use bootstrap::run;
