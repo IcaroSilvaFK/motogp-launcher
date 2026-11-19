@@ -20,7 +20,7 @@ pub use error::AppError;
 pub use game_error::GameError;
 pub use game_ports::{GameFiles, SteamLocator};
 pub use game_service::GameService;
-pub use library_error::LibraryError;
+pub use library_error::{ArchiveLimit, LibraryError};
 pub use library_ports::{ArchiveReader, ContentHasher, LibraryFiles, ModRepository};
 pub use mod_service::ModService;
 pub use ports::ConfigRepository;

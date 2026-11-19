@@ -27,4 +27,4 @@ pub use library_files::FsLibraryFiles;
 pub use library_repository::JsonModRepository;
 pub use mod_library::{mod_library, ModLibrary};
 pub use sha256_hasher::Sha256Hasher;
-pub use zip_archive::ZipArchiveReader;
+pub use zip_archive::{ZipArchiveReader, ZipLimits};

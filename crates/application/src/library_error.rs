@@ -2,6 +2,17 @@ use crate::AppError;
 use motogp_domain::GroupingError;
 use std::fmt;
 
+/// Which ZIP extraction limit was exceeded.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ArchiveLimit {
+    /// More entries than allowed.
+    EntryCount,
+    /// One entry extracts to more bytes than allowed.
+    EntryBytes,
+    /// All entries together extract to more bytes than allowed.
+    TotalBytes,
+}
+
 /// Errors of the mod library use cases. Adapters translate their failures
 /// (fs, ZIP, JSON) into these variants; no I/O or ZIP type leaks through.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -20,6 +31,8 @@ pub enum LibraryError {
     InvalidId { id: String },
     /// No mod with this ID is in the library.
     NotFound { id: String },
+    /// The archive exceeds an extraction limit (zip bomb protection).
+    ArchiveLimitExceeded { limit: ArchiveLimit },
 }
 
 impl From<AppError> for LibraryError {
@@ -54,6 +67,15 @@ impl fmt::Display for LibraryError {
             ),
             LibraryError::InvalidId { id } => write!(f, "invalid mod ID: {id:?}"),
             LibraryError::NotFound { id } => write!(f, "no mod with ID {id} in the library"),
+            LibraryError::ArchiveLimitExceeded { limit } => write!(
+                f,
+                "the archive is too large to import: {}",
+                match limit {
+                    ArchiveLimit::EntryCount => "too many entries",
+                    ArchiveLimit::EntryBytes => "an entry is too big",
+                    ArchiveLimit::TotalBytes => "the extracted size is too big",
+                }
+            ),
         }
     }
 }

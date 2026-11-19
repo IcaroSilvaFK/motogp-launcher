@@ -271,7 +271,10 @@ mod tests {
 
         let result = files.publish(&staging, &["A.pak".into()], ID);
 
-        assert!(matches!(result, Err(LibraryError::Storage(_))), "{result:?}");
+        assert!(
+            matches!(result, Err(LibraryError::Storage(_))),
+            "{result:?}"
+        );
         assert_eq!(fs::read(existing.join("keep.pak")).unwrap(), b"precious");
         assert!(!existing.join("A.pak").exists());
         assert!(staging.join("A.pak").exists());

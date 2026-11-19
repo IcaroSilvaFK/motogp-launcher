@@ -1,9 +1,9 @@
 //! `ArchiveReader` adapter: ZIP extraction. Entries are flattened, unsafe
 //! names (no `enclosed_name()`) are ignored and nothing is overwritten.
-use motogp_application::{AppError, ArchiveReader, LibraryError};
+use motogp_application::{AppError, ArchiveLimit, ArchiveReader, LibraryError};
 use motogp_domain::is_mod_file;
 use std::fs::{self, OpenOptions};
-use std::io;
+use std::io::{self, Read};
 use std::path::Path;
 
 /// Characters that are invalid in Windows file names (or control characters).
@@ -13,9 +13,36 @@ fn has_invalid_chars(name: &str) -> bool {
     })
 }
 
+/// Resource limits enforced while extracting (zip bomb protection). Declared
+/// sizes are never trusted: bytes are counted while streaming.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ZipLimits {
+    pub max_entry_bytes: u64,
+    pub max_total_bytes: u64,
+    pub max_entries: usize,
+}
+
+impl Default for ZipLimits {
+    fn default() -> Self {
+        Self {
+            max_entry_bytes: 8 * 1024 * 1024 * 1024,
+            max_total_bytes: 16 * 1024 * 1024 * 1024,
+            max_entries: 10_000,
+        }
+    }
+}
+
 /// Reads ZIP archives with the `zip` crate.
 #[derive(Debug, Default, Clone, Copy)]
-pub struct ZipArchiveReader;
+pub struct ZipArchiveReader {
+    limits: ZipLimits,
+}
+
+impl ZipArchiveReader {
+    pub fn with_limits(limits: ZipLimits) -> Self {
+        Self { limits }
+    }
+}
 
 impl ArchiveReader for ZipArchiveReader {
     fn extract_flat(&self, archive: &Path, dest_dir: &Path) -> Result<Vec<String>, LibraryError> {
@@ -33,6 +60,12 @@ impl ArchiveReader for ZipArchiveReader {
             })
         })?;
         let mut zip = zip::ZipArchive::new(file).map_err(|e| corrupted(&e))?;
+        if zip.len() > self.limits.max_entries {
+            return Err(LibraryError::ArchiveLimitExceeded {
+                limit: ArchiveLimit::EntryCount,
+            });
+        }
+        let mut total_bytes: u64 = 0;
 
         let mut written: Vec<String> = Vec::new();
         for index in 0..zip.len() {
@@ -70,7 +103,24 @@ impl ArchiveReader for ZipArchiveReader {
                 .create_new(true)
                 .open(&target)
                 .map_err(write_error)?;
-            io::copy(&mut entry, &mut out).map_err(write_error)?;
+            // Read at most one byte past the caps so an overflow is detected
+            // without trusting the declared size.
+            let allowed = self
+                .limits
+                .max_entry_bytes
+                .min(self.limits.max_total_bytes - total_bytes);
+            let copied = io::copy(&mut (&mut entry).take(allowed.saturating_add(1)), &mut out)
+                .map_err(write_error)?;
+            if copied > allowed {
+                let limit = if copied > self.limits.max_entry_bytes {
+                    ArchiveLimit::EntryBytes
+                } else {
+                    ArchiveLimit::TotalBytes
+                };
+                // The caller discards the whole staging directory.
+                return Err(LibraryError::ArchiveLimitExceeded { limit });
+            }
+            total_bytes += copied;
             written.push(name);
         }
         Ok(written)
@@ -118,7 +168,9 @@ mod tests {
         let out = dir.path().join("out");
         fs::create_dir(&out).unwrap();
 
-        let names = ZipArchiveReader.extract_flat(&zip, &out).unwrap();
+        let names = ZipArchiveReader::default()
+            .extract_flat(&zip, &out)
+            .unwrap();
 
         assert_eq!(sorted(names), vec!["A_P.pak", "A_P.utoc", "B.PAK"]);
         assert_eq!(fs::read(out.join("A_P.pak")).unwrap(), b"a");
@@ -143,7 +195,9 @@ mod tests {
         let out = dir.path().join("lib").join("staging");
         fs::create_dir_all(&out).unwrap();
 
-        let names = ZipArchiveReader.extract_flat(&zip, &out).unwrap();
+        let names = ZipArchiveReader::default()
+            .extract_flat(&zip, &out)
+            .unwrap();
 
         assert_eq!(names, vec!["ok.pak"]);
         assert!(!dir.path().join("evil.pak").exists());
@@ -159,7 +213,9 @@ mod tests {
         let out = dir.path().join("out");
         fs::create_dir(&out).unwrap();
 
-        let error = ZipArchiveReader.extract_flat(&zip, &out).unwrap_err();
+        let error = ZipArchiveReader::default()
+            .extract_flat(&zip, &out)
+            .unwrap_err();
 
         assert!(
             matches!(error, LibraryError::NameCollision { .. }),
@@ -177,7 +233,9 @@ mod tests {
         fs::create_dir(&out).unwrap();
         fs::write(out.join("A.pak"), b"old").unwrap();
 
-        assert!(ZipArchiveReader.extract_flat(&zip, &out).is_err());
+        assert!(ZipArchiveReader::default()
+            .extract_flat(&zip, &out)
+            .is_err());
         assert_eq!(fs::read(out.join("A.pak")).unwrap(), b"old");
     }
 
@@ -190,11 +248,11 @@ mod tests {
         fs::create_dir(&out).unwrap();
 
         assert!(matches!(
-            ZipArchiveReader.extract_flat(&bad, &out),
+            ZipArchiveReader::default().extract_flat(&bad, &out),
             Err(LibraryError::Storage(AppError::Corrupted { .. }))
         ));
         assert!(matches!(
-            ZipArchiveReader.extract_flat(&dir.path().join("missing.zip"), &out),
+            ZipArchiveReader::default().extract_flat(&dir.path().join("missing.zip"), &out),
             Err(LibraryError::Storage(AppError::Read { .. }))
         ));
     }
@@ -281,7 +339,7 @@ mod tests {
         build_zip(&zip, &[("A.pak", b"a")]);
         let missing_dest = dir.path().join("does-not-exist");
         assert!(matches!(
-            ZipArchiveReader.extract_flat(&zip, &missing_dest),
+            ZipArchiveReader::default().extract_flat(&zip, &missing_dest),
             Err(LibraryError::Storage(AppError::Write { .. }))
         ));
     }

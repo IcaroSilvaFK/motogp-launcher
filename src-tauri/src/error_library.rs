@@ -36,6 +36,10 @@ impl From<&LibraryError> for CommandError {
                 "mod_not_found",
                 format!("No mod with ID {id} exists in the library."),
             ),
+            LibraryError::ArchiveLimitExceeded { .. } => (
+                "archive_too_large",
+                "The archive is too large to import (possible zip bomb).".to_string(),
+            ),
         };
         CommandError {
             code: code.to_string(),
@@ -69,6 +73,12 @@ mod tests {
             "unsupported_format"
         );
         assert_eq!(code_of(LibraryError::NoPakFound), "no_pak_found");
+        assert_eq!(
+            code_of(LibraryError::ArchiveLimitExceeded {
+                limit: motogp_application::ArchiveLimit::TotalBytes
+            }),
+            "archive_too_large"
+        );
         assert_eq!(
             code_of(LibraryError::NameCollision {
                 name: "A.pak".into()

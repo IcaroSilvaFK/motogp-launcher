@@ -10,7 +10,7 @@ pub fn mod_library(data: &DataDir) -> ModLibrary {
     ModService::new(
         JsonModRepository::new(data.library_file()),
         FsLibraryFiles::new(data.library_dir()),
-        ZipArchiveReader,
+        ZipArchiveReader::default(),
         Sha256Hasher,
     )
 }

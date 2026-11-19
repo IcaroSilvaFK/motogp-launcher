@@ -150,6 +150,10 @@ Gherkin: `crates/infrastructure/tests/features/persistence.feature`, run by `cra
 | Preserve the previous version when the write fails | `failed_save_preserves_previous_file` (a directory on `<path>.tmp` forces the failure), `failed_replace_removes_the_temp_file` + cucumber scenario |
 | Application error propagation | `config_repository_error_is_propagated` (application, fake port) |
 | Domain defaults | `default_config_has_no_game_dir_and_no_active_profile` (domain) |
+| ZIP bomb protection (per-entry, total bytes, entry count, enforced while streaming) | `default_limits_are_generous_but_finite`, `entry_over_the_per_entry_cap_is_rejected_while_streaming`, `total_extracted_bytes_over_the_cap_are_rejected`, `archive_with_too_many_entries_is_rejected_before_extracting` (ZIP adapter), `zip_over_the_limits_is_rejected_and_the_staging_dir_is_cleaned_up` (infra) |
+| Publish never reuses an existing ID folder | `publish_never_reuses_an_existing_unindexed_id_folder` (fs adapter) |
+| A multi-group ZIP import is all-or-nothing | `zip_import_with_a_failing_second_group_leaves_the_index_unchanged`, `zip_import_index_failure_removes_every_folder_published_by_the_import` (application) |
+| Removal deletes the folder first and is retryable | `failed_folder_deletion_keeps_the_entry_and_a_retry_succeeds`, `remove_retries_when_the_folder_is_gone_but_the_entry_remains` (application) |
 | Error mapping at the Tauri boundary | `src-tauri/src/error.rs` unit tests (`CommandError { code, message }`) |
 
 ### Issue #4: scenario traceability
