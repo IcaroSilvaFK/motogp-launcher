@@ -15,6 +15,7 @@ same-file = "1"
 sha2 = "0.10"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 sysinfo = { version = "0.33", default-features = false, features = ["system"] }
+fs2 = "0.4"
 
 [target.'cfg(windows)'.dependencies]
 winreg = "0.55"

@@ -42,8 +42,9 @@ pub use library_ports::{ArchiveReader, ContentHasher, LibraryFiles, ModRepositor
 pub use mod_service::ModService;
 pub use play_error::PlayError;
 pub use play_ports::{
-    BackgroundRunner, Deployer, ModPlanner, PlayGame, RecoveryState, RecoveryStatus, SessionEvent,
-    SessionLock, SessionPublisher, SessionRuntime, SessionState, SpawnError,
+    BackgroundRunner, Deployer, InstanceGuard, InstanceLock, ModPlanner, PlayGame, RecoveryState,
+    RecoveryStatus, SessionEvent, SessionLock, SessionPublisher, SessionRuntime, SessionState,
+    SpawnError,
 };
 pub use play_service::PlayService;
 pub use ports::ConfigRepository;

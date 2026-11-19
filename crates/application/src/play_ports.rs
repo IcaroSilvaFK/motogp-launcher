@@ -33,6 +33,16 @@ pub trait SessionLock: Send + Sync {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpawnError(pub String);
 
+/// Keeps the single-instance lock while it lives (dropping it releases it).
+pub type InstanceGuard = Box<dyn std::any::Any + Send>;
+
+/// Port: an OS-backed lock that only one launcher process can hold, so two
+/// processes never share the deployment manifest and the game directory.
+pub trait InstanceLock {
+    /// `Ok(None)` when another launcher process already holds the lock.
+    fn acquire(&self) -> Result<Option<InstanceGuard>, AppError>;
+}
+
 /// Port: runs the (long) session tracking off the caller's thread. On `Err`
 /// the task was dropped without running.
 pub trait BackgroundRunner: Send + Sync {
