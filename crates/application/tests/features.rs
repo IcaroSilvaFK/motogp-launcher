@@ -7,10 +7,10 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
-#[path = "bdd/game_detection.rs"]
-mod game_detection;
 #[path = "bdd/deploy.rs"]
 mod deploy;
+#[path = "bdd/game_detection.rs"]
+mod game_detection;
 #[path = "bdd/library.rs"]
 mod library;
 #[path = "bdd/profiles.rs"]
