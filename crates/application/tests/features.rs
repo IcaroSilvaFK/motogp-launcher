@@ -7,6 +7,8 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+#[path = "bdd/commands_and_recovery.rs"]
+mod commands_and_recovery;
 #[path = "bdd/deploy.rs"]
 mod deploy;
 #[path = "bdd/game_detection.rs"]
@@ -27,6 +29,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("library", || Box::pin(library::run())),
     ("session-tracking", || Box::pin(session_tracking::run())),
     ("deploy", || Box::pin(deploy::run())),
+    ("commands-and-recovery", || Box::pin(commands_and_recovery::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.
