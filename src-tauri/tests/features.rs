@@ -1,5 +1,8 @@
 //! BDD runner (cucumber, `harness = false`) for the scenarios in `tests/features/`.
 //! Scenario traceability: see `docs/validation-workflow.md` (Scaffold section).
+mod ipc_support;
+#[path = "interface_steps.rs"]
+mod interface_steps;
 mod support;
 
 use cucumber::{given, then, when, World};
@@ -289,9 +292,15 @@ fn job_block<'a>(workflow: &'a str, id: &str) -> &'a str {
 }
 
 fn main() {
-    futures::executor::block_on(
+    use cucumber::writer::Stats as _;
+    let scaffold_failed = futures::executor::block_on(
         ScaffoldWorld::cucumber()
             .fail_on_skipped()
-            .run_and_exit("tests/features"),
-    );
+            .run(root().join("src-tauri/tests/features/scaffold.feature")),
+    )
+    .execution_has_failed();
+    let interface_ok = futures::executor::block_on(interface_steps::run());
+    if scaffold_failed || !interface_ok {
+        std::process::exit(1);
+    }
 }
