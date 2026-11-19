@@ -118,6 +118,21 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
         Ok(())
     }
 
+    /// Selects the active profile after checking that it exists.
+    pub fn set_active(
+        &self,
+        id: &str,
+        config: &impl ConfigRepository,
+    ) -> Result<(), ProfileServiceError> {
+        self.get(id)?;
+        let current = config.load()?;
+        config.save(&Config {
+            active_profile: Some(id.to_string()),
+            ..current
+        })?;
+        Ok(())
+    }
+
     /// Replaces the mods of a profile, preserving the given order.
     pub fn set_mods(&self, id: &str, mod_ids: Vec<String>) -> Result<Profile, ProfileServiceError> {
         self.update(id, |profile| {

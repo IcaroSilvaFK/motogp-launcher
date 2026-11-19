@@ -15,6 +15,12 @@ mod library_error;
 mod library_ports;
 mod mod_service;
 mod ports;
+mod game_settings;
+mod library_commands;
+mod play_error;
+mod play_ports;
+mod play_service;
+mod profile_mods;
 mod profile_ports;
 mod profile_service;
 mod session_error;
@@ -38,3 +44,12 @@ pub use profile_service::{ProfileService, ProfileServiceError};
 pub use session_error::SessionError;
 pub use session_ports::{ProcessInspector, SessionClock, TrackOutcome, UrlOpener, POLL};
 pub use session_service::SessionService;
+pub use game_settings::GameSettings;
+pub use library_commands::{import_mods, remove_mod, ImportBatchError, RemoveModError};
+pub use play_error::PlayError;
+pub use play_ports::{
+    BackgroundRunner, Deployer, ModPlanner, PlayGame, SessionEvent, SessionLock, SessionPublisher,
+    SessionRuntime, SessionState,
+};
+pub use play_service::PlayService;
+pub use profile_mods::{resolve_profile_mods, ProfileModPlanner};
