@@ -129,10 +129,12 @@ mod tests {
         }
     }
 
-    fn tmp_of(path: &Path) -> PathBuf {
-        let mut os = path.as_os_str().to_owned();
-        os.push(".tmp");
-        PathBuf::from(os)
+    fn temp_files_in(dir: &Path) -> Vec<PathBuf> {
+        fs::read_dir(dir)
+            .unwrap()
+            .map(|e| e.unwrap().path())
+            .filter(|p| p.extension().is_some_and(|x| x == "tmp"))
+            .collect()
     }
 
     #[test]
@@ -154,7 +156,7 @@ mod tests {
         store.save(&sample()).unwrap();
         assert!(path.parent().unwrap().is_dir());
         assert_eq!(store.load(), Ok(sample()));
-        assert!(!tmp_of(&path).exists());
+        assert!(temp_files_in(path.parent().unwrap()).is_empty());
         assert!(
             fs::read_to_string(&path).unwrap().contains('\n'),
             "pretty-printed"
@@ -193,23 +195,49 @@ mod tests {
         };
         store.save(&second).unwrap();
         assert_eq!(store.load(), Ok(second));
-        assert!(!tmp_of(&path).exists());
+        assert!(temp_files_in(dir.path()).is_empty());
     }
 
     #[test]
-    fn failed_save_preserves_previous_file() {
+    fn save_never_touches_a_competing_writers_temp_file() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("config.json");
+        let store = JsonConfigStore::new(&path);
+        let competitors = [
+            dir.path().join("config.json.tmp"),
+            dir.path().join("config.json.4242-0.tmp"),
+        ];
+        for c in &competitors {
+            fs::write(c, b"in-flight bytes of another writer").unwrap();
+        }
+        store.save(&sample()).unwrap();
+        assert_eq!(store.load(), Ok(sample()));
+        for c in &competitors {
+            assert_eq!(fs::read(c).unwrap(), b"in-flight bytes of another writer");
+        }
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn failed_replace_over_a_locked_destination_preserves_file_and_cleans_up() {
+        use std::os::windows::fs::OpenOptionsExt;
         let dir = tempdir().unwrap();
         let path = dir.path().join("config.json");
         let store = JsonConfigStore::new(&path);
         store.save(&sample()).unwrap();
         let before = fs::read(&path).unwrap();
-        // A directory squatting on the temp path makes the temp write fail
-        // deterministically on every platform.
-        fs::create_dir(tmp_of(&path)).unwrap();
+        // Open without FILE_SHARE_DELETE (0x4): replacing the file must fail.
+        let lock = fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0x1 | 0x2)
+            .open(&path)
+            .unwrap();
         let result = store.save(&Config::default());
-        assert!(matches!(result, Err(AppError::Write { .. })));
+        assert!(matches!(result, Err(AppError::Write { .. })), "{result:?}");
+        drop(lock);
         assert_eq!(fs::read(&path).unwrap(), before);
         assert_eq!(store.load(), Ok(sample()));
+        assert!(temp_files_in(dir.path()).is_empty());
     }
 
     #[test]
@@ -221,7 +249,7 @@ mod tests {
         let result = save_json(&path, &ConfigDto::default());
         assert!(matches!(result, Err(AppError::Write { .. })));
         assert!(path.is_dir());
-        assert!(!tmp_of(&path).exists());
+        assert!(temp_files_in(dir.path()).is_empty());
     }
 
     #[test]
