@@ -3,17 +3,21 @@
 //! Each feature owns one step module in `tests/bdd/<feature>.rs` with its own
 //! `World` and a `pub async fn run() -> bool` that runs only its `.feature`
 //! file. To add a feature: add one `#[path]` module and one `FEATURES` entry.
-//! No feature is registered yet; later issues add theirs here.
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
 #[path = "bdd/mod_grouping.rs"]
 mod mod_grouping;
+#[path = "bdd/session_state.rs"]
+mod session_state;
 
 type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
-const FEATURES: &[(&str, Runner)] = &[("mod_grouping", || Box::pin(mod_grouping::run()))];
+const FEATURES: &[(&str, Runner)] = &[
+    ("mod_grouping", || Box::pin(mod_grouping::run())),
+    ("session-state", || Box::pin(session_state::run())),
+];
 
 /// Absolute path of a `.feature` file in `tests/features/`.
 pub fn feature(file: &str) -> PathBuf {

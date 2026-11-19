@@ -3,7 +3,6 @@
 //! Each feature owns one step module in `tests/bdd/<feature>.rs` with its own
 //! `World` and a `pub async fn run() -> bool` that runs only its `.feature`
 //! file. To add a feature: add one `#[path]` module and one `FEATURES` entry.
-//! No feature is registered yet; later issues add theirs here.
 use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
@@ -15,12 +14,16 @@ mod library;
 #[path = "bdd/profiles.rs"]
 mod profiles;
 
+#[path = "bdd/session_tracking.rs"]
+mod session_tracking;
+
 type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
 const FEATURES: &[(&str, Runner)] = &[
     ("game-detection", || Box::pin(game_detection::run())),
     ("profiles", || Box::pin(profiles::run())),
     ("library", || Box::pin(library::run())),
+    ("session-tracking", || Box::pin(session_tracking::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.
