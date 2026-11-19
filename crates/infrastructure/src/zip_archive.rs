@@ -80,7 +80,7 @@ impl ArchiveReader for ZipArchiveReader {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use motogp_application::AppError;
+    use motogp_application::{AppError, ArchiveLimit};
     use std::fs;
     use std::io::Write;
 
@@ -197,6 +197,81 @@ mod tests {
             ZipArchiveReader.extract_flat(&dir.path().join("missing.zip"), &out),
             Err(LibraryError::Storage(AppError::Read { .. }))
         ));
+    }
+
+    fn limited(max_entry_bytes: u64, max_total_bytes: u64, max_entries: usize) -> ZipArchiveReader {
+        ZipArchiveReader::with_limits(ZipLimits {
+            max_entry_bytes,
+            max_total_bytes,
+            max_entries,
+        })
+    }
+
+    #[test]
+    fn default_limits_are_generous_but_finite() {
+        let limits = ZipLimits::default();
+        assert_eq!(limits.max_entry_bytes, 8 * 1024 * 1024 * 1024);
+        assert_eq!(limits.max_total_bytes, 16 * 1024 * 1024 * 1024);
+        assert_eq!(limits.max_entries, 10_000);
+    }
+
+    #[test]
+    fn entry_over_the_per_entry_cap_is_rejected_while_streaming() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip = dir.path().join("big.zip");
+        build_zip(&zip, &[("A.pak", &[1u8; 33])]);
+        let out = dir.path().join("out");
+        fs::create_dir(&out).unwrap();
+
+        let error = limited(32, 1024, 10).extract_flat(&zip, &out).unwrap_err();
+
+        assert_eq!(
+            error,
+            LibraryError::ArchiveLimitExceeded {
+                limit: ArchiveLimit::EntryBytes
+            }
+        );
+        // Exactly at the cap is fine.
+        let ok = dir.path().join("ok");
+        fs::create_dir(&ok).unwrap();
+        assert!(limited(33, 1024, 10).extract_flat(&zip, &ok).is_ok());
+    }
+
+    #[test]
+    fn total_extracted_bytes_over_the_cap_are_rejected() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip = dir.path().join("many.zip");
+        build_zip(&zip, &[("A.pak", &[1u8; 20]), ("B.pak", &[2u8; 20])]);
+        let out = dir.path().join("out");
+        fs::create_dir(&out).unwrap();
+
+        let error = limited(32, 39, 10).extract_flat(&zip, &out).unwrap_err();
+
+        assert_eq!(
+            error,
+            LibraryError::ArchiveLimitExceeded {
+                limit: ArchiveLimit::TotalBytes
+            }
+        );
+    }
+
+    #[test]
+    fn archive_with_too_many_entries_is_rejected_before_extracting() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip = dir.path().join("count.zip");
+        build_zip(&zip, &[("A.pak", b"a"), ("B.pak", b"b"), ("c.txt", b"c")]);
+        let out = dir.path().join("out");
+        fs::create_dir(&out).unwrap();
+
+        let error = limited(32, 1024, 2).extract_flat(&zip, &out).unwrap_err();
+
+        assert_eq!(
+            error,
+            LibraryError::ArchiveLimitExceeded {
+                limit: ArchiveLimit::EntryCount
+            }
+        );
+        assert!(fs::read_dir(&out).unwrap().next().is_none());
     }
 
     #[test]

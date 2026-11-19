@@ -296,3 +296,38 @@ fn corrupted_index_blocks_the_import_without_losing_the_files() {
         "the published folder was rolled back"
     );
 }
+
+#[test]
+fn zip_over_the_limits_is_rejected_and_the_staging_dir_is_cleaned_up() {
+    use motogp_application::{ArchiveLimit, ModService};
+    use motogp_infrastructure::{FsLibraryFiles, Sha256Hasher, ZipArchiveReader, ZipLimits};
+
+    let env = env();
+    let zip = env.src.join("bomb.zip");
+    build_zip(&zip, &[("A.pak", &[7u8; 64])]);
+    let library = ModService::new(
+        JsonModRepository::new(env.data.library_file()),
+        FsLibraryFiles::new(env.data.library_dir()),
+        ZipArchiveReader::with_limits(ZipLimits {
+            max_entry_bytes: 16,
+            max_total_bytes: 1024,
+            max_entries: 10,
+        }),
+        Sha256Hasher,
+    );
+
+    let error = library.import(&zip).unwrap_err();
+
+    assert_eq!(
+        error,
+        LibraryError::ArchiveLimitExceeded {
+            limit: ArchiveLimit::EntryBytes
+        }
+    );
+    assert!(index(&env).is_empty());
+    assert!(
+        library_entries(&env).is_empty(),
+        "no staging leftovers: {:?}",
+        library_entries(&env)
+    );
+}
