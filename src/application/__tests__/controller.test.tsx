@@ -6,15 +6,15 @@ import { createLauncherController } from '../createLauncherController';
 import { selectCanPlay } from '../selectCanPlay';
 import { useLauncherState } from '../useLauncherState';
 import { FakeDropEvents, FakeGateway, FakePicker, FakeSessionEvents } from './fakes';
-import type { FakeGatewayOptions } from './fakes';
+import type { FakeGatewayOptions, FakeSessionEventsOptions } from './fakes';
 
 const game: GameInfo = { name: 'MotoGP25', root: 'C:/g', mods_dir: 'C:/g/~mods', app_id: 1234 };
 
-function setup(options: FakeGatewayOptions = {}) {
+function setup(options: FakeGatewayOptions = {}, sessionOptions: FakeSessionEventsOptions = {}) {
   const log: string[] = [];
   const gateway = new FakeGateway({ log, game, ...options });
   const picker = new FakePicker();
-  const session = new FakeSessionEvents({ log });
+  const session = new FakeSessionEvents({ log, ...sessionOptions });
   const drop = new FakeDropEvents({ log });
   const controller = createLauncherController({ gateway, picker, session, drop });
   return { log, gateway, picker, session, drop, controller };
@@ -261,6 +261,66 @@ describe('Given the launcher controller', () => {
     expect(session.activeListeners()).toBe(2);
     controller.dispose();
     expect(session.activeListeners()).toBe(0);
+  });
+
+  it('When the session subscription rejects Then the session is unavailable and the error is reported', async () => {
+    const { controller, gateway } = setup(
+      { mods: [mod('a')] },
+      { rejectSession: { code: 'unknown', message: 'no ipc' } },
+    );
+    await controller.start();
+    const state = controller.getState();
+    expect(state.error).toEqual({ code: 'session_subscription_failed', message: 'no ipc' });
+    expect(state.session).toEqual({ kind: 'unavailable' });
+    expect(state.status).toBe('ready');
+    expect(state.mods).toHaveLength(1);
+    expect(state.game).toEqual(game);
+    expect(gateway.callsOf('recoveryStatus')).toHaveLength(1);
+    expect(selectCanPlay(state)).toBe(false);
+    await controller.play();
+    expect(gateway.callsOf('play')).toHaveLength(0);
+  });
+
+  it('When a non-Error reason rejects Then the message comes from toCommandError', async () => {
+    const { controller } = setup({}, { rejectSession: 'plain string' });
+    await controller.start();
+    expect(controller.getState().error?.code).toBe('session_subscription_failed');
+    expect(controller.getState().error?.message).toBe('plain string');
+  });
+
+  it('When the second subscription rejects Then the first one is released', async () => {
+    const { controller, session } = setup({}, { rejectSessionError: new Error('late') });
+    await controller.start();
+    expect(session.activeListeners()).toBe(0);
+    expect(controller.getState().error).toEqual({ code: 'session_subscription_failed', message: 'late' });
+    expect(controller.getState().session).toEqual({ kind: 'unavailable' });
+  });
+
+  it('When the subscription and recovery both fail Then the subscription error wins', async () => {
+    const { controller } = setup(
+      { recovery: { state: 'failed', error: 'boom', cleaned_count: 0 } },
+      { rejectSession: new Error('no ipc') },
+    );
+    await controller.start();
+    expect(controller.getState().error?.code).toBe('session_subscription_failed');
+  });
+
+  it('When disposed during a failing start Then no stale state is written', async () => {
+    const { controller } = setup({}, { rejectSession: new Error('no ipc') });
+    const pending = controller.start();
+    controller.dispose();
+    await pending;
+    expect(controller.getState().status).toBe('loading');
+    expect(controller.getState().error).toBeNull();
+    expect(controller.getState().session).toEqual({ kind: 'idle' });
+  });
+
+  it('When restarted after a failure (StrictMode remount) Then a fresh run is started', async () => {
+    const { controller, gateway } = setup({}, { rejectSession: new Error('no ipc') });
+    await controller.start();
+    controller.dispose();
+    await controller.start();
+    expect(gateway.callsOf('recoveryStatus')).toHaveLength(2);
   });
 
   it('When state changes Then subscribers are notified and state is stable', async () => {
