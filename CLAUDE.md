@@ -29,6 +29,13 @@ Rule: the chat does not implement directly. Development request → Codex genera
 4. **Dev finishes the task** on the branch.
 5. The delivery **goes through the whole review** (QA Haiku + Codex review/improvements).
 6. Only then: **opens the PR to `dev`** referencing the issue (`Closes #<no>`) and **closes the issue**.
+7. **The orchestrator merges on its own** (the user granted blanket merge permission on 2026-11-19): once QA approved, the Codex review is applied and CI is green, merge the PR (`gh pr merge --merge --delete-branch`) without asking. `Closes #N` does not auto-close issues on merges into `dev` (the default branch is `main`), so close the issue manually right after the merge.
+
+**Tooling notes:**
+- **Codex sandbox:** it can only write in the main checkout, not in `.worktrees/`, and it cannot run `git add`/commit or esbuild/Vitest. Use Codex for **read-only reviews** of worktree branches; a Sonnet dev applies the findings, and the orchestrator commits when needed.
+- **Node:** the system default is 18. Use Node 22 (`/c/Users/whyy/AppData/Local/nvm/v22.18.0` first on `PATH`) and `corepack pnpm`.
+- **gh** credentials live in the Windows keyring, so `gh` and git network commands must run outside the sandbox.
+- **Disk:** each worktree has its own `target/`. Run `cargo clean` and remove the worktree as soon as its PR merges.
 
 **One branch per unit of work, always.** Every task, fix, translation or doc change gets its own branch from `dev` and its own PR; never mix unrelated changes in the same branch. Parallel work uses separate `git worktree`s inside the repo, under `.worktrees/<issue>` (git-ignored), so branches don't step on each other.
 
