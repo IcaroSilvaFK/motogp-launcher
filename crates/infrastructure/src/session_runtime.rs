@@ -1,3 +1,38 @@
+//! Adapters for the session lock and background execution (plain std).
+use motogp_application::{BackgroundRunner, SessionLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// `SessionLock` backed by an atomic flag.
+#[derive(Debug, Default)]
+pub struct AtomicSessionLock(AtomicBool);
+
+impl SessionLock for AtomicSessionLock {
+    fn try_acquire(&self) -> bool {
+        self.0
+            .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+            .is_ok()
+    }
+
+    fn release(&self) {
+        self.0.store(false, Ordering::Release);
+    }
+}
+
+/// `BackgroundRunner` that runs each task on its own named OS thread.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct ThreadRunner;
+
+impl BackgroundRunner for ThreadRunner {
+    fn spawn(&self, task: Box<dyn FnOnce() + Send + 'static>) {
+        // A failure to create the thread is a resource exhaustion we cannot
+        // recover from here; the task (and its lock) would never run.
+        std::thread::Builder::new()
+            .name("motogp-session".into())
+            .spawn(task)
+            .expect("could not start the session thread");
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
