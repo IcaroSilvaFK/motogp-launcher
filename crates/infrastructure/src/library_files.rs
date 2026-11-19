@@ -260,6 +260,23 @@ mod tests {
     }
 
     #[test]
+    fn publish_never_reuses_an_existing_unindexed_id_folder() {
+        let (_guard, files, library) = setup();
+        let existing = library.join(ID);
+        fs::create_dir_all(&existing).unwrap();
+        fs::write(existing.join("keep.pak"), b"precious").unwrap();
+        let staging = files.create_staging().unwrap();
+        fs::write(staging.join("A.pak"), b"1").unwrap();
+
+        let result = files.publish(&staging, &["A.pak".into()], ID);
+
+        assert!(matches!(result, Err(LibraryError::Storage(_))), "{result:?}");
+        assert_eq!(fs::read(existing.join("keep.pak")).unwrap(), b"precious");
+        assert!(!existing.join("A.pak").exists());
+        assert!(staging.join("A.pak").exists());
+    }
+
+    #[test]
     fn discard_removes_staging_but_never_paths_outside_the_library() {
         let (guard, files, library) = setup();
         let staging = files.create_staging().unwrap();
