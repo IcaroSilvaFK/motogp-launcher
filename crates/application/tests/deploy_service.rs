@@ -4,7 +4,7 @@ mod fakes;
 
 use fakes::*;
 use motogp_application::DeployError;
-use motogp_domain::Deployed;
+use motogp_domain::{Deployed, DeployedFile};
 use std::path::PathBuf;
 
 fn deploy_a_and_b(state: &Shared) -> Vec<String> {
@@ -28,7 +28,7 @@ fn deploy_writes_files_in_profile_order_with_prefix() {
     assert!(disk_has(&state, "001_aaaaaaaaaaaa_A.pak"));
     let manifest = state.borrow().manifest.clone();
     assert_eq!(manifest.mods_dir, mods_dir());
-    assert_eq!(manifest.files, names);
+    assert_eq!(manifest_names(&manifest.files), names);
     assert!(manifest.pending.is_empty());
 }
 
@@ -55,7 +55,10 @@ fn every_deployed_file_has_a_persisted_record_before_it_exists() {
     assert!(service(&state).deploy(&mods_dir(), &mods).is_err());
 
     let manifest = state.borrow().manifest.clone();
-    assert_eq!(manifest.pending, vec!["000_aaaaaaaaaaaa_A.pak"]);
+    assert_eq!(
+        manifest_names(&manifest.pending),
+        vec!["000_aaaaaaaaaaaa_A.pak"]
+    );
 }
 
 #[test]
@@ -78,7 +81,7 @@ fn deploy_cleans_previous_session_first() {
             "materialize 000_bbbbbbbbbbbb_B.pak"
         ]
     );
-    assert_eq!(state.borrow().manifest.files, names);
+    assert_eq!(manifest_names(&state.borrow().manifest.files), names);
     assert_eq!(disk_names(&state), vec!["000_bbbbbbbbbbbb_B.pak"]);
 }
 
@@ -148,7 +151,7 @@ fn deploy_refuses_a_destination_that_already_exists_and_leaves_it_alone() {
     assert!(state.borrow().manifest.is_empty());
     assert_eq!(state.borrow().materialize_calls, 0);
     // A later cleanup must never touch the foreign file.
-    service(&state).clean().unwrap();
+    service(&state).clean(&mods_dir()).unwrap();
     assert!(disk_has(&state, "000_aaaaaaaaaaaa_A.pak"));
 }
 
@@ -213,7 +216,7 @@ fn interrupted_deploy_remains_recoverable() {
 
         // The next launch recovers from the manifest and journal.
         state.borrow_mut().dead = false;
-        service(&state).clean().unwrap();
+        service(&state).clean(&mods_dir()).unwrap();
 
         assert_eq!(
             disk_names(&state),
@@ -261,7 +264,7 @@ fn clean_removes_only_registered_files_and_reports_the_count() {
     deploy_a_and_b(&state);
     put_disk(&state, "meu_mod.pak", b"manual");
 
-    let removed = service(&state).clean().unwrap();
+    let removed = service(&state).clean(&mods_dir()).unwrap();
 
     assert_eq!(removed, 2);
     assert_eq!(disk_names(&state), vec!["meu_mod.pak"]);
@@ -272,7 +275,7 @@ fn clean_removes_only_registered_files_and_reports_the_count() {
 fn clean_without_a_session_does_nothing() {
     let state = new_state();
 
-    assert_eq!(service(&state).clean().unwrap(), 0);
+    assert_eq!(service(&state).clean(&mods_dir()).unwrap(), 0);
     assert_eq!(state.borrow().manifest_saves, 0);
 }
 
@@ -285,7 +288,7 @@ fn clean_tolerates_an_already_missing_file_and_counts_only_removed_ones() {
         .disk
         .remove(&(mods_dir(), "000_bbbbbbbbbbbb_B.pak".to_string()));
 
-    let removed = service(&state).clean().unwrap();
+    let removed = service(&state).clean(&mods_dir()).unwrap();
 
     assert_eq!(removed, 1);
     assert!(state.borrow().manifest.is_empty());
@@ -297,7 +300,7 @@ fn failed_clean_keeps_pending_entries() {
     deploy_a_and_b(&state);
     state.borrow_mut().fail_remove = vec!["001_aaaaaaaaaaaa_A.pak".into()];
 
-    let error = service(&state).clean().unwrap_err();
+    let error = service(&state).clean(&mods_dir()).unwrap_err();
 
     assert!(matches!(
         error,
@@ -308,11 +311,14 @@ fn failed_clean_keeps_pending_entries() {
         }
     ));
     let manifest = state.borrow().manifest.clone();
-    assert_eq!(manifest.files, vec!["001_aaaaaaaaaaaa_A.pak"]);
+    assert_eq!(
+        manifest_names(&manifest.files),
+        vec!["001_aaaaaaaaaaaa_A.pak"]
+    );
     assert_eq!(manifest.mods_dir, mods_dir());
     // A retry after the failure is gone finishes the job.
     state.borrow_mut().fail_remove.clear();
-    assert_eq!(service(&state).clean().unwrap(), 1);
+    assert_eq!(service(&state).clean(&mods_dir()).unwrap(), 1);
     assert!(state.borrow().manifest.is_empty());
 }
 
@@ -327,11 +333,14 @@ fn invalid_manifest_path_is_rejected() {
         );
         state.borrow_mut().manifest = Deployed {
             mods_dir: mods_dir(),
-            files: vec!["000_aaaaaaaaaaaa_A.pak".into(), bad.into()],
+            files: vec![
+                DeployedFile::new("000_aaaaaaaaaaaa_A.pak", "lib/a/A.pak"),
+                DeployedFile::new(bad, "lib/a/A.pak"),
+            ],
             pending: vec![],
         };
 
-        let error = service(&state).clean().unwrap_err();
+        let error = service(&state).clean(&mods_dir()).unwrap_err();
 
         assert!(matches!(error, DeployError::InvalidPath { .. }), "{bad:?}");
         // Validation happens before any removal, and the manifest is kept.
@@ -346,11 +355,11 @@ fn a_manifest_with_files_but_no_directory_is_rejected() {
     let state = new_state();
     state.borrow_mut().manifest = Deployed {
         mods_dir: PathBuf::new(),
-        files: vec!["a.pak".into()],
+        files: vec![DeployedFile::new("a.pak", "lib/a/a.pak")],
         pending: vec![],
     };
 
-    let error = service(&state).clean().unwrap_err();
+    let error = service(&state).clean(&mods_dir()).unwrap_err();
 
     assert!(matches!(error, DeployError::InvalidPath { .. }));
 }
@@ -379,4 +388,108 @@ fn deploy_error_messages_are_descriptive() {
     for (error, text) in cases {
         assert!(error.to_string().contains(text), "{error}");
     }
+}
+
+// ---------- ownership proof (issue #6 review, finding 1) ----------
+
+#[test]
+fn a_user_file_created_after_journaling_survives_a_failed_untrack_save() {
+    let state = new_state();
+    let mods = [mod_of(ID_A, &["A.pak"])];
+    put_sources(&state, &mods);
+    {
+        let mut s = state.borrow_mut();
+        // The user creates the destination after the intent was journaled ...
+        s.user_file_before_materialize =
+            Some((0, "000_aaaaaaaaaaaa_A.pak".into(), b"user".to_vec()));
+        // ... and the save that would untrack it fails (save #0 journals).
+        s.fail_save_at = Some(1);
+    }
+
+    assert!(service(&state).deploy(&mods_dir(), &mods).is_err());
+
+    assert_eq!(
+        state
+            .borrow()
+            .disk
+            .get(&(mods_dir(), "000_aaaaaaaaaaaa_A.pak".to_string())),
+        Some(&b"user".to_vec())
+    );
+    // The stale journal entry was resolved without deleting the user file.
+    assert!(state.borrow().manifest.is_empty());
+}
+
+#[test]
+fn a_user_file_at_a_journaled_destination_survives_recovery_after_a_crash() {
+    let state = new_state();
+    let mods = [mod_of(ID_A, &["A.pak"])];
+    put_sources(&state, &mods);
+    state.borrow_mut().crash_before_materialize = Some(0);
+    assert!(service(&state).deploy(&mods_dir(), &mods).is_err());
+    assert_eq!(state.borrow().manifest.pending.len(), 1);
+    // After the crash the user drops their own file under that name.
+    put_disk(&state, "000_aaaaaaaaaaaa_A.pak", b"user");
+    state.borrow_mut().dead = false;
+
+    let removed = service(&state).clean(&mods_dir()).unwrap();
+
+    assert_eq!(removed, 0);
+    assert!(disk_has(&state, "000_aaaaaaaaaaaa_A.pak"));
+    assert!(state.borrow().manifest.is_empty());
+}
+
+#[test]
+fn a_tracked_name_that_now_holds_different_content_survives_clean() {
+    let state = new_state();
+    deploy_a_and_b(&state);
+    put_disk(&state, "000_bbbbbbbbbbbb_B.pak", b"replaced by the user");
+
+    let removed = service(&state).clean(&mods_dir()).unwrap();
+
+    assert_eq!(removed, 1);
+    assert_eq!(disk_names(&state), vec!["000_bbbbbbbbbbbb_B.pak"]);
+    assert!(state.borrow().manifest.is_empty());
+}
+
+// ---------- authorized directory (issue #6 review, finding 2) ----------
+
+fn foreign_manifest(state: &Shared) {
+    state.borrow_mut().disk.insert(
+        (PathBuf::from("Documents"), "notes.txt".to_string()),
+        b"mine".to_vec(),
+    );
+    state.borrow_mut().manifest = Deployed {
+        mods_dir: PathBuf::from("Documents"),
+        files: vec![DeployedFile::new("notes.txt", "lib/a/notes.txt")],
+        pending: vec![],
+    };
+}
+
+#[test]
+fn clean_refuses_a_manifest_that_points_outside_the_authorized_directory() {
+    let state = new_state();
+    foreign_manifest(&state);
+
+    let error = service(&state).clean(&mods_dir()).unwrap_err();
+
+    assert!(
+        matches!(error, DeployError::UnauthorizedDirectory { .. }),
+        "{error}"
+    );
+    assert_eq!(state.borrow().disk.len(), 1);
+    assert!(state.borrow().log.is_empty());
+    assert_eq!(state.borrow().manifest.files.len(), 1);
+}
+
+#[test]
+fn deploy_refuses_to_proceed_when_the_manifest_directory_is_foreign() {
+    let state = new_state();
+    foreign_manifest(&state);
+    let mods = [mod_of(ID_A, &["A.pak"])];
+    put_sources(&state, &mods);
+
+    let error = service(&state).deploy(&mods_dir(), &mods).unwrap_err();
+
+    assert!(matches!(error, DeployError::UnauthorizedDirectory { .. }));
+    assert_eq!(state.borrow().materialize_calls, 0);
 }

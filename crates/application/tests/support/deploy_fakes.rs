@@ -2,7 +2,7 @@
 //! simulated "process death" (every later operation fails until revived).
 #![allow(dead_code)]
 use motogp_application::{
-    AppError, DeployError, DeployFiles, DeployMod, DeployService, DeployedRepository,
+    AppError, DeployError, DeployFiles, DeployMod, DeployService, DeployedRepository, DirCheck,
 };
 use motogp_domain::Deployed;
 use std::cell::RefCell;
@@ -27,6 +27,10 @@ pub struct DeployState {
     /// Names whose removal fails.
     pub fail_remove: Vec<String>,
     pub dead: bool,
+    /// A foreign (user) file appears at `name` right before the n-th materialization.
+    pub user_file_before_materialize: Option<(usize, String, Vec<u8>)>,
+    /// The n-th (0-based) manifest save fails once (the process survives).
+    pub fail_save_at: Option<usize>,
     /// Ordered log of "materialize <name>" / "remove <name>".
     pub log: Vec<String>,
     /// Source file contents by path.
@@ -70,8 +74,12 @@ impl DeployedRepository for FakeRepo {
         if state.dead {
             return Err(io_error("process is dead"));
         }
-        state.manifest = deployed.clone();
+        let call = state.manifest_saves;
         state.manifest_saves += 1;
+        if state.fail_save_at == Some(call) {
+            return Err(io_error("manifest save failed"));
+        }
+        state.manifest = deployed.clone();
         Ok(())
     }
 }
@@ -85,6 +93,38 @@ impl DeployFiles for FakeFiles {
         Ok(state
             .disk
             .contains_key(&(dir.to_path_buf(), name.to_string())))
+    }
+
+    fn check_dir(&self, manifest_dir: &Path, authorized: &Path) -> Result<DirCheck, DeployError> {
+        let state = self.0.borrow();
+        if manifest_dir != authorized {
+            return Ok(DirCheck::Foreign);
+        }
+        let present = state.dirs.iter().any(|d| d == manifest_dir)
+            || state.disk.keys().any(|(d, _)| d == manifest_dir);
+        Ok(if present {
+            DirCheck::Authorized
+        } else {
+            DirCheck::Missing
+        })
+    }
+
+    /// Fakes have no inode identity: a file is ours when its bytes equal the
+    /// library source (what a hard link or a faithful copy looks like).
+    fn owns(&self, dir: &Path, name: &str, source: &Path) -> Result<bool, DeployError> {
+        let state = self.0.borrow();
+        if state.dead {
+            return Err(io_error("process is dead"));
+        }
+        Ok(
+            match (
+                state.disk.get(&(dir.to_path_buf(), name.to_string())),
+                state.sources.get(source),
+            ) {
+                (Some(on_disk), Some(original)) => on_disk == original,
+                _ => false,
+            },
+        )
     }
 
     fn create_dir_all(&self, dir: &Path) -> Result<(), DeployError> {
@@ -111,6 +151,11 @@ impl DeployFiles for FakeFiles {
         }
         if state.fail_materialize == Some(call) {
             return Err(io_error("disk full"));
+        }
+        if let Some((at, user_name, content)) = state.user_file_before_materialize.clone() {
+            if at == call {
+                state.disk.insert((dir.to_path_buf(), user_name), content);
+            }
         }
         let key = (dir.to_path_buf(), name.to_string());
         if state.disk.contains_key(&key) {
@@ -140,6 +185,10 @@ impl DeployFiles for FakeFiles {
             .remove(&(dir.to_path_buf(), name.to_string()))
             .is_some())
     }
+}
+
+pub fn manifest_names(files: &[motogp_domain::DeployedFile]) -> Vec<String> {
+    files.iter().map(|f| f.name.clone()).collect()
 }
 
 pub type FakeDeployService = DeployService<FakeRepo, FakeFiles>;

@@ -3,14 +3,14 @@
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
 use motogp_application::{DeployError, DeployMod};
-use motogp_domain::Deployed;
+use motogp_domain::{Deployed, DeployedFile};
 use std::path::PathBuf;
 
 #[path = "../support/deploy_fakes.rs"]
 mod fakes;
 use fakes::{
-    disk_has, disk_names, mod_of, mods_dir, new_state, put_disk, put_sources, service, Shared,
-    ID_A, ID_B,
+    disk_has, disk_names, manifest_names, mod_of, mods_dir, new_state, put_disk, put_sources,
+    service, Shared, ID_A, ID_B,
 };
 
 #[derive(Debug, World)]
@@ -65,7 +65,7 @@ fn destinations(w: &mut DeployWorld, a: String, b: String) {
 
 #[then("each deployed file has a recoverable persisted record")]
 fn persisted_record(w: &mut DeployWorld) {
-    assert_eq!(w.state.borrow().manifest.files, w.deployed);
+    assert_eq!(manifest_names(&w.state.borrow().manifest.files), w.deployed);
     assert_eq!(w.state.borrow().manifest.mods_dir, mods_dir());
 }
 
@@ -94,7 +94,7 @@ fn failing_second(w: &mut DeployWorld) {
 
 #[when("I clean the session")]
 fn clean_session(w: &mut DeployWorld) {
-    w.clean_result = Some(service(&w.state).clean());
+    w.clean_result = Some(service(&w.state).clean(&mods_dir()));
 }
 
 #[then("only the registered files are removed")]
@@ -138,7 +138,7 @@ fn get_error(w: &mut DeployWorld) {
 #[then("the second file remains tracked for recovery")]
 fn second_tracked(w: &mut DeployWorld) {
     let manifest = w.state.borrow().manifest.clone();
-    assert_eq!(manifest.files, vec![w.deployed[1].clone()]);
+    assert_eq!(manifest_names(&manifest.files), vec![w.deployed[1].clone()]);
 }
 
 // ---------- Clean the previous session before redeploying ----------
@@ -168,7 +168,7 @@ fn a_before_b(w: &mut DeployWorld) {
 
 #[then("only B is registered")]
 fn only_b_registered(w: &mut DeployWorld) {
-    assert_eq!(w.state.borrow().manifest.files, w.deployed);
+    assert_eq!(manifest_names(&w.state.borrow().manifest.files), w.deployed);
     assert_eq!(disk_names(&w.state), vec!["000_bbbbbbbbbbbb_B.pak"]);
 }
 
@@ -197,7 +197,7 @@ fn error_containing(w: &mut DeployWorld, text: String) {
 #[then("the manual file stays intact and outside the cleanup")]
 fn manual_intact(w: &mut DeployWorld) {
     assert!(w.state.borrow().manifest.is_empty());
-    service(&w.state).clean().unwrap();
+    service(&w.state).clean(&mods_dir()).unwrap();
     assert_eq!(
         w.state.borrow().disk[&(mods_dir(), "000_aaaaaaaaaaaa_A.pak".to_string())],
         b"manual-bytes".to_vec()
@@ -235,7 +235,7 @@ fn interruption(w: &mut DeployWorld) {
 fn resume(w: &mut DeployWorld) {
     // The new process starts alive and recovers from the persisted state.
     w.state.borrow_mut().dead = false;
-    w.clean_result = Some(service(&w.state).clean());
+    w.clean_result = Some(service(&w.state).clean(&mods_dir()));
 }
 
 #[then("every file proven deployed can be cleaned")]
@@ -259,14 +259,17 @@ fn tampered(w: &mut DeployWorld, fragment: String) {
     );
     w.state.borrow_mut().manifest = Deployed {
         mods_dir: mods_dir(),
-        files: vec![format!("{fragment}/evil.pak")],
+        files: vec![DeployedFile::new(
+            format!("{fragment}/evil.pak"),
+            "lib/a/evil.pak",
+        )],
         pending: vec![],
     };
 }
 
 #[when("I try to clean the session")]
 fn try_clean(w: &mut DeployWorld) {
-    w.clean_result = Some(service(&w.state).clean());
+    w.clean_result = Some(service(&w.state).clean(&mods_dir()));
 }
 
 #[then("the operation returns an error")]
