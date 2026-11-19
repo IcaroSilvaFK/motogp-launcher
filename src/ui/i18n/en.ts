@@ -23,6 +23,7 @@ export const en: Messages = {
     running: 'Running…',
     ended: (cleaned) => `Session ended — ${cleaned} files removed`,
     neverStarted: 'The game did not open within 2 min; mods removed',
+    unavailable: 'Play is disabled: the game session cannot be tracked.',
   },
   library: {
     title: 'Library',
@@ -106,6 +107,7 @@ export const en: Messages = {
     deploy_unauthorized_directory: 'The launcher is not allowed to use this directory.',
     deploy_cleanup_incomplete: 'Cleanup did not remove every deployed file.',
     session_error: 'The game session failed.',
+    session_subscription_failed: 'Session events are unavailable.',
     recovery_failed: 'Recovery of a previous session failed.',
     unknown: 'Something went wrong.',
   },

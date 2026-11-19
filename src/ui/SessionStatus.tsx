@@ -21,6 +21,9 @@ export function SessionStatus() {
     case 'never-started':
       text = error === null ? t.session.neverStarted : null;
       break;
+    case 'unavailable':
+      text = t.session.unavailable;
+      break;
     case 'idle':
       text = null;
       break;

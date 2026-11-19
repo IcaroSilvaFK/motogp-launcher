@@ -23,6 +23,7 @@ export const ptBR: Messages = {
     running: 'Em execução…',
     ended: (cleaned) => `Sessão encerrada — ${cleaned} ${plural(cleaned, 'arquivo removido', 'arquivos removidos')}`,
     neverStarted: 'O jogo não abriu em 2 min; mods removidos',
+    unavailable: 'Jogar está desativado: não foi possível acompanhar a sessão do jogo.',
   },
   library: {
     title: 'Biblioteca',
@@ -106,6 +107,7 @@ export const ptBR: Messages = {
     deploy_unauthorized_directory: 'O launcher não tem permissão para usar este diretório.',
     deploy_cleanup_incomplete: 'A limpeza não removeu todos os arquivos implantados.',
     session_error: 'A sessão do jogo falhou.',
+    session_subscription_failed: 'Os eventos da sessão estão indisponíveis.',
     recovery_failed: 'A recuperação de uma sessão anterior falhou.',
     unknown: 'Algo deu errado.',
   },

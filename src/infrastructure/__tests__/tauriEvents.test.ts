@@ -83,6 +83,14 @@ describe('Given the session and drop adapters', () => {
     expect(onDrop).not.toHaveBeenCalled();
   });
 
+  it('When the SDK registration rejects Then the session subscriptions reject with that reason', async () => {
+    const reason = new Error('listen failed');
+    const listen = vi.fn(() => Promise.reject(reason));
+    const events = createTauriSessionEvents(listen);
+    await expect(events.onSession(vi.fn())).rejects.toBe(reason);
+    await expect(events.onSessionError(vi.fn())).rejects.toBe(reason);
+  });
+
   it('When non-drop drag events arrive Then drop_ignores_non_drop_events', async () => {
     const drop = fakeRegistration();
     const onDrop = vi.fn();
