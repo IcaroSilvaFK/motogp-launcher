@@ -6,7 +6,8 @@ export type SessionPhase =
   | { kind: 'starting' }
   | { kind: 'running' }
   | { kind: 'ended'; cleaned: number }
-  | { kind: 'never-started'; cleaned: number };
+  | { kind: 'never-started'; cleaned: number }
+  | { kind: 'unavailable' };
 
 export type Notice =
   | { kind: 'imported'; count: number }

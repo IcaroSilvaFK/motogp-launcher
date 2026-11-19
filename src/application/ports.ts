@@ -27,6 +27,7 @@ export interface FilePicker {
   pickGameDirectory(): Promise<string | null>;
 }
 
+/** Both methods reject when the subscription cannot be established (no event will ever be delivered). */
 export interface SessionEvents {
   onSession(callback: (event: SessionEvent) => void): Promise<Unsubscribe>;
   onSessionError(callback: (event: SessionErrorEvent) => void): Promise<Unsubscribe>;

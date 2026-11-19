@@ -276,20 +276,29 @@ class Listeners<T> {
   }
 }
 
+export interface FakeSessionEventsOptions {
+  log?: string[];
+  /** Rejection reasons: makes the matching subscription reject instead of registering. */
+  rejectSession?: unknown;
+  rejectSessionError?: unknown;
+}
+
 export class FakeSessionEvents implements SessionEvents {
   private readonly session: Listeners<SessionEvent>;
   private readonly errors: Listeners<SessionErrorEvent>;
 
-  constructor(options: { log?: string[] } = {}) {
+  constructor(private readonly options: FakeSessionEventsOptions = {}) {
     this.session = new Listeners('session', options.log);
     this.errors = new Listeners('session-error', options.log);
   }
 
   onSession(callback: (event: SessionEvent) => void): Promise<Unsubscribe> {
+    if ('rejectSession' in this.options) return Promise.reject(this.options.rejectSession);
     return this.session.add(callback);
   }
 
   onSessionError(callback: (event: SessionErrorEvent) => void): Promise<Unsubscribe> {
+    if ('rejectSessionError' in this.options) return Promise.reject(this.options.rejectSessionError);
     return this.errors.add(callback);
   }
 
