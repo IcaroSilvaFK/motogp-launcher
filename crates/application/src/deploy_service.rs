@@ -74,12 +74,16 @@ impl<R: DeployedRepository, F: DeployFiles> DeployService<R, F> {
             if self.files.exists(mods_dir, name)? {
                 return Err(DeployError::AlreadyExists { name: name.clone() });
             }
-            manifest.pending.push(DeployedFile::new(name.clone(), source.clone()));
+            manifest
+                .pending
+                .push(DeployedFile::new(name.clone(), source.clone()));
             self.repository.save(&manifest)?;
             match self.files.materialize(source, mods_dir, name) {
                 Ok(()) => {
                     manifest.pending.retain(|f| f.name != *name);
-                    manifest.files.push(DeployedFile::new(name.clone(), source.clone()));
+                    manifest
+                        .files
+                        .push(DeployedFile::new(name.clone(), source.clone()));
                     self.repository.save(&manifest)?;
                 }
                 Err(error @ DeployError::AlreadyExists { .. }) => {

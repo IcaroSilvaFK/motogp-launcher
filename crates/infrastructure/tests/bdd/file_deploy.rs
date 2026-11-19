@@ -27,6 +27,7 @@ struct FileWorld {
     deploy_errors: Vec<String>,
     clean_result: Option<Result<usize, DeployError>>,
     log_order: Vec<String>,
+    lock: Option<fs::File>,
 }
 
 impl FileWorld {
@@ -156,13 +157,10 @@ fn registered_removed(w: &mut FileWorld) {
 fn failing_second(w: &mut FileWorld) {
     let mods = w.two_mods();
     w.deploy(&mods);
-    // Replace the second deployed file with a non-empty directory: removing a
-    // file entry that is a directory fails on every platform.
-    let dir = w.mods_dir();
-    let second = dir.join(&w.deployed[1]);
-    fs::remove_file(&second).unwrap();
-    fs::create_dir(&second).unwrap();
-    fs::write(second.join("inner"), b"x").unwrap();
+    // Hold the second deployed file open without delete sharing: removing it
+    // fails while the file is still provably ours.
+    let second = w.mods_dir().join(&w.deployed[1]);
+    w.lock = Some(hold_open(&second));
 }
 
 #[when("I clean the session")]
@@ -237,7 +235,7 @@ fn a_removed(w: &mut FileWorld) {
 
 #[then("only B is registered")]
 fn only_b(w: &mut FileWorld) {
-    assert_eq!(w.manifest().files, w.deployed);
+    assert_eq!(names_of(&w.manifest().files), w.deployed);
     assert_eq!(w.deployed, vec!["000_bbbbbbbbbbbb_B.pak"]);
     assert_eq!(w.mods_names(), w.deployed);
 }
@@ -326,7 +324,10 @@ fn interruption(w: &mut FileWorld) {
     fs::write(lib.join("A.pak"), b"A").unwrap();
     let manifest = Deployed {
         mods_dir: dir,
-        files: vec![DeployedFile::new("000_bbbbbbbbbbbb_B.pak", lib.join("B.pak"))],
+        files: vec![DeployedFile::new(
+            "000_bbbbbbbbbbbb_B.pak",
+            lib.join("B.pak"),
+        )],
         pending: vec![
             DeployedFile::new("001_aaaaaaaaaaaa_A.pak", lib.join("A.pak")),
             DeployedFile::new("002_cccccccccccc_C.pak", lib.join("C.pak")),
@@ -397,4 +398,24 @@ pub async fn run() -> bool {
 
 fn names_of(files: &[DeployedFile]) -> Vec<String> {
     files.iter().map(|f| f.name.clone()).collect()
+}
+
+/// Opens `path` so that deleting it fails while the handle lives.
+#[cfg(windows)]
+fn hold_open(path: &Path) -> fs::File {
+    use std::os::windows::fs::OpenOptionsExt;
+    fs::OpenOptions::new()
+        .read(true)
+        .share_mode(1)
+        .open(path)
+        .unwrap()
+}
+
+/// Non-Windows: a read-only directory forbids removing its entries.
+#[cfg(not(windows))]
+fn hold_open(path: &Path) -> fs::File {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = path.parent().unwrap();
+    fs::set_permissions(dir, fs::Permissions::from_mode(0o555)).unwrap();
+    fs::File::open(path).unwrap()
 }

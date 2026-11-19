@@ -1,25 +1,47 @@
 //! `DeployedRepository` adapter: the manifest stored in `deployed.json`.
 use crate::store::{load_json, save_json};
 use motogp_application::{DeployError, DeployedRepository};
-use motogp_domain::Deployed;
+use motogp_domain::{Deployed, DeployedFile};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(default)]
+struct DeployedFileDto {
+    name: String,
+    source: PathBuf,
+}
 
 /// Serialization shape of `deployed.json` (kept out of the domain model).
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(default)]
 struct DeployedDto {
     mods_dir: PathBuf,
-    files: Vec<String>,
-    pending: Vec<String>,
+    files: Vec<DeployedFileDto>,
+    pending: Vec<DeployedFileDto>,
+}
+
+impl From<DeployedFileDto> for DeployedFile {
+    fn from(dto: DeployedFileDto) -> Self {
+        DeployedFile::new(dto.name, dto.source)
+    }
+}
+
+impl From<&DeployedFile> for DeployedFileDto {
+    fn from(file: &DeployedFile) -> Self {
+        DeployedFileDto {
+            name: file.name.clone(),
+            source: file.source.clone(),
+        }
+    }
 }
 
 impl From<DeployedDto> for Deployed {
     fn from(dto: DeployedDto) -> Self {
         Deployed {
             mods_dir: dto.mods_dir,
-            files: dto.files,
-            pending: dto.pending,
+            files: dto.files.into_iter().map(Into::into).collect(),
+            pending: dto.pending.into_iter().map(Into::into).collect(),
         }
     }
 }
@@ -28,8 +50,8 @@ impl From<&Deployed> for DeployedDto {
     fn from(deployed: &Deployed) -> Self {
         DeployedDto {
             mods_dir: deployed.mods_dir.clone(),
-            files: deployed.files.clone(),
-            pending: deployed.pending.clone(),
+            files: deployed.files.iter().map(Into::into).collect(),
+            pending: deployed.pending.iter().map(Into::into).collect(),
         }
     }
 }

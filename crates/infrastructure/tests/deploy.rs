@@ -292,21 +292,31 @@ fn deploy_empty_profile_does_not_create_the_directory() {
     assert!(!env.mods.exists());
 }
 
+#[cfg(windows)]
 #[test]
 fn failed_clean_on_disk_keeps_pending_entries_for_a_retry() {
+    use std::os::windows::fs::OpenOptionsExt;
     let env = env();
     let names = deploy_two(&env);
-    let second = env.mods.join(&names[1]);
-    fs::remove_file(&second).unwrap();
-    fs::create_dir(&second).unwrap();
-    fs::write(second.join("inner"), b"x").unwrap();
+    // Hold the second file open without FILE_SHARE_DELETE: removal fails.
+    let lock = fs::OpenOptions::new()
+        .read(true)
+        .share_mode(1)
+        .open(env.mods.join(&names[1]))
+        .unwrap();
 
     let error = env.service().clean(&env.mods).unwrap_err();
 
-    assert!(matches!(error, DeployError::CleanIncomplete { .. }));
-    assert_eq!(names_of(&env.repo().load().unwrap().files), vec![names[1].clone()]);
-    fs::remove_dir_all(&second).unwrap();
-    assert_eq!(env.service().clean(&env.mods).unwrap(), 0);
+    assert!(
+        matches!(error, DeployError::CleanIncomplete { .. }),
+        "{error}"
+    );
+    assert_eq!(
+        names_of(&env.repo().load().unwrap().files),
+        vec![names[1].clone()]
+    );
+    drop(lock);
+    assert_eq!(env.service().clean(&env.mods).unwrap(), 1);
     assert!(env.repo().load().unwrap().is_empty());
 }
 
