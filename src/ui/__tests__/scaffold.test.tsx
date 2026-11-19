@@ -2,11 +2,12 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { App } from '../App';
+import { createFakeController } from './fakeController';
 
 describe('Given the launcher started in the WebView', () => {
   describe('When the interface is rendered', () => {
     it('renders_launcher_shell: Then I see the accessible MotoGP Launcher shell', () => {
-      render(<App />);
+      render(<App controller={createFakeController()} />);
 
       expect(screen.getByRole('banner')).toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 1, name: 'MotoGP Launcher' })).toBeInTheDocument();
