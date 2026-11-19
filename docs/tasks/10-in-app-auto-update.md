@@ -108,5 +108,5 @@ There are no original names in this extra issue. Write first:
 - [ ] Gate 6: boundaries/Cargo deps green; updater/process SDK only in adapters and bootstrap, no direct import by the UI.
 - [ ] Gate 7: `cargo llvm-cov` and `pnpm test --coverage` with ≥90% domain/application per layer/crate and ≥80% overall per stack.
 - [ ] Gate 8: criteria traced to tests; **Rust core** and **Frontend** green; build/release conditioned on the gates.
-- [ ] QA Haiku approved and Codex review applied; the integrated validation of the real update is explicitly left to issue 11, without claiming a fake proves a restart on the new version.
+- [ ] QA Haiku approved; the integrated validation of the real update is explicitly left to issue 11, without claiming a fake proves a restart on the new version.
 - [ ] Branch from `dev`; PR to `dev` with a real `Closes #<no>`; promotions `dev → qas → main`, no direct commit to those branches.

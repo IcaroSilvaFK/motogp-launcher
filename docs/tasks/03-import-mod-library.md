@@ -104,5 +104,5 @@ Keep the eight plan names. Separate unit policies from adapter proofs:
 - [ ] Gate 6: Cargo deps inward and boundaries green; domain without serde/hash/ZIP/fs, application depends only on domain in production.
 - [ ] Gate 7: `cargo llvm-cov` and `pnpm test --coverage` with ≥90% domain/application per layer/crate and ≥80% overall per stack.
 - [ ] Gate 8: all criteria traced; **Rust core** and **Frontend** green in CI.
-- [ ] QA Haiku approved and Codex review applied; malicious entries do not escape the library.
+- [ ] QA Haiku approved; malicious entries do not escape the library.
 - [ ] Branch from `dev`; PR to `dev` with a real `Closes #<no>`; no direct commit to `dev/qas/main`.
