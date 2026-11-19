@@ -1,5 +1,5 @@
-use crate::{AppError, Clock, ProfileRepository};
-use motogp_domain::{normalize_name, Profile, ProfileError, VANILLA_ID};
+use crate::{AppError, Clock, ConfigRepository, ProfileRepository};
+use motogp_domain::{normalize_name, Config, Profile, ProfileError, VANILLA_ID};
 use std::fmt;
 
 /// Failure of a profile use case: a business rule or the storage.
@@ -82,8 +82,14 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
         self.update(id, |profile| profile.rename(&name))
     }
 
-    /// Deletes a profile; Vanilla is always refused.
-    pub fn delete(&self, id: &str) -> Result<(), ProfileServiceError> {
+    /// Deletes a profile; Vanilla is always refused. When the deleted profile is
+    /// the active one, the config falls back to Vanilla (persisted before the
+    /// profile is removed, so a failure never leaves a dangling active ID).
+    pub fn delete(
+        &self,
+        id: &str,
+        config: &impl ConfigRepository,
+    ) -> Result<(), ProfileServiceError> {
         if id == VANILLA_ID {
             return Err(ProfileError::VanillaProtected.into());
         }
@@ -93,7 +99,22 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
         if profiles.len() == before {
             return Err(ProfileError::NotFound.into());
         }
-        self.repository.save(&profiles)?;
+        let current = config.load()?;
+        let was_active = current.active_profile.as_deref() == Some(id);
+        if was_active {
+            let fallback = Config {
+                active_profile: Some(VANILLA_ID.to_string()),
+                ..current.clone()
+            };
+            config.save(&fallback)?;
+        }
+        if let Err(error) = self.repository.save(&profiles) {
+            if was_active {
+                // Best effort: restore the previous active profile.
+                let _ = config.save(&current);
+            }
+            return Err(error.into());
+        }
         Ok(())
     }
 
@@ -250,8 +271,8 @@ mod tests {
     #[test]
     fn create_then_list() {
         let service = service();
-        let created = service.create("  Pinturas 2025 ").unwrap();
-        assert_eq!(created.name, "Pinturas 2025");
+        let created = service.create("  Liveries 2025 ").unwrap();
+        assert_eq!(created.name, "Liveries 2025");
         assert_eq!(created.id, "p1700000000000");
         assert!(created.mod_ids.is_empty());
         let listed = service.list().unwrap();
@@ -330,9 +351,9 @@ mod tests {
     fn rename_persists_new_name() {
         let service = service();
         let created = service.create("Old").unwrap();
-        let renamed = service.rename(&created.id, " Corrida ").unwrap();
-        assert_eq!(renamed.name, "Corrida");
-        assert_eq!(stored(&service)[1].name, "Corrida");
+        let renamed = service.rename(&created.id, " Race ").unwrap();
+        assert_eq!(renamed.name, "Race");
+        assert_eq!(stored(&service)[1].name, "Race");
     }
 
     #[test]

@@ -14,7 +14,7 @@ Feature: Persist profiles safely
     And profiles.json now contains Vanilla
 
   Scenario: Roundtrip preserves the mod order
-    Given a saved profile "Pinturas 2025" with mods "b", "a", "c"
+    Given a saved profile "Liveries 2025" with mods "b", "a", "c"
     When I read the profiles again from a new store
     Then the mods of that profile are "b", "a", "c"
 

@@ -9,9 +9,9 @@ Feature: Maintain ordered profiles
 
   Scenario: Create and list a profile
     Given Vanilla already exists
-    When I create "Pinturas 2025"
+    When I create "Liveries 2025"
     Then the list contains two profiles
-    And the new profile is named "Pinturas 2025" and has its own ID
+    And the new profile is named "Liveries 2025" and has its own ID
 
   Scenario: Preserve the mod order
     Given an existing profile
@@ -43,7 +43,7 @@ Feature: Maintain ordered profiles
 
   Scenario: Rename a profile and handle an unknown ID
     Given an existing profile
-    When I rename it to "Corrida"
+    When I rename it to "Race"
     Then the updated name is persisted
     When I look up an unknown ID
     Then I receive the error "profile not found"

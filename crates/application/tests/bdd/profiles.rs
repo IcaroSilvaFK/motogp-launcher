@@ -290,7 +290,7 @@ fn rename_it(w: &mut ProfilesWorld, name: String) {
 fn name_persisted(w: &mut ProfilesWorld) {
     let id = w.target();
     let profile = w.persisted().into_iter().find(|p| p.id == id).unwrap();
-    assert_eq!(profile.name, "Corrida");
+    assert_eq!(profile.name, "Race");
 }
 
 #[when("I look up an unknown ID")]

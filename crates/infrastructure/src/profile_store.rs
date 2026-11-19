@@ -1,7 +1,7 @@
 //! `ProfileRepository` backed by `profiles.json` and the real `Clock`.
 use crate::store::{load_json, save_json};
 use motogp_application::{AppError, Clock, ProfileRepository};
-use motogp_domain::Profile;
+use motogp_domain::{normalize_name, Profile, ProfileError};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -15,13 +15,15 @@ struct ProfileDto {
     mod_ids: Vec<String>,
 }
 
-impl From<ProfileDto> for Profile {
-    fn from(dto: ProfileDto) -> Self {
-        Profile {
+impl TryFrom<ProfileDto> for Profile {
+    type Error = ProfileError;
+
+    fn try_from(dto: ProfileDto) -> Result<Self, Self::Error> {
+        Ok(Profile {
             id: dto.id,
-            name: dto.name,
+            name: normalize_name(&dto.name)?,
             mod_ids: dto.mod_ids,
-        }
+        })
     }
 }
 
@@ -50,7 +52,22 @@ impl JsonProfileStore {
 impl ProfileRepository for JsonProfileStore {
     fn load(&self) -> Result<Vec<Profile>, AppError> {
         let dtos: Vec<ProfileDto> = load_json(&self.path)?;
-        Ok(dtos.into_iter().map(Profile::from).collect())
+        let corrupted = |detail: String| AppError::Corrupted {
+            location: self.path.display().to_string(),
+            detail,
+        };
+        let mut profiles: Vec<Profile> = Vec::with_capacity(dtos.len());
+        for dto in dtos {
+            let profile = Profile::try_from(dto).map_err(|e| corrupted(e.to_string()))?;
+            if profiles.iter().any(|other| other.id == profile.id) {
+                return Err(corrupted(format!(
+                    "duplicate profile id \"{}\"",
+                    profile.id
+                )));
+            }
+            profiles.push(profile);
+        }
+        Ok(profiles)
     }
 
     fn save(&self, profiles: &[Profile]) -> Result<(), AppError> {
@@ -90,12 +107,12 @@ mod tests {
     #[test]
     fn profiles_roundtrip_preserves_order() {
         let dir = tempdir().unwrap();
-        let path = dir.path().join("dados").join("profiles.json");
+        let path = dir.path().join("data").join("profiles.json");
         let store = JsonProfileStore::new(&path);
         let profiles = vec![
             Profile::vanilla(),
-            profile("p2", "Pinturas 2025", &["b", "a", "c"]),
-            profile("p1", "Corrida", &["z", "y"]),
+            profile("p2", "Liveries 2025", &["b", "a", "c"]),
+            profile("p1", "Race", &["z", "y"]),
         ];
         store.save(&profiles).unwrap();
         assert_eq!(store.load(), Ok(profiles));
