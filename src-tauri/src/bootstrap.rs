@@ -4,8 +4,11 @@
 //! through `compose`, `commands`, `adapters` and `startup`.
 use crate::adapters::{TauriEvents, TauriOpener};
 use crate::{compose, configure, run_recovery};
-use motogp_infrastructure::{DataDir, SteamLibraries, SysinfoProcesses, ThreadRunner};
-use std::sync::Arc;
+use motogp_application::{InstanceGuard, InstanceLock};
+use motogp_infrastructure::{
+    DataDir, FileInstanceLock, SteamLibraries, SysinfoProcesses, ThreadRunner,
+};
+use std::sync::{Arc, Mutex};
 use tauri::Manager;
 
 #[cfg(windows)]
@@ -18,6 +21,9 @@ fn steam_libraries() -> SteamLibraries {
     SteamLibraries::new(None)
 }
 
+/// Keeps the single-instance lock alive in the managed state.
+struct InstanceHold(#[allow(dead_code)] Mutex<Option<InstanceGuard>>);
+
 /// Starts the Tauri application.
 pub fn run() {
     configure(
@@ -28,6 +34,18 @@ pub fn run() {
     .setup(|app| {
         let data = DataDir::new(app.path().app_data_dir()?);
         std::fs::create_dir_all(data.root())?;
+        // One launcher process at a time: a second one would share the
+        // deployment manifest and the game directory. The lock is taken before
+        // the recovery and held for the whole app lifetime.
+        match FileInstanceLock::new(data.root().join("instance.lock")).acquire()? {
+            Some(guard) => {
+                app.manage(InstanceHold(Mutex::new(Some(guard))));
+            }
+            None => {
+                eprintln!("another MotoGP Launcher is already running; exiting");
+                std::process::exit(0);
+            }
+        }
         let handle = app.handle().clone();
         let state = compose(
             &data,

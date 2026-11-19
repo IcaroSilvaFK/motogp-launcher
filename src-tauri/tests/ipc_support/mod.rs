@@ -64,6 +64,25 @@ impl SessionPublisher for Recorder {
     }
 }
 
+/// Sends a command through the IPC layer, like the WebView would.
+pub fn invoke_on(
+    webview: &WebviewWindow<MockRuntime>,
+    cmd: &str,
+    body: Value,
+) -> Result<Value, Value> {
+    let request = InvokeRequest {
+        cmd: cmd.into(),
+        callback: CallbackFn(0),
+        error: CallbackFn(1),
+        url: "http://tauri.localhost".parse().unwrap(),
+        body: InvokeBody::Json(body),
+        headers: Default::default(),
+        invoke_key: INVOKE_KEY.to_string(),
+    };
+    get_ipc_response(webview, request)
+        .map(|body| body.deserialize::<Value>().expect("JSON response"))
+}
+
 pub struct Harness {
     pub tmp: TempDir,
     pub opened: Arc<Mutex<Vec<String>>>,
@@ -118,17 +137,12 @@ impl Harness {
 
     /// Sends a command through the IPC layer, like the WebView would.
     pub fn invoke(&self, cmd: &str, body: Value) -> Result<Value, Value> {
-        let request = InvokeRequest {
-            cmd: cmd.into(),
-            callback: CallbackFn(0),
-            error: CallbackFn(1),
-            url: "http://tauri.localhost".parse().unwrap(),
-            body: InvokeBody::Json(body),
-            headers: Default::default(),
-            invoke_key: INVOKE_KEY.to_string(),
-        };
-        get_ipc_response(&self.webview, request)
-            .map(|body| body.deserialize::<Value>().expect("JSON response"))
+        invoke_on(&self.webview, cmd, body)
+    }
+
+    /// A handle other threads can use to invoke commands concurrently.
+    pub fn webview(&self) -> WebviewWindow<MockRuntime> {
+        self.webview.clone()
     }
 
     /// A valid Unreal install `steam/steamapps/common/MotoGP25` with an App ID.

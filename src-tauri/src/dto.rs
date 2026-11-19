@@ -1,6 +1,6 @@
 //! IPC data transfer objects. Fields are snake_case on the wire; the
 //! JS-side command arguments are camelCase (handled by `#[tauri::command]`).
-use motogp_application::{SessionEvent, SessionState};
+use motogp_application::{RecoveryState, RecoveryStatus, SessionEvent, SessionState};
 use motogp_domain::{Config, GameInfo, ModEntry, Profile};
 use serde::Serialize;
 
@@ -99,4 +99,30 @@ impl From<SessionEvent> for SessionEventDto {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SessionErrorDto {
     pub message: String,
+}
+
+/// Result of `recovery_status`: `state` is `not-run`, `recovered`,
+/// `game-running` or `failed`. The frontend reads it after subscribing to the
+/// events, so a failure at startup is never lost.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RecoveryStatusDto {
+    pub state: &'static str,
+    pub error: Option<String>,
+    pub cleaned_count: usize,
+}
+
+impl From<RecoveryStatus> for RecoveryStatusDto {
+    fn from(status: RecoveryStatus) -> Self {
+        let state = match status.state {
+            RecoveryState::NotRun => "not-run",
+            RecoveryState::Recovered => "recovered",
+            RecoveryState::GameRunning => "game-running",
+            RecoveryState::Failed => "failed",
+        };
+        RecoveryStatusDto {
+            state,
+            error: status.error,
+            cleaned_count: status.cleaned_count,
+        }
+    }
 }

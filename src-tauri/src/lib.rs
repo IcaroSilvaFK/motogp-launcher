@@ -17,6 +17,8 @@ pub use adapters::{is_steam_url, TauriEvents, TauriOpener, SESSION_ERROR_EVENT, 
 pub use bootstrap::run;
 pub use commands::configure;
 pub use compose::{compose, AppState, Profiles, Settings};
-pub use dto::{ConfigDto, GameInfoDto, ModDto, ProfileDto, SessionErrorDto, SessionEventDto};
+pub use dto::{
+    ConfigDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto, SessionErrorDto, SessionEventDto,
+};
 pub use error::CommandError;
 pub use startup::run_recovery;

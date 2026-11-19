@@ -221,10 +221,14 @@ fn concurrent_imports_do_not_lose_updates() {
 
     std::thread::scope(|scope| {
         for source in &sources {
-            let h = &h;
+            let webview = h.webview();
             scope.spawn(move || {
-                h.invoke("import_mods", json!({ "paths": [source.to_string_lossy()] }))
-                    .expect("import");
+                ipc_support::invoke_on(
+                    &webview,
+                    "import_mods",
+                    json!({ "paths": [source.to_string_lossy()] }),
+                )
+                .expect("import");
             });
         }
     });
