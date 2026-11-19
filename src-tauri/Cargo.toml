@@ -18,6 +18,7 @@ tauri = { version = "2", features = [] }
 motogp-domain = { path = "../crates/domain" }
 motogp-application = { path = "../crates/application" }
 motogp-infrastructure = { path = "../crates/infrastructure" }
+serde = { version = "1", features = ["derive"] }
 
 [dev-dependencies]
 cucumber = "0.21"

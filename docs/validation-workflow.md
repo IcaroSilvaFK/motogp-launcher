@@ -137,6 +137,41 @@ Limits live in `tooling/coverage-thresholds.json` (`core` = 90, `overall` = 80) 
 | Reject dependencies that violate the architecture | `rejects_ui_importing_infrastructure` (Vitest, real ESLint on `tests/fixtures/boundaries`), `rejects_outward_cargo_dependencies` (`src-tauri/tests/architecture.rs`, fixtures in `src-tauri/tests/fixtures`) |
 | Run all gates in CI | cucumber step + `tooling/__tests__/ci-workflow.test.ts` inspect `.github/workflows/validacao.yml`; the CI itself runs the gates |
 
+### Scenario traceability (issue #2)
+
+Gherkin: `crates/infrastructure/tests/features/persistence.feature`, run by `crates/infrastructure/tests/features.rs` (cucumber, temp dirs only). Application scenarios use a fake `ConfigRepository` (no fs).
+
+| Scenario | Test |
+|----------|------|
+| Read a missing configuration | `missing_file_returns_default` + cucumber scenario |
+| Save and read in a path with spaces and accents | `roundtrip_in_path_with_accents` + cucumber scenario |
+| Refuse corrupted JSON | `corrupted_json_is_an_error`, `zero_byte_file_is_an_error_not_a_default` + cucumber scenario |
+| Replace existing data safely on Windows | `save_replaces_existing_file_atomically` + cucumber scenario |
+| Preserve the previous version when the write fails | `failed_save_preserves_previous_file` (a directory on `<path>.tmp` forces the failure), `failed_replace_removes_the_temp_file` + cucumber scenario |
+| Application error propagation | `config_repository_error_is_propagated` (application, fake port) |
+| Domain defaults | `default_config_has_no_game_dir_and_no_active_profile` (domain) |
+| Error mapping at the Tauri boundary | `src-tauri/src/error.rs` unit tests (`CommandError { code, message }`) |
+
+### Issue #4: scenario traceability
+
+Gherkin: `crates/application/tests/features/profiles.feature` (fake repository and fake clock, run by `crates/application/tests/bdd/profiles.rs`) and `crates/infrastructure/tests/features/profile-persistence.feature` (temp dirs, run by `crates/infrastructure/tests/bdd/profile_persistence.rs`).
+
+| Scenario | Test |
+|----------|------|
+| Seed missing or empty profiles | `empty_store_seeds_vanilla` (application) + cucumber; infrastructure: `empty_collection_is_seeded_and_persisted` + "Seed a missing profiles file" / "Seed a valid empty collection" |
+| Create and list a profile | `create_then_list` + cucumber; `profile_ids_do_not_collide`, `rapid_creations_with_the_real_clock_do_not_collide` |
+| Preserve the mod order | `set_mods_preserves_order` + cucumber; infrastructure: `profiles_roundtrip_preserves_order` + "Roundtrip preserves the mod order" |
+| Delete an ordinary profile | `delete_removes_profile` + cucumber |
+| Remove references from all profiles | `remove_mod_everywhere_strips_from_all_profiles` (+ domain `remove_mod_strips_every_occurrence_and_keeps_order`) + cucumber |
+| Reject a blank name | `blank_name_is_rejected` (+ domain `normalize_name_trims_and_rejects_blank`) + cucumber |
+| Protect Vanilla in the backend | `vanilla_cannot_be_deleted` + cucumber |
+| Rename a profile and handle an unknown ID | `rename_persists_new_name`, `unknown_profile_returns_error` + cucumber |
+| Invalid storage is never reseeded | `invalid_storage_is_propagated_and_not_reseeded` (application), `invalid_profiles_json_is_not_reseeded` + cucumber ("Do not reseed invalid JSON", "Do not reseed a zero-byte file") |
+| Error mapping at the Tauri boundary | `error_profiles::tests::maps_business_rules_to_stable_codes_and_messages`, `error_profiles::tests::storage_errors_reuse_the_app_error_mapping` (`src-tauri/src/error_profiles.rs`) |
 ### Manual smoke: `pnpm tauri dev`
 
 Prerequisites: MSVC build tools, Rust stable (MSVC), Node 22, pnpm (corepack), WebView2 Runtime. Run `pnpm tauri dev` and confirm the "MotoGP Launcher" window opens with a 1100x700 client area (minimum 900x600) and shows the "MotoGP Launcher" heading. Verified on Windows 11 during issue #1.
+
+### BDD runners per crate
+
+`domain`, `application` and `infrastructure` each have one `features` test target (`tests/features.rs`, `harness = false`). It is a dispatcher: every feature owns `tests/bdd/<feature>.rs` with its own `World` and `pub async fn run() -> bool` that runs only `tests/features/<feature>.feature`. Adding a feature means one `#[path]` module line and one `FEATURES` entry, so parallel issues only touch those lines.

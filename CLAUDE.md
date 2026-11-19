@@ -4,6 +4,8 @@
 
 **File names and file contents are always in English**: code, identifiers, comments, test names, Gherkin `.feature` files (Feature/Scenario/Given/When/Then), commit messages, branch names, docs, issues/PRs and error messages. Only the chat with the user stays in Portuguese.
 
+Exception: **test data may be non-ASCII on purpose.** Fixtures like the Windows folder `Usuário Padrão` exist to test accented paths, which real users have. Keep them, with a short English comment saying why. QA must not reject them.
+
 ## Memory and preferences
 
 Always save memories, decisions and preferences **locally in the project** (in this `CLAUDE.md` or in `docs/`), never only in the user's global memory.
@@ -35,7 +37,8 @@ Rule: the chat does not implement directly. Development request → Codex genera
 - **Codex sandbox:** it can only write in the main checkout, not in `.worktrees/`, and it cannot run `git add`/commit or esbuild/Vitest. Use Codex for **read-only reviews** of worktree branches; a Sonnet dev applies the findings, and the orchestrator commits when needed.
 - **Node:** the system default is 18. Use Node 22 (`/c/Users/whyy/AppData/Local/nvm/v22.18.0` first on `PATH`) and `corepack pnpm`.
 - **gh** credentials live in the Windows keyring, so `gh` and git network commands must run outside the sandbox.
-- **Disk:** each worktree has its own `target/`. Run `cargo clean` and remove the worktree as soon as its PR merges.
+- **Disk:** a Rust build directory is about 11 GB and disk D: is small, so never build into a worktree's own `target/`. Before any cargo command in a worktree, `export CARGO_TARGET_DIR=/c/Users/whyy/.cache/motogp-target/<issue>` (on C:, one folder per worktree so parallel builds don't block each other). Delete that folder and remove the worktree as soon as its PR merges.
+- **Coverage inside worktrees:** until the coverage-gate fix is merged, the local gate ignores every path containing `.worktrees` and passes vacuously. QA must read the real per-crate numbers from the llvm-cov JSON instead.
 
 **One branch per unit of work, always.** Every task, fix, translation or doc change gets its own branch from `dev` and its own PR; never mix unrelated changes in the same branch. Parallel work uses separate `git worktree`s inside the repo, under `.worktrees/<issue>` (git-ignored), so branches don't step on each other.
 
