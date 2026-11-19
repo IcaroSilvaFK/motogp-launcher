@@ -14,6 +14,9 @@ mod mod_service;
 mod ports;
 mod profile_ports;
 mod profile_service;
+mod session_error;
+mod session_ports;
+mod session_service;
 
 pub use config_service::ConfigService;
 pub use error::AppError;
@@ -26,3 +29,6 @@ pub use mod_service::ModService;
 pub use ports::ConfigRepository;
 pub use profile_ports::{Clock, ProfileRepository};
 pub use profile_service::{ProfileService, ProfileServiceError};
+pub use session_error::SessionError;
+pub use session_ports::{Clock, ProcessInspector, UrlOpener, POLL};
+pub use session_service::SessionService;

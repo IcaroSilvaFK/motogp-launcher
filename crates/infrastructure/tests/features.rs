@@ -12,6 +12,9 @@ mod steam;
 
 #[path = "bdd/file_import.rs"]
 mod file_import;
+#[path = "bdd/processes.rs"]
+mod processes;
+
 #[path = "bdd/persistence.rs"]
 mod persistence;
 #[path = "bdd/profile_persistence.rs"]
@@ -24,6 +27,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("profile-persistence", || {
         Box::pin(profile_persistence::run())
     }),
+    ("processes", || Box::pin(processes::run())),
     ("steam", || Box::pin(steam::run())),
     ("file_import", || Box::pin(file_import::run())),
 ];
