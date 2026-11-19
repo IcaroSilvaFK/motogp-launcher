@@ -30,8 +30,9 @@ If a subagent cannot spawn other agents, the PO spawns the devs and QA itself, u
 3. **A branch is opened** from `dev`, linked to the issue, in its own worktree (e.g. `feat/<issue-no>-<slug>` in `.worktrees/<issue-no>`).
 4. **Dev implements the task** in that worktree and hands it to QA.
 5. **QA validates** (all gates + scenarios). Failures go back to the Coordinator, who dispatches a new dev; this loops until QA passes and notifies the PO.
-6. Only then: **the PO commits on the branch, pushes and opens the PR to `dev`** referencing the issue (`Closes #<no>`).
-7. **The PO merges on its own** (the user granted blanket merge permission on 2026-11-19): once QA approved and CI is green, merge the PR (`gh pr merge --merge --delete-branch`) without asking. `Closes #N` does not auto-close issues on merges into `dev` (the default branch is `main`), so close the issue/card manually right after the merge.
+6. **Integration check (PO, before every push):** QA approved the branch against the `dev` it started from, so it may not compose with what merged since. The PO commits, rebases onto the current `origin/dev` and, if `dev` moved since the branch was cut or last checked, runs the cheap integration gate in the worktree: `cargo check --workspace --all-targets` (Rust touched on either side), `cargo test -p <crate>` for every crate both sides touched, and `corepack pnpm tsc --noEmit` + `corepack pnpm test` (frontend touched on either side). Any failure goes back to the Coordinator as a normal QA failure. Typical breaks: a new enum variant hitting an exhaustive `match` written by another issue, a renamed port, a new IPC error code missing from a mapping, two BDD runner lists edited at once.
+7. Only then: **the PO pushes and opens the PR to `dev`** referencing the issue (`Closes #<no>`).
+8. **The PO merges on its own** (the user granted blanket merge permission on 2026-11-19): once QA approved and CI is green, merge the PR (`gh pr merge --merge --delete-branch`) without asking. `Closes #N` does not auto-close issues on merges into `dev` (the default branch is `main`), so close the issue/card manually right after the merge.
 
 **Tooling notes:**
 - **Node:** the system default is 18. Use Node 22 (`/c/Users/whyy/AppData/Local/nvm/v22.18.0` first on `PATH`) and `corepack pnpm`.
@@ -54,6 +55,7 @@ Parallelism applies to **agents**, never to heavy local processes. The limits be
 **Parallelize by default; never run issues one by one when they are independent.**
 - At any moment, every issue whose dependencies are satisfied must be in progress, each one with its own Coordinator/dev/QA agents in its own worktree (`.worktrees/<issue>`).
 - Do not wait for a PR to be merged to start dependent work: stack the new branch on the unmerged parent branch, then rebase it onto `dev` as soon as the parent merges.
+- **After every merge into `dev`**, the PO tells the Coordinators of the in-flight issues that touch the same crates or frontend layers. They rebase at the next checkpoint (between dev tasks, never mid-task, setting uncommitted work aside in a local WIP commit that the PO rewrites later) and rerun the integration gate, so a break surfaces while the issue is still in development and not only in the PR's CI. GitHub already enforces "branch up to date + green CI" on `dev`, `qas` and `main` (strict status checks); this step only moves the detection earlier.
 - QA, translation/docs and CI waits run concurrently with development; the orchestrator never idles waiting on a single agent.
 - Only serialize what truly conflicts: the same files, or a dependency whose contract (ports/types) doesn't exist yet.
 
