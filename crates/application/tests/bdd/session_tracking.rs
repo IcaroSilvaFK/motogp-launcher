@@ -1,7 +1,7 @@
 //! Steps for `tests/features/session-tracking.feature` (issue #7), fake clock and processes only.
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
-use motogp_application::{AppError, Clock, ProcessInspector, SessionService, UrlOpener};
+use motogp_application::{AppError, ProcessInspector, SessionClock, SessionService, UrlOpener};
 use motogp_domain::WatchEvent;
 use std::cell::{Cell, RefCell};
 use std::path::Path;
@@ -11,7 +11,7 @@ use std::time::Duration;
 #[derive(Clone, Default)]
 struct FakeClock(Rc<Cell<Duration>>);
 
-impl Clock for FakeClock {
+impl SessionClock for FakeClock {
     fn now(&self) -> Duration {
         self.0.get()
     }

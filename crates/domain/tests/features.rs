@@ -7,21 +7,17 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
-<<<<<<< HEAD
 #[path = "bdd/mod_grouping.rs"]
 mod mod_grouping;
-
-type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
-
-const FEATURES: &[(&str, Runner)] = &[("mod_grouping", || Box::pin(mod_grouping::run()))];
-=======
 #[path = "bdd/session_state.rs"]
 mod session_state;
 
 type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
-const FEATURES: &[(&str, Runner)] = &[("session-state", || Box::pin(session_state::run()))];
->>>>>>> e9a28ea (test: add failing session launch/tracking tests and BDD features (refs #7))
+const FEATURES: &[(&str, Runner)] = &[
+    ("mod_grouping", || Box::pin(mod_grouping::run())),
+    ("session-state", || Box::pin(session_state::run())),
+];
 
 /// Absolute path of a `.feature` file in `tests/features/`.
 pub fn feature(file: &str) -> PathBuf {

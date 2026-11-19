@@ -1,4 +1,4 @@
-use crate::{AppError, Clock, ProcessInspector, SessionError, UrlOpener, POLL};
+use crate::{AppError, ProcessInspector, SessionClock, SessionError, UrlOpener, POLL};
 use motogp_domain::{launch_url, watch_step, GameInfo, WatchEvent, WatchState};
 use std::path::Path;
 
@@ -9,7 +9,7 @@ pub struct SessionService<O, P, C> {
     clock: C,
 }
 
-impl<O: UrlOpener, P: ProcessInspector, C: Clock> SessionService<O, P, C> {
+impl<O: UrlOpener, P: ProcessInspector, C: SessionClock> SessionService<O, P, C> {
     pub fn new(opener: O, inspector: P, clock: C) -> Self {
         Self {
             opener,
@@ -54,7 +54,7 @@ mod tests {
 
     #[derive(Clone, Default)]
     struct FakeClock(Rc<Cell<Duration>>);
-    impl Clock for FakeClock {
+    impl SessionClock for FakeClock {
         fn now(&self) -> Duration {
             self.0.get()
         }

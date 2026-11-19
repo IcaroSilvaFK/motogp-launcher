@@ -17,7 +17,7 @@ pub trait ProcessInspector {
 }
 
 /// Port: monotonic time and waiting, so tests never sleep for real.
-pub trait Clock {
+pub trait SessionClock {
     /// Time elapsed since an arbitrary, fixed origin.
     fn now(&self) -> Duration;
     /// Blocks (or advances a fake clock) for `duration`.
