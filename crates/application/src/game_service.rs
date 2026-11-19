@@ -17,7 +17,11 @@ impl<L: SteamLocator, F: GameFiles> GameService<L, F> {
     pub fn detect_games(&self) -> Result<Vec<GameInfo>, GameError> {
         let mut games: Vec<GameInfo> = Vec::new();
         for library in self.locator.library_folders()? {
-            for dir in self.files.common_dirs(&library)? {
+            // Automatic detection is best effort: an unreadable library is skipped.
+            let Ok(dirs) = self.files.common_dirs(&library) else {
+                continue;
+            };
+            for dir in dirs {
                 let is_candidate = dir
                     .file_name()
                     .is_some_and(|n| is_motogp_folder(&n.to_string_lossy()));
@@ -26,8 +30,8 @@ impl<L: SteamLocator, F: GameFiles> GameService<L, F> {
                 }
                 match self.inspect_root(&dir) {
                     Ok(game) if !games.iter().any(|g| g.root == game.root) => games.push(game),
-                    Ok(_) | Err(GameError::NotUnrealGame { .. }) => {}
-                    Err(other) => return Err(other),
+                    // Duplicates, non-Unreal folders and unreadable candidates are skipped.
+                    _ => {}
                 }
             }
         }
