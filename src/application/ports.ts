@@ -1,4 +1,13 @@
-import type { Config, GameInfo, ModEntry, Profile, RecoveryStatus, SessionErrorEvent, SessionEvent } from '../domain';
+import type {
+  Config,
+  GameInfo,
+  Locale,
+  ModEntry,
+  Profile,
+  RecoveryStatus,
+  SessionErrorEvent,
+  SessionEvent,
+} from '../domain';
 
 export type Unsubscribe = () => void;
 
@@ -35,4 +44,10 @@ export interface SessionEvents {
 
 export interface DropEvents {
   onDrop(callback: (paths: string[]) => void): Promise<Unsubscribe>;
+}
+
+/** Synchronous on purpose: the locale must be known before the first render. */
+export interface LocaleStore {
+  load(): Locale | null;
+  save(locale: Locale): void;
 }
