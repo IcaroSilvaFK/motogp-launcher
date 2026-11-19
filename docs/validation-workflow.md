@@ -137,6 +137,25 @@ Limits live in `tooling/coverage-thresholds.json` (`core` = 90, `overall` = 80) 
 | Reject dependencies that violate the architecture | `rejects_ui_importing_infrastructure` (Vitest, real ESLint on `tests/fixtures/boundaries`), `rejects_outward_cargo_dependencies` (`src-tauri/tests/architecture.rs`, fixtures in `src-tauri/tests/fixtures`) |
 | Run all gates in CI | cucumber step + `tooling/__tests__/ci-workflow.test.ts` inspect `.github/workflows/validacao.yml`; the CI itself runs the gates |
 
+### Scenario traceability (issue #2)
+
+Gherkin: `crates/infrastructure/tests/features/persistence.feature`, run by `crates/infrastructure/tests/features.rs` (cucumber, temp dirs only). Application scenarios use a fake `ConfigRepository` (no fs).
+
+| Scenario | Test |
+|----------|------|
+| Read a missing configuration | `missing_file_returns_default` + cucumber scenario |
+| Save and read in a path with spaces and accents | `roundtrip_in_path_with_accents` + cucumber scenario |
+| Refuse corrupted JSON | `corrupted_json_is_an_error`, `zero_byte_file_is_an_error_not_a_default` + cucumber scenario |
+| Replace existing data safely on Windows | `save_replaces_existing_file_atomically` + cucumber scenario |
+| Preserve the previous version when the write fails | `failed_save_preserves_previous_file` (a directory on `<path>.tmp` forces the failure), `failed_replace_removes_the_temp_file` + cucumber scenario |
+| Application error propagation | `config_repository_error_is_propagated` (application, fake port) |
+| Domain defaults | `default_config_has_no_game_dir_and_no_active_profile` (domain) |
+| Error mapping at the Tauri boundary | `src-tauri/src/error.rs` unit tests (`CommandError { code, message }`) |
+
 ### Manual smoke: `pnpm tauri dev`
 
 Prerequisites: MSVC build tools, Rust stable (MSVC), Node 22, pnpm (corepack), WebView2 Runtime. Run `pnpm tauri dev` and confirm the "MotoGP Launcher" window opens with a 1100x700 client area (minimum 900x600) and shows the "MotoGP Launcher" heading. Verified on Windows 11 during issue #1.
+
+### BDD runners per crate
+
+`domain`, `application` and `infrastructure` each have one `features` test target (`tests/features.rs`, `harness = false`). It is a dispatcher: every feature owns `tests/bdd/<feature>.rs` with its own `World` and `pub async fn run() -> bool` that runs only `tests/features/<feature>.feature`. Adding a feature means one `#[path]` module line and one `FEATURES` entry, so parallel issues only touch those lines.

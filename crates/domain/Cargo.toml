@@ -8,3 +8,13 @@ rust-version.workspace = true
 
 # Architecture rule: the domain has NO production dependencies.
 [dependencies]
+
+# Test tooling (BDD) lives only in dev-dependencies.
+[dev-dependencies]
+cucumber = "0.21"
+futures = "0.3"
+
+# BDD dispatcher (cucumber) without the default libtest harness.
+[[test]]
+name = "features"
+harness = false
