@@ -23,12 +23,11 @@ impl Default for SystemClock {
 
 impl Clock for SystemClock {
     fn now(&self) -> Duration {
-        todo!()
+        self.origin.elapsed()
     }
 
     fn sleep(&self, duration: Duration) {
-        let _ = duration;
-        todo!()
+        std::thread::sleep(duration);
     }
 }
 

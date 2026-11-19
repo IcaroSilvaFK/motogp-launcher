@@ -194,6 +194,22 @@ Gherkin: `crates/application/tests/features/game-detection.feature` (fake `Steam
 | Inspection has no write effects | `inspection_does_not_create_mods_directory` (infrastructure) |
 | Error mapping at the Tauri boundary | `src-tauri/src/error_game.rs` unit tests (`not_unreal_game` code) |
 
+### Issue #7: scenario traceability
+
+Gherkin: `crates/domain/tests/features/session-state.feature` (steps `tests/bdd/session_state.rs`), `crates/application/tests/features/session-tracking.feature` (fake clock/inspector, `tests/bdd/session_tracking.rs`) and `crates/infrastructure/tests/features/processes.feature` (controlled paths, `tests/bdd/processes.rs`). No test starts a real game or sleeps for real.
+
+| Scenario | Test |
+|----------|------|
+| Build the URL with a detected App ID | `launch_url_uses_app_id` (domain), `launch_opens_the_steam_url` (application) + `session-state.feature` |
+| Refuse to launch without an App ID | `launch_url_without_app_id_errors`, `launch_without_app_id_does_not_open_anything` + `session-state.feature` |
+| End after two consecutive absences | `started_then_ended_after_two_missing_polls`, `terminal_watch_event_is_not_repeated` + `session-state.feature` |
+| Reset absences when the process reappears | `flapping_resets_missing_counter` + `session-state.feature` |
+| Report a game that never started | `never_started_after_120s`, `watcher_reports_never_started_at_120_seconds_without_sleeping_for_real` + `session-state.feature` |
+| Observe only executables inside the root | `process_path_comparison_is_case_insensitive`, `sibling_directory_is_not_game_root`, `missing_process_executable_is_ignored` (infrastructure `processes.rs`) + `processes.feature` |
+| Use the defined tracking interval | `watcher_polls_every_two_seconds` (application) + `session-tracking.feature` |
+
+Deviation: the `UrlOpener`, `ProcessInspector` and `Clock` ports are defined in `application/src/session_ports.rs`. The real opener (Tauri opener plugin) is wired in issue #8.
+
 ### Manual smoke: Steam registry (Windows)
 
 The precedence/fallback logic is unit-tested through the injectable `RegistryReader`; only the real `winreg` reader (`read_steam_path`, `SteamLibraries::from_registry`) is verified by this smoke. With Steam installed, `HKCU\Software\Valve\Steam` must have a `SteamPath` value (otherwise `HKLM\SOFTWARE\WOW6432Node\Valve\Steam` `InstallPath` is used); call `SteamLibraries::from_registry().library_folders()` (or the future detect command) and confirm it lists the Steam install and every library in `libraryfolders.vdf`. With the value missing, the result must be an empty list.

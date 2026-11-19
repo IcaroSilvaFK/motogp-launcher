@@ -20,15 +20,27 @@ impl<O: UrlOpener, P: ProcessInspector, C: Clock> SessionService<O, P, C> {
 
     /// Opens the game's `steam://rungameid/<id>` URL.
     pub fn launch(&self, game: &GameInfo) -> Result<(), SessionError> {
-        let _ = (game, &self.opener);
-        todo!()
+        let url = launch_url(game)?;
+        self.opener.open(&url).map_err(SessionError::Opener)
     }
 
     /// Polls every `POLL` until a terminal event; each event goes to `emit`.
     pub fn track(&self, root: &Path, mut emit: impl FnMut(WatchEvent)) -> Result<(), AppError> {
-        let _ = (root, &mut emit, &self.inspector, &self.clock, POLL);
-        let _ = (watch_step, WatchState::default());
-        todo!()
+        let start = self.clock.now();
+        let mut state = WatchState::default();
+        loop {
+            let running = self.inspector.game_running(root)?;
+            let elapsed = self.clock.now().saturating_sub(start);
+            let (next, event) = watch_step(state, running, elapsed);
+            state = next;
+            if let Some(event) = event {
+                emit(event);
+            }
+            if state.is_finished() {
+                return Ok(());
+            }
+            self.clock.sleep(POLL);
+        }
     }
 }
 

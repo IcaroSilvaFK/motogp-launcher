@@ -30,8 +30,9 @@ impl std::error::Error for LaunchError {}
 
 /// `steam://rungameid/<id>` for a game with a detected App ID.
 pub fn launch_url(game: &GameInfo) -> Result<String, LaunchError> {
-    let _ = game;
-    todo!()
+    game.app_id
+        .map(|id| format!("steam://rungameid/{id}"))
+        .ok_or(LaunchError::MissingAppId)
 }
 
 /// What a session observation can report.
@@ -65,8 +66,29 @@ pub fn watch_step(
     running: bool,
     elapsed: Duration,
 ) -> (WatchState, Option<WatchEvent>) {
-    let _ = (state, running, elapsed);
-    todo!()
+    if state.finished {
+        return (state, None);
+    }
+    let mut next = state;
+    if running {
+        next.missing = 0;
+        if !next.started {
+            next.started = true;
+            return (next, Some(WatchEvent::Started));
+        }
+        return (next, None);
+    }
+    if next.started {
+        next.missing += 1;
+        if next.missing >= MISSING_POLLS_TO_END {
+            next.finished = true;
+            return (next, Some(WatchEvent::Ended));
+        }
+    } else if elapsed >= NEVER_STARTED_AFTER {
+        next.finished = true;
+        return (next, Some(WatchEvent::NeverStarted));
+    }
+    (next, None)
 }
 
 #[cfg(test)]

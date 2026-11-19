@@ -1,12 +1,20 @@
 //! Process inspection adapter (`sysinfo`) and the pure path rules it relies on.
 use motogp_application::{AppError, ProcessInspector};
 use std::path::{Path, PathBuf};
+use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+
+/// Components lowercased, so `C:/Jogos` and `c:\jogos` compare equal.
+fn normalized(path: &Path) -> Vec<String> {
+    path.components()
+        .map(|c| c.as_os_str().to_string_lossy().to_lowercase())
+        .collect()
+}
 
 /// True when `exe` is `root` itself or lives under it. Components are compared
 /// whole and ignoring case, so `MotoGP25Backup` is not inside `MotoGP25`.
 pub fn is_inside_root(exe: &Path, root: &Path) -> bool {
-    let _ = (exe, root);
-    todo!()
+    let root = normalized(root);
+    !root.is_empty() && normalized(exe).starts_with(&root)
 }
 
 /// True when any known executable path is inside `root`. A process whose
@@ -15,8 +23,10 @@ pub fn any_inside_root<I>(executables: I, root: &Path) -> bool
 where
     I: IntoIterator<Item = Option<PathBuf>>,
 {
-    let _ = (executables, root);
-    todo!()
+    executables
+        .into_iter()
+        .flatten()
+        .any(|exe| is_inside_root(&exe, root))
 }
 
 /// `ProcessInspector` backed by the real process table.
@@ -25,8 +35,17 @@ pub struct SysinfoProcesses;
 
 impl ProcessInspector for SysinfoProcesses {
     fn game_running(&self, root: &Path) -> Result<bool, AppError> {
-        let _ = root;
-        todo!()
+        let mut system = System::new();
+        system.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::nothing().with_exe(UpdateKind::OnlyIfNotSet),
+        );
+        let executables = system
+            .processes()
+            .values()
+            .map(|process| process.exe().map(Path::to_path_buf));
+        Ok(any_inside_root(executables, root))
     }
 }
 
