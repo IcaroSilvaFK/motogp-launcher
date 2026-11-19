@@ -8,10 +8,12 @@ mod game_files;
 mod library_files;
 mod library_repository;
 mod mod_library;
+mod processes;
 mod profile_store;
 mod sha256_hasher;
 mod steam;
 mod store;
+mod system_clock;
 #[cfg(windows)]
 mod windows_registry;
 mod zip_archive;
@@ -21,10 +23,12 @@ pub use game_files::FsGameFiles;
 pub use library_files::FsLibraryFiles;
 pub use library_repository::JsonModRepository;
 pub use mod_library::{mod_library, ModLibrary};
+pub use processes::{any_inside_root, is_inside_root, SysinfoProcesses};
 pub use profile_store::{JsonProfileStore, SystemClock};
 pub use sha256_hasher::Sha256Hasher;
 pub use steam::{parse_app_manifest, parse_library_folders, SteamLibraries};
 pub use store::{load_json, save_json, JsonConfigStore};
+pub use system_clock::MonotonicClock;
 #[cfg(windows)]
 pub use windows_registry::read_steam_path;
 pub use zip_archive::{ZipArchiveReader, ZipLimits};

@@ -8,6 +8,7 @@ mod game;
 mod mod_entry;
 mod mod_grouping;
 mod profile;
+mod session;
 
 pub use config::Config;
 pub use game::{
@@ -20,3 +21,7 @@ pub use mod_grouping::{
     MOD_EXTENSIONS,
 };
 pub use profile::{normalize_name, Profile, ProfileError, VANILLA_ID};
+pub use session::{
+    launch_url, watch_step, LaunchError, WatchEvent, WatchState, MISSING_POLLS_TO_END,
+    NEVER_STARTED_AFTER,
+};
