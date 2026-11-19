@@ -86,19 +86,18 @@ describe('coverage_thresholds_reject_insufficient_coverage', () => {
     expect(() => evaluateRustCoverage(input)).toThrow(/invalid.*coverage/i);
   });
 
-  it.each([
-    '.worktrees/translate/crates/domain/src/b.rs',
-    'D:\\repo\\.worktrees\\translate\\crates\\domain\\src\\b.rs',
-    '/repo/.worktrees/translate/crates/domain/src/b.rs',
-  ])('excludes nested worktree file %s from core and overall coverage', (filename) => {
-    const options = { root: '/repo', hasSource: () => false };
-    expect(
-      evaluateRustCoverage(report({ 'crates/domain/src/a.rs': [90, 100], [filename]: [0, 1000] }), options).ok,
-    ).toBe(true);
-    expect(
-      evaluateRustCoverage(report({ 'crates/domain/src/a.rs': [85, 100], [filename]: [1000, 1000] }), options).ok,
-    ).toBe(false);
-  });
+  it.each(['.worktrees/translate/crates/domain/src/b.rs', '/repo/.worktrees/translate/crates/domain/src/b.rs'])(
+    'excludes nested worktree file %s from core and overall coverage',
+    (filename) => {
+      const options = { root: '/repo', hasSource: () => false };
+      expect(
+        evaluateRustCoverage(report({ 'crates/domain/src/a.rs': [90, 100], [filename]: [0, 1000] }), options).ok,
+      ).toBe(true);
+      expect(
+        evaluateRustCoverage(report({ 'crates/domain/src/a.rs': [85, 100], [filename]: [1000, 1000] }), options).ok,
+      ).toBe(false);
+    },
+  );
 
   it.each([
     [

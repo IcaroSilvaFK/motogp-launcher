@@ -5,7 +5,7 @@
 // A core crate without measurable lines is reported explicitly (never a silent pass).
 //
 // Usage: node scripts/check-rust-coverage.mjs <report.json>
-import { readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -14,8 +14,8 @@ const thresholds = JSON.parse(readFileSync(join(here, '..', 'tooling', 'coverage
 
 /** Core crates and the source folder that identifies each of them in the report. */
 export const CORE_CRATES = [
-  { name: 'motogp-domain', marker: '/crates/domain/src/' },
-  { name: 'motogp-application', marker: '/crates/application/src/' },
+  { name: 'motogp-domain', dir: 'crates/domain/src', marker: '/crates/domain/src/' },
+  { name: 'motogp-application', dir: 'crates/application/src', marker: '/crates/application/src/' },
 ];
 
 const sumLines = (files) =>
@@ -24,13 +24,41 @@ const sumLines = (files) =>
     { count: 0, covered: 0 },
   );
 
+const normalize = (path) => path.replace(/\\/g, '/');
+
+/** Path of `file` relative to `root` (both slash-normalized); unchanged when it is not under root. */
+function relativeTo(root, file) {
+  const base = normalize(root).replace(/\/+$/, '');
+  const f = normalize(file);
+  return f.toLowerCase().startsWith(`${base.toLowerCase()}/`) ? f.slice(base.length + 1) : f;
+}
+
+/** True when the crate has non-test Rust code (anything beyond blank lines and comments). */
+function crateHasSource(root, crate) {
+  const walk = (dir) =>
+    readdirSync(dir, { withFileTypes: true }).some((entry) => {
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) return entry.name !== 'tests' && walk(full);
+      if (!entry.name.endsWith('.rs') || /^tests?\.rs$/.test(entry.name)) return false;
+      return readFileSync(full, 'utf8')
+        .split('\n')
+        .some((line) => line.trim() !== '' && !line.trim().startsWith('//'));
+    });
+  const dir = join(root, crate.dir);
+  return existsSync(dir) && walk(dir);
+}
+
 const pct = (covered, count) => (count === 0 ? 100 : (covered / count) * 100);
 
 /**
  * @param {{ data: { files: { filename: string, summary: { lines: { count: number, covered: number } } }[] }[] }} report
+ * @param {{ root?: string, hasSource?: (crate: { name: string, dir: string }) => boolean }} [options]
+ *   root: active workspace root (default cwd). Only worktrees NESTED under it are excluded.
  * @returns {{ ok: boolean, failures: string[], notes: string[] }}
  */
-export function evaluateRustCoverage(report) {
+export function evaluateRustCoverage(report, options = {}) {
+  const root = options.root ?? process.cwd();
+  const hasSource = options.hasSource ?? ((crate) => crateHasSource(root, crate));
   if (
     !Array.isArray(report?.data) ||
     report.data.length === 0 ||
@@ -53,14 +81,20 @@ export function evaluateRustCoverage(report) {
       ) {
         throw new Error('Invalid Rust coverage file or line counters');
       }
-      return { ...file, filename: `/${file.filename.replace(/\\/g, '/')}` };
+      return { ...file, filename: `/${relativeTo(root, file.filename).replace(/^\/+/, '')}` };
     })
-    .filter((file) => !file.filename.includes('/.worktrees/'));
+    .filter((file) => !file.filename.startsWith('/.worktrees/'));
   const failures = [];
   const notes = [];
 
   for (const crate of CORE_CRATES) {
     const total = sumLines(files.filter((f) => f.filename.includes(crate.marker)));
+    if (total.count === 0 && hasSource(crate)) {
+      failures.push(
+        `${crate.name}: has source code but no measurable lines in the coverage report (minimum ${thresholds.core}%)`,
+      );
+      continue;
+    }
     if (total.count === 0) {
       notes.push(
         `${crate.name}: no measurable lines yet (empty core crate): limit of ${thresholds.core}% applies as soon as code exists`,
