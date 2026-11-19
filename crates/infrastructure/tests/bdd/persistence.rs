@@ -41,10 +41,11 @@ impl PersistenceWorld {
     }
 }
 
-fn tmp_of(path: &Path) -> PathBuf {
-    let mut os = path.as_os_str().to_owned();
-    os.push(".tmp");
-    PathBuf::from(os)
+fn no_temp_files(path: &Path) -> bool {
+    let dir = path.parent().unwrap();
+    fs::read_dir(dir)
+        .unwrap()
+        .all(|e| e.unwrap().path().extension().map_or(true, |x| x != "tmp"))
 }
 
 fn sample(profile: &str) -> Config {
@@ -110,7 +111,7 @@ fn parents_created(w: &mut PersistenceWorld) {
 
 #[then("no config.json.tmp file remains")]
 fn no_tmp_remains(w: &mut PersistenceWorld) {
-    assert!(!tmp_of(&w.path()).exists());
+    assert!(no_temp_files(&w.path()));
 }
 
 // ---------- Scenario: Refuse corrupted JSON ----------
@@ -147,7 +148,7 @@ fn no_default_saved(w: &mut PersistenceWorld) {
     // A default would have been serialized as JSON with `game_dir`/`active_profile`.
     let on_disk = String::from_utf8(fs::read(w.path()).unwrap()).unwrap();
     assert!(!on_disk.contains("game_dir") && !on_disk.contains("active_profile"));
-    assert!(!tmp_of(&w.path()).exists());
+    assert!(no_temp_files(&w.path()));
 }
 
 // ---------- Scenario: Replace existing data safely ----------
@@ -174,7 +175,7 @@ fn next_read_second(w: &mut PersistenceWorld) {
 
 #[then("there is no pending temporary file")]
 fn no_pending_tmp(w: &mut PersistenceWorld) {
-    assert!(!tmp_of(&w.path()).exists());
+    assert!(no_temp_files(&w.path()));
 }
 
 // ---------- Scenario: Preserve the previous version when the write fails ----------
@@ -190,8 +191,23 @@ fn already_saved(w: &mut PersistenceWorld) {
 
 #[when("an I/O failure prevents the atomic replacement")]
 fn io_failure(w: &mut PersistenceWorld) {
-    // A directory squatting on the temp path makes the write fail deterministically.
-    fs::create_dir(tmp_of(&w.path())).unwrap();
+    // Hold the destination open without delete-sharing so the final replace
+    // fails deterministically (Windows); elsewhere make the directory read-only.
+    #[cfg(windows)]
+    let _guard = {
+        use std::os::windows::fs::OpenOptionsExt;
+        fs::OpenOptions::new()
+            .read(true)
+            .share_mode(0x1 | 0x2)
+            .open(w.path())
+            .unwrap()
+    };
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = w.path().parent().unwrap().to_path_buf();
+        fs::set_permissions(dir, fs::Permissions::from_mode(0o555)).unwrap();
+    }
     w.save_result = Some(w.store().save(&sample("second")));
 }
 

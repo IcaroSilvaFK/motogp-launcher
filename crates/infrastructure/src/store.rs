@@ -7,6 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Serialization shape of `config.json` (kept out of the domain model).
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -53,9 +54,13 @@ pub fn load_json<T: DeserializeOwned + Default>(path: &Path) -> Result<T, AppErr
     })
 }
 
+static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
+/// Unique per invocation (pid + counter), in the same directory as `path`.
 fn temp_path(path: &Path) -> PathBuf {
+    let n = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
     let mut os = path.as_os_str().to_owned();
-    os.push(".tmp");
+    os.push(format!(".{}-{}.tmp", std::process::id(), n));
     PathBuf::from(os)
 }
 
@@ -66,7 +71,7 @@ fn write_error(path: &Path, detail: impl ToString) -> AppError {
     }
 }
 
-/// Saves `value` as pretty JSON through `<path>.tmp` and an atomic replace.
+/// Saves `value` as pretty JSON through a unique `<path>.<pid>-<n>.tmp` and an atomic replace.
 /// On failure the previous file is left untouched and the temp file removed.
 ///
 /// `fs::rename` replaces an existing destination on Windows too (std uses
@@ -77,21 +82,33 @@ pub fn save_json<T: Serialize>(path: &Path, value: &T) -> Result<(), AppError> {
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         fs::create_dir_all(parent).map_err(|e| write_error(path, e))?;
     }
-    let tmp = temp_path(path);
-    let result = write_synced(&tmp, &json).and_then(|()| fs::rename(&tmp, path));
+    // `create_new` never opens (or truncates) a file made by another writer;
+    // on a name collision we pick a fresh name.
+    let (tmp, mut file) = loop {
+        let tmp = temp_path(path);
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)
+        {
+            Ok(file) => break (tmp, file),
+            Err(e) if e.kind() == io::ErrorKind::AlreadyExists => continue,
+            Err(e) => return Err(write_error(path, e)),
+        }
+    };
+    let result = file
+        .write_all(&json)
+        .and_then(|()| file.sync_all())
+        .and_then(|()| {
+            drop(file);
+            fs::rename(&tmp, path)
+        });
     if let Err(e) = result {
-        // Best effort: never touches `path`; a directory squatting on the temp
-        // path is not removed by `remove_file`.
+        // Only the temp file created by this invocation is removed.
         let _ = fs::remove_file(&tmp);
         return Err(write_error(path, e));
     }
     Ok(())
-}
-
-fn write_synced(path: &Path, bytes: &[u8]) -> io::Result<()> {
-    let mut file = fs::File::create(path)?;
-    file.write_all(bytes)?;
-    file.sync_all()
 }
 
 /// `ConfigRepository` backed by a JSON file.
