@@ -6,7 +6,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { evaluateRustCoverage } from '../../scripts/check-rust-coverage.mjs';
+import { crateHasSource, evaluateRustCoverage } from '../../scripts/check-rust-coverage.mjs';
 import thresholds from '../coverage-thresholds.json';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -166,7 +166,7 @@ describe('coverage_thresholds_reject_insufficient_coverage', () => {
   });
 
   it('explicitly reports a core crate with no measurable lines instead of silently approving it', () => {
-    const result = evaluateRustCoverage(report({}));
+    const result = evaluateRustCoverage(report({}), { root: '/repo', hasSource: () => false });
     expect(result.ok).toBe(true);
     expect(result.notes.join('\n')).toMatch(/motogp-domain.*no measurable lines/);
     expect(result.notes.join('\n')).toMatch(/motogp-application.*no measurable lines/);
@@ -183,4 +183,92 @@ describe('coverage_thresholds_reject_insufficient_coverage', () => {
     expect(run.status).toBe(1);
     expect(`${run.stdout}${run.stderr}`).toContain('"src/domain/**" threshold (90%)');
   }, 30_000);
+});
+
+describe('coverage_windows_path_canonicalization', () => {
+  const bs = (path: string) => path.split('/').join(String.fromCharCode(92));
+  const win = (path: string) => ({ root: bs(path), hasSource: () => false });
+  it.each([
+    ['//?/D:/repo', '//?/D:/repo/crates/domain/src/a.rs', '//?/D:/repo/.worktrees/x/crates/domain/src/b.rs'],
+    ['/??/D:/repo', '/??/D:/repo/crates/domain/src/a.rs', '/??/D:/repo/.worktrees/x/crates/domain/src/b.rs'],
+    [
+      '//?/UNC/srv/share/repo',
+      '//?/UNC/srv/share/repo/crates/domain/src/a.rs',
+      '//?/UNC/srv/share/repo/.worktrees/x/crates/domain/src/b.rs',
+    ],
+    ['D:/Repo', 'd:/repo/crates/domain/src/a.rs', 'D:/REPO/.WORKTREES/x/crates/domain/src/b.rs'],
+    ['//?/d:/repo', 'D:/REPO/crates/domain/src/a.rs', '//?/D:/Repo/.WorkTrees/x/crates/domain/src/b.rs'],
+  ])('root %s: strips prefixes/case and excludes nested worktrees', (rootPath, own0, nested0) => {
+    const [own, nested] = [bs(own0), bs(nested0)];
+    const options = win(rootPath);
+    expect(evaluateRustCoverage(report({ [own]: [90, 100], [nested]: [0, 1000] }), options).ok).toBe(true);
+    // an 85% core file plus covered nested-worktree files must still fail
+    const result = evaluateRustCoverage(report({ [own]: [85, 100], [nested]: [1000, 1000] }), options);
+    expect(result.ok).toBe(false);
+    expect(result.failures.join('\n')).toMatch(/motogp-domain.*85/);
+  });
+
+  it('keeps POSIX paths case-sensitive', () => {
+    const options = { root: '/repo', hasSource: () => false };
+    const result = evaluateRustCoverage(
+      report({ '/repo/crates/domain/src/a.rs': [85, 100], '/repo/.WORKTREES/x/crates/domain/src/b.rs': [100, 100] }),
+      options,
+    );
+    // `.WORKTREES` is a different directory on POSIX, so it is NOT nested and its coverage counts
+    expect(result.ok).toBe(true);
+  });
+});
+
+describe('coverage_source_detection', () => {
+  const crate = { name: 'motogp-domain', dir: 'crates/domain/src' };
+  const withCrate = (files: Record<string, string>, check: (dir: string) => void) => {
+    const directory = mkdtempSync(join(tmpdir(), 'motogp-src-'));
+    try {
+      for (const [name, content] of Object.entries(files)) {
+        const full = join(directory, crate.dir, name);
+        mkdirSync(dirname(full), { recursive: true });
+        writeFileSync(full, content);
+      }
+      check(directory);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  };
+
+  it.each([
+    ['empty crate', {}],
+    ['only comments', { 'lib.rs': '// c\n\n' }],
+    ['inner doc block comment', { 'lib.rs': '/*! crate docs\n pub fn x() {} */\n' }],
+    ['nested block comment', { 'lib.rs': '/* a /* b */ fn x() {} */\n' }],
+    ['empty cfg(test) module', { 'lib.rs': '#[cfg(test)]\nmod tests {}\n' }],
+    ['cfg(test) module with code', { 'lib.rs': '#[cfg(test)]\nmod tests { fn t() { let _ = "}"; } }\n' }],
+    [
+      'declaration-only mod with comment-only child',
+      { 'lib.rs': 'pub mod child;\nmod other;\n', 'child.rs': '//! docs\n', 'other.rs': '/* nothing */' },
+    ],
+  ])('has no production code: %s', (_name, files) => {
+    withCrate(files, (dir) => expect(crateHasSource(dir, crate)).toBe(false));
+  });
+
+  it.each([
+    ['real fn', { 'lib.rs': '/*! docs */\npub fn x() {}\n' }],
+    ['fn after cfg(test) module', { 'lib.rs': '#[cfg(test)]\nmod tests {}\nfn real() {}\n' }],
+    ['child module with code', { 'lib.rs': 'mod child;\n', 'child.rs': 'pub fn y() {}\n' }],
+  ])('has production code: %s', (_name, files) => {
+    withCrate(files, (dir) => expect(crateHasSource(dir, crate)).toBe(true));
+  });
+
+  it('fails the gate for a crate with a real fn missing from the report', () => {
+    withCrate({ 'lib.rs': 'pub fn x() {}\n' }, (dir) => {
+      const result = evaluateRustCoverage(report({}), { root: dir });
+      expect(result.ok).toBe(false);
+      expect(result.failures.join('\n')).toMatch(/motogp-domain.*no measurable lines/);
+    });
+  });
+
+  it('passes the gate for a comment-only crate missing from the report', () => {
+    withCrate({ 'lib.rs': '/*! docs */\n#[cfg(test)]\nmod tests {}\n' }, (dir) => {
+      expect(evaluateRustCoverage(report({}), { root: dir }).ok).toBe(true);
+    });
+  });
 });
