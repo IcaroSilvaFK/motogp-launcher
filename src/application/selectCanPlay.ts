@@ -5,5 +5,6 @@ export const selectCanPlay: SelectCanPlay = (state) =>
   state.game !== null &&
   state.config.active_profile !== null &&
   !state.busy &&
+  state.session.kind !== 'unavailable' &&
   state.session.kind !== 'starting' &&
   state.session.kind !== 'running';

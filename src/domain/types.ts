@@ -78,7 +78,12 @@ export const BACKEND_ERROR_CODES = [
   'deploy_cleanup_incomplete',
 ] as const;
 
-export const FRONTEND_ERROR_CODES = ['session_error', 'recovery_failed', 'unknown'] as const;
+export const FRONTEND_ERROR_CODES = [
+  'session_error',
+  'session_subscription_failed',
+  'recovery_failed',
+  'unknown',
+] as const;
 
 export const ERROR_CODES = [...BACKEND_ERROR_CODES, ...FRONTEND_ERROR_CODES] as const;
 

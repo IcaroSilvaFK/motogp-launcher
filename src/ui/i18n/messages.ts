@@ -23,6 +23,7 @@ export interface Messages {
     running: string;
     ended: (cleaned: number) => string;
     neverStarted: string;
+    unavailable: string;
   };
   library: {
     title: string;

@@ -82,20 +82,31 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     set({ busy: false, error, notice: error ? null : notice });
   }
 
+  /** Subscribes to the session events; on failure releases what was obtained and returns the error. */
+  async function subscribeSession(run: number): Promise<CommandError | null> {
+    const obtained: Unsubscribe[] = [];
+    try {
+      obtained.push(
+        await session.onSession((event) => {
+          if (event.state === 'started') set({ session: { kind: 'running' } });
+          else set({ session: { kind: event.state, cleaned: event.cleaned } });
+        }),
+      );
+      obtained.push(
+        await session.onSessionError((event) => {
+          set({ session: { kind: 'idle' }, error: { code: 'session_error', message: event.message } });
+        }),
+      );
+    } catch (caught) {
+      for (const release of obtained) release();
+      return { code: 'session_subscription_failed', message: toCommandError(caught).message };
+    }
+    for (const release of obtained) track(release, run);
+    return null;
+  }
+
   async function runStart(run: number): Promise<void> {
-    track(
-      await session.onSession((event) => {
-        if (event.state === 'started') set({ session: { kind: 'running' } });
-        else set({ session: { kind: event.state, cleaned: event.cleaned } });
-      }),
-      run,
-    );
-    track(
-      await session.onSessionError((event) => {
-        set({ session: { kind: 'idle' }, error: { code: 'session_error', message: event.message } });
-      }),
-      run,
-    );
+    const subscriptionError = await subscribeSession(run);
     if (disposed || run !== generation) return;
 
     let error: CommandError | null = null;
@@ -114,7 +125,14 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     } catch (caught) {
       error ??= toCommandError(caught);
     }
-    set({ status: 'ready', recovery, error: error ?? state.error, notice: notice ?? state.notice });
+    set({
+      status: 'ready',
+      recovery,
+      // The subscription failure is the most fundamental error, so it wins over recovery/load errors.
+      error: subscriptionError ?? error ?? state.error,
+      notice: notice ?? state.notice,
+      ...(subscriptionError ? { session: { kind: 'unavailable' as const } } : {}),
+    });
   }
 
   async function importPaths(paths: string[]): Promise<void> {
