@@ -24,6 +24,15 @@ pub enum PlayError {
     /// A previous deployment could not be cleaned; new deploys stay blocked
     /// until it is resolved (or startup recovery has not run yet).
     RecoveryPending { detail: String },
+    /// The game is still running, so its deployment is neither cleaned nor
+    /// replaced until it ends.
+    GameStillRunning,
+    /// The process table could not be read, so it is unknown whether the
+    /// game is running.
+    ProcessInspection { detail: String },
+    /// The background worker could not be started; the files stay deployed
+    /// and the next Play retries the cleanup first.
+    SessionThread { detail: String },
 }
 
 impl fmt::Display for PlayError {
@@ -39,6 +48,18 @@ impl fmt::Display for PlayError {
             PlayError::Session(error) => write!(f, "{error}"),
             PlayError::RecoveryPending { detail } => {
                 write!(f, "a previous session is not cleaned up yet: {detail}")
+            }
+            PlayError::GameStillRunning => {
+                write!(
+                    f,
+                    "the game is still running; close it before playing again"
+                )
+            }
+            PlayError::ProcessInspection { detail } => {
+                write!(f, "could not check whether the game is running: {detail}")
+            }
+            PlayError::SessionThread { detail } => {
+                write!(f, "could not follow the game session: {detail}")
             }
         }
     }

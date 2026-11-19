@@ -9,7 +9,7 @@ mod fakes;
 use fakes::deploy::{disk_has, disk_names, put_disk, put_source, ID_A};
 use fakes::*;
 use motogp_application::{
-    AppError, PlayError, RecoveryState, SessionEvent, SessionState, TrackOutcome,
+    AppError, PlayError, RecoveryState, SessionEvent, SessionLock, SessionState, TrackOutcome,
 };
 use motogp_domain::{Deployed, DeployedFile, WatchEvent};
 use std::panic::{catch_unwind, AssertUnwindSafe};
@@ -61,16 +61,16 @@ fn restart_with_the_game_running_keeps_files_and_resumes_tracking() {
     assert_eq!(cleaned, 0, "nothing is cleaned while the game runs");
     assert!(disk_has(&rig.disk, DEPLOYED_A));
     assert_eq!(rig.disk.borrow().manifest.files.len(), 1);
-    assert_eq!(
-        rig.play.recovery_status().state,
-        RecoveryState::GameRunning
-    );
+    assert_eq!(rig.play.recovery_status().state, RecoveryState::GameRunning);
     assert_eq!(
         rig.runner.pending(),
         1,
         "tracking resumed in the background"
     );
-    assert_eq!(rig.play.play("p1").unwrap_err(), PlayError::GameStillRunning);
+    assert_eq!(
+        rig.play.play("p1").unwrap_err(),
+        PlayError::GameStillRunning
+    );
 
     // The game ends: the deployment is cleaned and Play works again.
     rig.runner.run_pending();
@@ -98,7 +98,7 @@ fn startup_inspection_failure_blocks_and_deletes_nothing() {
     assert_eq!(rig.errors().len(), 1);
     assert!(matches!(
         rig.play.play("p1").unwrap_err(),
-        PlayError::RecoveryPending { .. }
+        PlayError::ProcessInspection { .. }
     ));
     assert_eq!(rig.launches(), 0);
 

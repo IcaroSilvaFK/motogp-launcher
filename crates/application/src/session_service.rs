@@ -26,6 +26,11 @@ impl<O: UrlOpener, P: ProcessInspector, C: SessionClock> SessionService<O, P, C>
         self.opener.open(&url).map_err(SessionError::Opener)
     }
 
+    /// One inspection: is the game of `root` running right now?
+    pub fn game_running(&self, root: &Path) -> Result<bool, AppError> {
+        self.inspector.game_running(root)
+    }
+
     /// Polls every `POLL` on a fixed schedule (inspection time never drifts it)
     /// until a terminal event; each event goes to `emit`. `cancel` is checked
     /// before every inspection (so also after every wait); when it fires the

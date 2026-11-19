@@ -28,9 +28,38 @@ pub trait SessionLock: Send + Sync {
     fn release(&self);
 }
 
-/// Port: runs the (long) session tracking off the caller's thread.
+/// The background worker could not be started (for example, the OS refused
+/// to create a thread).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SpawnError(pub String);
+
+/// Port: runs the (long) session tracking off the caller's thread. On `Err`
+/// the task was dropped without running.
 pub trait BackgroundRunner: Send + Sync {
-    fn spawn(&self, task: Box<dyn FnOnce() + Send + 'static>);
+    fn spawn(&self, task: Box<dyn FnOnce() + Send + 'static>) -> Result<(), SpawnError>;
+}
+
+/// Where the startup recovery stands.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RecoveryState {
+    /// The recovery has not run yet.
+    NotRun,
+    /// Nothing is left deployed (cleaned, or there was nothing to clean).
+    Recovered,
+    /// The game from the previous run is still running; its files stay
+    /// deployed and tracking resumed until it ends.
+    GameRunning,
+    /// The recovery failed; the files stay and new deploys are blocked.
+    Failed,
+}
+
+/// What the interface can read at any time (it may subscribe to events after
+/// the recovery already ran).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RecoveryStatus {
+    pub state: RecoveryState,
+    pub error: Option<String>,
+    pub cleaned_count: usize,
 }
 
 /// Port: how session results reach the user interface.
@@ -64,6 +93,8 @@ pub trait Deployer: Send + Sync {
 /// Opens the game and follows its process.
 pub trait SessionRuntime: Send + Sync {
     fn launch(&self, game: &GameInfo) -> Result<(), SessionError>;
+    /// `true` when a process of the game installed in `root` is running.
+    fn game_running(&self, root: &Path) -> Result<bool, AppError>;
     /// Blocks until a terminal event (calls `emit` for every event).
     fn track(
         &self,
