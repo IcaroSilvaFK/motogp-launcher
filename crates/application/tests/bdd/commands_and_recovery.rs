@@ -381,6 +381,89 @@ fn becomes_vanilla(w: &mut CommandsWorld) {
     );
 }
 
+#[given("a manifest left by a previous run and its game still running")]
+fn manifest_with_running_game(w: &mut CommandsWorld) {
+    let rig = Rig::new();
+    seed_manifest(&rig);
+    *rig.runtime.running.lock().unwrap() = Ok(true);
+    w.rig = Some(rig);
+}
+
+#[then("the files stay deployed and tracking resumes")]
+fn files_stay_and_tracking_resumes(w: &mut CommandsWorld) {
+    assert!(disk_has(&w.rig().disk, DEPLOYED_A));
+    assert_eq!(w.rig().runner.pending(), 1);
+}
+
+#[then("Play is refused until the game ends and the cleanup completes")]
+fn play_refused_until_the_game_ends(w: &mut CommandsWorld) {
+    let rig = w.rig();
+    assert_eq!(
+        rig.play.play("p1").unwrap_err(),
+        PlayError::GameStillRunning
+    );
+    rig.runner.run_pending();
+    assert!(disk_names(&rig.disk).is_empty());
+    *rig.runtime.running.lock().unwrap() = Ok(false);
+    rig.play.play("p1").expect("play after the game ended");
+}
+
+#[given("a session whose background worker panics")]
+fn session_with_panicking_worker(w: &mut CommandsWorld) {
+    let rig = Rig::ready();
+    rig.runtime
+        .track_panics
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    rig.play.play("p1").expect("play");
+    w.rig = Some(rig);
+}
+
+#[when("the worker runs")]
+fn worker_runs(w: &mut CommandsWorld) {
+    let rig = w.rig();
+    let outcome =
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| rig.runner.run_pending()));
+    assert!(outcome.is_err(), "the worker panicked");
+}
+
+#[then("the lock is released and the cleanup stays pending")]
+fn lock_released_cleanup_pending(w: &mut CommandsWorld) {
+    use motogp_application::SessionLock;
+    let rig = w.rig();
+    assert!(rig.lock.try_acquire(), "the lock was released");
+    rig.lock.release();
+    assert!(disk_has(&rig.disk, DEPLOYED_A), "files stay deployed");
+}
+
+#[then("the next Play retries the cleanup before deploying")]
+fn next_play_retries_cleanup(w: &mut CommandsWorld) {
+    let rig = w.rig();
+    rig.disk.borrow_mut().fail_remove = vec![DEPLOYED_A.to_string()];
+    assert!(matches!(
+        rig.play.play("p1").unwrap_err(),
+        PlayError::RecoveryPending { .. }
+    ));
+}
+
+#[given("a manifest whose cleanup fails on startup")]
+fn manifest_with_failing_cleanup(w: &mut CommandsWorld) {
+    let rig = Rig::new();
+    seed_manifest(&rig);
+    rig.disk.borrow_mut().fail_remove = vec![DEPLOYED_A.to_string()];
+    w.errors.push(rig.play.recover_on_startup().unwrap_err());
+    w.rig = Some(rig);
+}
+
+#[when("the interface reads the recovery status after subscribing")]
+fn interface_reads_status(_w: &mut CommandsWorld) {}
+
+#[then("it still sees the failure and its message")]
+fn status_keeps_the_failure(w: &mut CommandsWorld) {
+    let status = w.rig().play.recovery_status();
+    assert_eq!(status.state, motogp_application::RecoveryState::Failed);
+    assert!(status.error.unwrap().contains("cleanup incomplete"));
+}
+
 /// Runs only `commands-and-recovery.feature`; returns `true` when every step passed.
 pub async fn run() -> bool {
     let writer = CommandsWorld::cucumber()

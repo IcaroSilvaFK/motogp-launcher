@@ -14,6 +14,11 @@ struct InterfaceWorld {
     game: Value,
     recovered: Option<usize>,
     early_error: Value,
+    status: Value,
+    sources: Vec<std::path::PathBuf>,
+    held: Option<motogp_application::InstanceGuard>,
+    lock_dir: Option<tempfile::TempDir>,
+    second: Option<bool>,
 }
 
 impl std::fmt::Debug for InterfaceWorld {
@@ -140,6 +145,95 @@ fn cleaned_before_play(w: &mut InterfaceWorld) {
 #[then("the cleaned amount is recorded")]
 fn amount_recorded(w: &mut InterfaceWorld) {
     assert_eq!(w.recovered, Some(1));
+}
+
+#[given("a startup recovery that failed before the frontend listened")]
+fn failed_startup_recovery(w: &mut InterfaceWorld) {
+    let h = Harness::new();
+    fs::write(h.data_dir().join("deployed.json"), "not json").unwrap();
+    h.recover().unwrap_err();
+    w.harness = Some(h);
+}
+
+#[when("the frontend reads recovery_status")]
+fn frontend_reads_status(w: &mut InterfaceWorld) {
+    w.status = w.h().invoke("recovery_status", json!({})).unwrap();
+}
+
+#[then("it receives the failed state with the error message")]
+fn receives_failed_state(w: &mut InterfaceWorld) {
+    assert_eq!(w.status["state"], "failed");
+    assert!(w.status["error"].is_string());
+}
+
+#[given("concurrent imports through IPC")]
+fn concurrent_imports(w: &mut InterfaceWorld) {
+    let h = Harness::new();
+    h.recover().expect("recovery");
+    w.sources = (0..4)
+        .map(|n| h.write_mod_source(&format!("Mod{n}_P.pak"), format!("content {n}").as_bytes()))
+        .collect();
+    w.harness = Some(h);
+}
+
+#[when("the commands run on the blocking pool")]
+fn commands_run_concurrently(w: &mut InterfaceWorld) {
+    let h = w.h();
+    std::thread::scope(|scope| {
+        for source in &w.sources {
+            let webview = h.webview();
+            scope.spawn(move || {
+                crate::ipc_support::invoke_on(
+                    &webview,
+                    "import_mods",
+                    json!({ "paths": [source.to_string_lossy()] }),
+                )
+                .expect("import");
+            });
+        }
+    });
+}
+
+#[then("every import ends up in the library index")]
+fn every_import_is_indexed(w: &mut InterfaceWorld) {
+    let mods = w.h().invoke("list_mods", json!({})).unwrap();
+    assert_eq!(mods.as_array().unwrap().len(), 4);
+}
+
+#[given("a launcher instance holding the OS lock")]
+fn instance_holds_lock(w: &mut InterfaceWorld) {
+    use motogp_application::InstanceLock;
+    let dir = tempfile::tempdir().unwrap();
+    let lock = motogp_infrastructure::FileInstanceLock::new(dir.path().join("instance.lock"));
+    w.held = lock.acquire().unwrap();
+    assert!(w.held.is_some());
+    w.lock_dir = Some(dir);
+}
+
+#[when("a second instance tries to acquire it")]
+fn second_instance_acquires(w: &mut InterfaceWorld) {
+    use motogp_application::InstanceLock;
+    let path = w.lock_dir.as_ref().unwrap().path().join("instance.lock");
+    w.second = Some(
+        motogp_infrastructure::FileInstanceLock::new(path)
+            .acquire()
+            .unwrap()
+            .is_some(),
+    );
+}
+
+#[then("it is refused without touching the deployment state")]
+fn second_instance_refused(w: &mut InterfaceWorld) {
+    assert_eq!(w.second, Some(false));
+    assert!(
+        !w.lock_dir
+            .as_ref()
+            .unwrap()
+            .path()
+            .join("deployed.json")
+            .exists(),
+        "the refused instance wrote nothing"
+    );
 }
 
 /// Runs only `tauri-interface.feature`; returns `true` when every step passed.

@@ -53,3 +53,20 @@ Feature: Expose use cases and recover sessions through the launcher
     When I remove the mod and delete the active profile
     Then the references to the mod are removed from all profiles
     And the active profile becomes Vanilla
+
+  Scenario: Never clean or redeploy while the game is still running
+    Given a manifest left by a previous run and its game still running
+    When the launcher starts
+    Then the files stay deployed and tracking resumes
+    And Play is refused until the game ends and the cleanup completes
+
+  Scenario: Release the session lock when the worker fails
+    Given a session whose background worker panics
+    When the worker runs
+    Then the lock is released and the cleanup stays pending
+    And the next Play retries the cleanup before deploying
+
+  Scenario: Keep the startup recovery result readable
+    Given a manifest whose cleanup fails on startup
+    When the interface reads the recovery status after subscribing
+    Then it still sees the failure and its message
