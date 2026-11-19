@@ -41,7 +41,7 @@ jobs:
         shell: bash
         run: |
           cargo llvm-cov --workspace --json --summary-only --output-path coverage-rust.json \
-            --ignore-filename-regex '(^|[\\/])\.worktrees[\\/]|src-tauri[\\/]src[\\/](main|bootstrap)\.rs'
+            --ignore-filename-regex 'src-tauri[\\/]src[\\/](main|bootstrap)\.rs'
           node scripts/check-rust-coverage.mjs coverage-rust.json
 
   frontend:
