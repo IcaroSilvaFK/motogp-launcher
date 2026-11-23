@@ -46,6 +46,10 @@ export const en: Messages = {
     filterLabel: 'Filter',
     filterAll: 'All',
     clearFilters: 'Clear filters',
+    toggleNamed: (modName, profileName) => `Include ${modName} in ${profileName ?? 'the active profile'}`,
+    toggleLocked: 'Profile changes are locked while the game is running.',
+    toggleVanilla: 'Vanilla always runs without mods. Pick another profile to add mods.',
+    toggleNoProfile: 'Select a profile first.',
   },
   profiles: {
     title: 'Profiles',

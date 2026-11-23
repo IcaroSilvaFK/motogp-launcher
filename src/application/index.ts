@@ -15,3 +15,4 @@ export type { UpdateService } from './ports/UpdateService';
 export type { UpdateController, UpdateDeps, UpdateState } from './updateController';
 export { createUpdateController } from './useCases/checkForUpdate';
 export { selectSessionClean } from './selectSessionClean';
+export { selectProfileLocked } from './selectProfileLocked';

@@ -1,7 +1,8 @@
 import type { CommandError } from '../domain';
-import { VANILLA_ID, isSupportedModFile, toCommandError } from '../domain';
+import { VANILLA_ID, isSupportedModFile, isVanilla, toCommandError, toggleMod } from '../domain';
 import type { LauncherController, LauncherDeps, LauncherState, Notice } from './controller';
 import { selectCanPlay } from './selectCanPlay';
+import { selectProfileLocked } from './selectProfileLocked';
 import type { Unsubscribe } from './ports';
 
 type Reload = 'config' | 'game' | 'mods' | 'profiles';
@@ -238,6 +239,14 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         await gateway.setProfileMods(id, modIds);
         return { kind: 'profile-saved' };
       }),
+    toggleModInActiveProfile: async (modId) => {
+      const active = state.profiles.find((p) => p.id === state.config.active_profile);
+      if (!active || isVanilla(active) || selectProfileLocked(state)) return;
+      await mutate(['profiles'], async () => {
+        await gateway.setProfileMods(active.id, toggleMod(active.mod_ids, modId));
+        return null;
+      });
+    },
     setActiveProfile: (id) =>
       mutate(['config'], async () => {
         await gateway.setActiveProfile(id);

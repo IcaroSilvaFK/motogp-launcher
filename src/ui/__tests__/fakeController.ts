@@ -68,6 +68,7 @@ export function createFakeController(patch: Partial<LauncherState> = {}): FakeCo
     deleteProfile: action(),
     setProfileMods: action(),
     setActiveProfile: action(),
+    toggleModInActiveProfile: action(),
     forgetStaleSession: action(),
     cleanStaleSession: action(),
     play: action(),

@@ -505,4 +505,66 @@ describe('Given a stale deploy session', () => {
     expect(controller.getState().error?.code).toBe('read_failed');
     expect(controller.getState().game).toEqual(game);
   });
+
+  describe('toggleModInActiveProfile', () => {
+    async function withActive(modIds: string[]) {
+      const ctx = await ready({ mods: [mod('a'), mod('b'), mod('c')] });
+      await ctx.controller.createProfile('Mine');
+      const id = ctx.controller.getState().profiles.find((p) => p.name === 'Mine')?.id ?? '';
+      await ctx.controller.setProfileMods(id, modIds);
+      await ctx.controller.setActiveProfile(id);
+      ctx.controller.dismissNotice();
+      return { ...ctx, id };
+    }
+    const modsOf = (c: { getState(): { profiles: Profile[] } }, id: string) =>
+      c.getState().profiles.find((p) => p.id === id)?.mod_ids;
+
+    it('When the mod is absent Then it is added at the end keeping order, with no notice', async () => {
+      const { controller, id } = await withActive(['b', 'a']);
+      await controller.toggleModInActiveProfile('c');
+      expect(modsOf(controller, id)).toEqual(['b', 'a', 'c']);
+      expect(controller.getState().notice).toBeNull();
+      expect(controller.getState().error).toBeNull();
+    });
+
+    it('When the mod is present Then it is removed', async () => {
+      const { controller, id } = await withActive(['b', 'a']);
+      await controller.toggleModInActiveProfile('b');
+      expect(modsOf(controller, id)).toEqual(['a']);
+      expect(controller.getState().notice).toBeNull();
+    });
+
+    it('When there is no active profile Then nothing happens', async () => {
+      const { controller, gateway } = await ready({
+        mods: [mod('a')],
+        config: { game_dir: game.root, active_profile: null },
+      });
+      await controller.toggleModInActiveProfile('a');
+      expect(gateway.callsOf('setProfileMods')).toHaveLength(0);
+    });
+
+    it('When the active profile is Vanilla Then nothing happens', async () => {
+      const { controller, gateway } = await ready({ mods: [mod('a')] });
+      await controller.toggleModInActiveProfile('a');
+      expect(gateway.callsOf('setProfileMods')).toHaveLength(0);
+    });
+
+    it.each(['starting', 'running'] as const)('When the session is %s Then nothing happens', async (kind) => {
+      const { controller, gateway, session, id } = await withActive(['a']);
+      await controller.play();
+      if (kind === 'running') session.emitSession({ state: 'started', cleaned: 0 });
+      expect(controller.getState().session.kind).toBe(kind);
+      const before = gateway.callsOf('setProfileMods').length;
+      await controller.toggleModInActiveProfile('b');
+      expect(gateway.callsOf('setProfileMods')).toHaveLength(before);
+      expect(modsOf(controller, id)).toEqual(['a']);
+    });
+
+    it('When the gateway fails Then the error is exposed', async () => {
+      const { controller, gateway } = await withActive(['a']);
+      gateway.failNext('setProfileMods', { code: 'write_failed', message: 'x' });
+      await controller.toggleModInActiveProfile('b');
+      expect(controller.getState().error?.code).toBe('write_failed');
+    });
+  });
 });

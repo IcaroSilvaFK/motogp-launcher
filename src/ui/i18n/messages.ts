@@ -43,6 +43,11 @@ export interface Messages {
     filterLabel: string;
     filterAll: string;
     clearFilters: string;
+    /** Accessible name of the row switch; `profileName` is null without an active profile. */
+    toggleNamed: (modName: string, profileName: string | null) => string;
+    toggleLocked: string;
+    toggleVanilla: string;
+    toggleNoProfile: string;
   };
   profiles: {
     title: string;

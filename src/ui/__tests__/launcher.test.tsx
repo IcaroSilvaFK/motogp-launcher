@@ -107,6 +107,43 @@ describe('Given the Library screen', () => {
     expect(controller.dispose).toHaveBeenCalledTimes(1);
     expect(controller.start).toHaveBeenCalledTimes(1);
   });
+
+  it('row_switch_is_inert_while_busy: When the controller is busy Then the switch ignores clicks without a hint', async () => {
+    const { user, controller } = renderApp(
+      createFakeController({
+        mods: [modA],
+        profiles: [
+          { id: 'vanilla', name: 'Vanilla', mod_ids: [] },
+          { id: 'p1', name: 'Mine', mod_ids: [] },
+        ],
+        config: { game_dir: null, active_profile: 'p1' },
+        busy: true,
+      }),
+    );
+
+    const toggle = screen.getByRole('switch', { name: 'Include Mod A in Mine' });
+    expect(toggle).toHaveAttribute('aria-disabled', 'true');
+    expect(toggle).not.toHaveAttribute('title');
+    expect(toggle).not.toHaveAttribute('aria-describedby');
+    await user.click(toggle);
+    expect(controller.toggleModInActiveProfile).not.toHaveBeenCalled();
+
+    act(() => controller.setState({ busy: false }));
+    expect(toggle).not.toHaveAttribute('aria-disabled');
+    await user.click(toggle);
+    expect(controller.toggleModInActiveProfile).toHaveBeenCalledWith('A');
+  });
+
+  it('row_switch_needs_a_profile: When no profile is active Then the switch asks to select one', async () => {
+    const { user, controller } = renderApp(createFakeController({ mods: [modA] }));
+
+    const toggle = screen.getByRole('switch', { name: 'Include Mod A in the active profile' });
+    expect(toggle).toHaveAttribute('aria-disabled', 'true');
+    expect(toggle).toHaveAttribute('title', 'Select a profile first.');
+    expect(toggle).toHaveAccessibleDescription('Select a profile first.');
+    await user.click(toggle);
+    expect(controller.toggleModInActiveProfile).not.toHaveBeenCalled();
+  });
 });
 
 describe('Given the Profiles screen', () => {

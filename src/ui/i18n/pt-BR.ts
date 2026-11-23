@@ -46,6 +46,11 @@ export const ptBR: Messages = {
     filterLabel: 'Filtro',
     filterAll: 'Todos',
     clearFilters: 'Limpar filtros',
+    toggleNamed: (modName, profileName) =>
+      profileName === null ? `Incluir ${modName} no perfil ativo` : `Incluir ${modName} em ${profileName}`,
+    toggleLocked: 'As alterações de perfil ficam bloqueadas enquanto o jogo está em execução.',
+    toggleVanilla: 'O Vanilla sempre roda sem mods. Escolha outro perfil para adicionar mods.',
+    toggleNoProfile: 'Selecione um perfil primeiro.',
   },
   profiles: {
     title: 'Perfis',
