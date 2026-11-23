@@ -99,6 +99,21 @@ export interface Messages {
     noGame: string;
     setUp: string;
     ready: string;
+    version: (version: string) => string;
+    versionTitle: string;
+  };
+  about: {
+    title: string;
+    versionLabel: string;
+    versionHint: string;
+    versionUnknown: string;
+    updatesLabel: string;
+    updatesHint: string;
+    check: string;
+    checking: string;
+    upToDate: string;
+    available: (version: string) => string;
+    install: string;
   };
   staleSession: {
     regionLabel: string;

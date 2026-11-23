@@ -34,13 +34,14 @@ The domain has no mod category, version or per-mod enabled flag. "Enabled" means
 
 - **Top bar** (`<header>`, role banner): brand (`<h1>`) and the main navigation (`TopNav`, `<nav aria-label={t.nav.label}>`), icon + label tabs with `aria-current="page"` and a 2px accent underline.
 - **Status bar** (`StatusBar`, `<footer>`, role contentinfo), always visible:
-  - left: game tile, game name (tooltip = root folder) and a `Steam` store badge when an App ID exists; without a game, "No game selected" plus a **Set up game** link-button that opens Settings;
+  - left: game tile, game name (tooltip = root folder) and a `Steam` store badge when an App ID exists; without a game, "No game selected" plus a **Set up game** link-button that opens Settings; then the launcher version (`statusbar-version`, `v0.1.0`, 12px muted caption after a 1px hairline, tooltip "Launcher version"). The caption is not rendered while the version is unknown or could not be read (issue #53);
   - middle: `SessionStatus` (`role="status"`, announced) or, when nothing is happening and Play is possible, a plain "Ready to play" line (not announced);
   - right: the active-profile select (`#active-profile`, visible label) and **Play** (`btn btn-primary play`, 40px, filled play glyph).
 - **Page head** on every screen: one visible `<h2>` (the screen title, also the `aria-labelledby` target) and a `page-subtitle` with live counts (`2 mods · 1 in Mine`, `2 profiles · active: Mine`, a short description for Settings). Toolbar actions sit on the right.
 - **Library:** filter rail (search, `Filter` group of facet buttons with counts: All / In active profile / Not in active profile, `aria-pressed`; the drop hint as a dashed drop zone) + mod list (tile with the initial, name, size · file count, active-profile switch with its state label, Remove). No results shows the message with **Clear filters**.
 - **Profiles:** rail with "Your profiles" (each row: name button with `aria-pressed`, mod count, `Active` badge) and the "New profile" form; content shows the editor (rename, mods checklist and load order side by side, Save) or an empty state asking to pick a profile.
-- **Settings:** section nav (`<nav aria-label="Settings sections">`, anchor links with `aria-current="location"`) + sections of **cards of rows** (`setting-row`: label + help text on the left, control on the right). Game: folder row (Detect games, Choose folder…), the current game details, detected games. Preferences: Language.
+- **Settings:** section nav (`<nav aria-label="Settings sections">`, anchor links with `aria-current="location"`) + sections of **cards of rows** (`setting-row`: label + help text on the left, control on the right). Game: folder row (Detect games, Choose folder…), the current game details, detected games. Preferences: Language. About (always last, `AboutSection`): a "Launcher version" row (value on the right, "Unknown" muted when it cannot be read) and, only when an updater exists, an "Updates" row with a small outlined **Check for updates** button.
+- **Manual update check (Settings > About, issue #53):** user-initiated (`updater.check()` without `background`). While it runs the button is disabled and reads "Checking…". The result sits under the row in a polite live region (`role="status"`): "The launcher is up to date." with a green check glyph (only after a user check in this app session, because a failed silent startup check also ends in `none`; the flag lives in `AppInfoContext` so it survives leaving Settings), "Version X is available" (semibold) plus **Install update** (`btn btn-sm btn-accent-outline`: Play keeps the only fill; disabled with the session hint as its `aria-describedby` while a session is not clean), the downloading / restarting lines, or the translated `t.update.errors[kind]` in danger text (never the raw message). The update banner keeps its own behaviour; both read the same controller state.
 - **Notices and banners** sit between the top bar and the content, aligned to the content column.
 - **Loading:** while `status === 'loading'`, `<main aria-busy="true">` shows "Loading…" and skeleton rows instead of a screen, so no empty state flashes.
 
@@ -86,17 +87,17 @@ Banner pairs (`--*-fg` on `--*-bg`, all above 10) and the danger text on the sur
 
 ## Components
 
-- Shell: `app-shell`, `topbar`, `brand`, `top-nav`, `nav-tab`, `app-messages`, `statusbar` (`statusbar-game`, `game-tile`, `statusbar-game-name`, `statusbar-message`, `statusbar-idle`, `statusbar-actions`), `profile-field`.
+- Shell: `app-shell`, `topbar`, `brand`, `top-nav`, `nav-tab`, `app-messages`, `statusbar` (`statusbar-game`, `game-tile`, `statusbar-game-name`, `statusbar-version`, `statusbar-message`, `statusbar-idle`, `statusbar-actions`), `profile-field`.
 - Page: `page`, `page-head`, `page-heading`, `page-subtitle`, `page-actions`, `split`/`library-layout`, `split-rail`, `split-main`, `rail-title`, `panel`.
 - Buttons: `btn` (small outlined secondary), `btn-primary` (Play, update), `btn-accent-outline` (a screen's main action), `btn-ghost`, `btn-danger` (outline), `btn-sm`, `btn-icon`, `btn-link`; Play is `btn btn-primary play`.
 - Forms: `input`, `field` (inline label), `form-field` (stacked label, input), `form-row`, `section-title`, `hint`.
 - Filters: `search`, `facet-group`, `facet` (`aria-pressed`), `facet-count`, `drop-hint`.
 - Lists: `mod-list`, `mod-row`, `mod-tile`, `mod-main`, `mod-name`, `mod-meta`, `dot`; `profile-list`, `profile-item`, `profile-select`, `profile-meta`; `check-list`, `check-row`, `order-list`, `detected-list`.
-- Settings: `section-nav`, `section-link` (`aria-current="location"`), `settings-section`, `group-title`, `card rows`, `setting-row`, `setting-row-block`, `setting-text`, `setting-label`, `setting-control`, `details`.
+- Settings: `section-nav`, `section-link` (`aria-current="location"`), `settings-section`, `group-title`, `card rows`, `setting-row`, `setting-row-block`, `setting-row-stack` (label line + an often-empty result, no gap), `setting-row-line`, `setting-text`, `setting-label`, `setting-control`, `setting-value`, `details`; About update result: `update-result`, `update-result-line` (the live region), `update-result-ok`, `update-result-new`, `update-result-error`, `update-result-action`.
 - Badges: `badge badge-on|badge-off|badge-store`.
 - Switch: `toggle` (switch + state label), `switch` (`role="switch"`, `aria-checked`, `aria-disabled`; the button is a 32x24 hit target drawing a 28x16 track with `::before`), `switch-thumb`, `toggle-label` (+ `toggle-label-on`), `toggle-hint` (the visible reason the switches are unavailable). Off: `--surface-3` track, `--border-strong` border, `--text-muted` thumb. On: `--running` track, `--bg` thumb. Unavailable: 0.45 opacity, `not-allowed` cursor.
 - States: `empty-state` (+ `empty-state-compact`, `empty-icon`, `empty-title`), `loading-state`, `skeleton-list`, `skeleton-row`, `skeleton`; `session-status session-status-<kind>`, `notice notice-info|success|warning|error`, `banner banner-info|error` (update banner), `banner-icon`.
-- Icons: `Icon` (`icon`, `nav-icon`, `search-icon`), names: library, profiles, settings, search, import, play, game, folder, refresh, language, filter, up, down, plus.
+- Icons: `Icon` (`icon`, `nav-icon`, `search-icon`), names: library, profiles, settings, search, import, play, game, folder, refresh, language, filter, up, down, plus, check (up-to-date result), info (About section).
 
 ## Focus
 
@@ -106,7 +107,6 @@ Every interactive element gets a `:focus-visible` outline using `--focus-ring` (
 
 Not implemented in #48, suggested as separate issues:
 
-- Launcher version in the status bar (and an About section in Settings with the version and a manual "check for updates").
 - Game build/version and store detection beyond "has a Steam App ID".
 - Mod metadata: version, author, category/type facets, thumbnails.
 - Library load-order view per profile (drag to reorder) and a conflicts check between mods that ship the same files.

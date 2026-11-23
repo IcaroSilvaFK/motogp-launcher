@@ -421,6 +421,16 @@ main {
   font-weight: 500;
 }
 
+/* Launcher version: a quiet caption after the game block, split off by a hairline. */
+.statusbar-version {
+  flex: none;
+  padding-left: var(--space-3);
+  border-left: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+  white-space: nowrap;
+}
+
 .statusbar-message {
   display: flex;
   align-items: center;
@@ -1417,6 +1427,66 @@ button {
 
 .setting-control select {
   min-width: 180px;
+}
+
+.setting-value {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.setting-value.muted {
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+/* A row whose label/control line is followed by a result that is often empty (Settings > About). */
+.setting-row-stack {
+  gap: 0;
+}
+
+.setting-row-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.update-result > :not(:empty) {
+  margin-top: var(--space-2);
+}
+
+.update-result-line {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-small);
+}
+
+.update-result-ok {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+}
+
+.update-result-ok .icon {
+  stroke: var(--running);
+}
+
+.update-result-new {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.update-result-error {
+  color: var(--danger-text);
+}
+
+.update-result-action {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 /* ---------- Cards, lists, details ---------- */

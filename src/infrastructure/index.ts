@@ -4,3 +4,4 @@ export { createTauriPicker } from './tauriPicker';
 export { createTauriSessionEvents } from './tauriSessionEvents';
 export { createTauriDropEvents } from './tauriDropEvents';
 export { createTauriUpdateService } from './tauri/TauriUpdateService';
+export { createTauriAppInfo } from './tauri/TauriAppInfo';

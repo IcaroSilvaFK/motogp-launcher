@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { selectSessionClean, useLauncherState } from '../application';
-import type { LauncherController, UpdateController } from '../application';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { readAppVersion, selectSessionClean, useLauncherState } from '../application';
+import type { AppInfo, LauncherController, UpdateController } from '../application';
+import { AppInfoContext } from './AppInfoContext';
 import { I18nProvider, useI18n } from './i18n';
 import type { Locale } from './i18n';
 import { LauncherContext } from './LauncherContext';
@@ -38,11 +39,26 @@ function LoadingState() {
   );
 }
 
-function Shell({ controller, updater }: { controller: LauncherController; updater?: UpdateController }) {
+function Shell({
+  controller,
+  updater,
+  appInfo,
+}: {
+  controller: LauncherController;
+  updater?: UpdateController;
+  appInfo?: AppInfo;
+}) {
   const { t } = useI18n();
   const state = useLauncherState(controller);
   const [screen, setScreen] = useState<ScreenId>('library');
+  const [version, setVersion] = useState<string | null>(null);
+  const [userChecked, setUserChecked] = useState(false);
   const value = useMemo(() => ({ controller, state }), [controller, state]);
+  const markUserChecked = useCallback(() => setUserChecked(true), []);
+  const info = useMemo(
+    () => ({ version, updater, userChecked, markUserChecked }),
+    [version, updater, userChecked, markUserChecked],
+  );
   const loading = state.status === 'loading';
 
   useEffect(() => {
@@ -50,37 +66,51 @@ function Shell({ controller, updater }: { controller: LauncherController; update
     return () => controller.dispose();
   }, [controller]);
 
+  // Read once per AppInfo port; a failure leaves the version hidden (readAppVersion never throws).
+  useEffect(() => {
+    if (!appInfo) return;
+    let active = true;
+    void readAppVersion(appInfo).then((read) => {
+      if (active) setVersion(read);
+    });
+    return () => {
+      active = false;
+    };
+  }, [appInfo]);
+
   return (
-    <LauncherContext.Provider value={value}>
-      <div className="app-shell">
-        <header className="topbar">
-          <div className="brand">
-            <svg className="brand-mark" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-              <rect x="2" y="2" width="16" height="16" rx="4" />
-              <path d="M6 13.5l2.6-7 1.4 3.6 1.4-3.6 2.6 7" />
-            </svg>
-            <h1>{t.appName}</h1>
+    <AppInfoContext.Provider value={info}>
+      <LauncherContext.Provider value={value}>
+        <div className="app-shell">
+          <header className="topbar">
+            <div className="brand">
+              <svg className="brand-mark" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+                <rect x="2" y="2" width="16" height="16" rx="4" />
+                <path d="M6 13.5l2.6-7 1.4 3.6 1.4-3.6 2.6 7" />
+              </svg>
+              <h1>{t.appName}</h1>
+            </div>
+            <TopNav current={screen} onSelect={setScreen} />
+          </header>
+          <div className="app-messages">
+            <NoticeBar />
+            {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
           </div>
-          <TopNav current={screen} onSelect={setScreen} />
-        </header>
-        <div className="app-messages">
-          <NoticeBar />
-          {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
+          <main aria-busy={loading ? 'true' : undefined}>
+            {loading ? (
+              <LoadingState />
+            ) : (
+              <>
+                {screen === 'library' && <LibraryScreen />}
+                {screen === 'profiles' && <ProfilesScreen />}
+                {screen === 'settings' && <SettingsScreen />}
+              </>
+            )}
+          </main>
+          <StatusBar onSetUpGame={() => setScreen('settings')} />
         </div>
-        <main aria-busy={loading ? 'true' : undefined}>
-          {loading ? (
-            <LoadingState />
-          ) : (
-            <>
-              {screen === 'library' && <LibraryScreen />}
-              {screen === 'profiles' && <ProfilesScreen />}
-              {screen === 'settings' && <SettingsScreen />}
-            </>
-          )}
-        </main>
-        <StatusBar onSetUpGame={() => setScreen('settings')} />
-      </div>
-    </LauncherContext.Provider>
+      </LauncherContext.Provider>
+    </AppInfoContext.Provider>
   );
 }
 
@@ -89,15 +119,17 @@ export function App({
   locale,
   onLocaleChange,
   updater,
+  appInfo,
 }: {
   controller: LauncherController;
   locale?: Locale;
   onLocaleChange?: (locale: Locale) => void;
   updater?: UpdateController;
+  appInfo?: AppInfo;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
-      <Shell controller={controller} updater={updater} />
+      <Shell controller={controller} updater={updater} appInfo={appInfo} />
     </I18nProvider>
   );
 }

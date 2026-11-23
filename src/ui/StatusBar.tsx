@@ -1,4 +1,5 @@
 import { selectCanPlay } from '../application';
+import { useAppInfo } from './AppInfoContext';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
@@ -13,6 +14,7 @@ export function StatusBar({ onSetUpGame }: { onSetUpGame: () => void }) {
   const { controller, state } = useLauncher();
   const { game } = state;
   const canPlay = selectCanPlay(state);
+  const { version } = useAppInfo();
 
   return (
     <footer className="statusbar">
@@ -34,6 +36,11 @@ export function StatusBar({ onSetUpGame }: { onSetUpGame: () => void }) {
             </span>
             {game.app_id !== null && <span className="badge badge-store">{t.statusBar.steam}</span>}
           </div>
+        )}
+        {version !== null && (
+          <span className="statusbar-version num" title={t.statusBar.versionTitle}>
+            {t.statusBar.version(version)}
+          </span>
         )}
       </div>
 
