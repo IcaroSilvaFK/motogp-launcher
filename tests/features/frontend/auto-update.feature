@@ -23,9 +23,21 @@ Feature: Update the installed launcher through the interface
   Scenario: Keep the launcher usable offline
     Given the feed query fails due to the network
     When the app starts
-    Then I see a recoverable notice
+    Then no update banner is shown
     And I can still use library, profiles and settings
     And no restart is requested
+
+  Scenario: Stay silent when the update feed is not published
+    Given the feed query fails because the release JSON cannot be fetched
+    When the app starts
+    Then no update banner is shown
+    And the failure is only logged to the console
+
+  Scenario: Show only the translated message when the user checks for updates
+    Given the feed query fails due to the network
+    When I check for updates
+    Then I see the translated network error
+    And the raw error text from the updater is not shown
 
   Scenario: Refuse a package with an invalid signature
     Given an update whose package fails the signature verification
@@ -37,6 +49,7 @@ Feature: Update the installed launcher through the interface
     Given the download finishes but the installation fails
     When the service returns the error
     Then the error is visible and the attempt is no longer in progress
+    And the raw error text from the updater is not shown
     And no restart is requested
 
   Scenario: Avoid simultaneous installs

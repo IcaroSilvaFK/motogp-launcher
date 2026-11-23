@@ -38,8 +38,8 @@ const updater = createUpdateController({
   isSessionClean: () => selectSessionClean(controller.getState()),
 });
 
-// Fire-and-forget: the check never blocks the launcher; failures become a recoverable notice.
-void updater.check();
+// Fire-and-forget: the check never blocks the launcher; failures are only logged, never shown.
+void updater.check({ background: true });
 
 createRoot(container).render(
   <StrictMode>

@@ -38,12 +38,7 @@ export function UpdateBanner({ state, installBlocked, onUpdate }: UpdateBannerPr
         </>
       )}
       {state.kind === 'installed' && <p role="status">{t.update.restarting}</p>}
-      {state.kind === 'error' && (
-        <p role="alert">
-          {t.update.errors[state.error.kind]}
-          {state.error.message !== '' && <span className="notice-detail"> {state.error.message}</span>}
-        </p>
-      )}
+      {state.kind === 'error' && <p role="alert">{t.update.errors[state.error.kind]}</p>}
       {installBlocked && !busy && <p className="hint">{t.update.blockedBySession}</p>}
       {info !== null && (
         <button type="button" disabled={!canUpdate} onClick={onUpdate}>
