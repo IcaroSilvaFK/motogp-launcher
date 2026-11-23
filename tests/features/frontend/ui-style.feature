@@ -1,0 +1,114 @@
+Feature: Polished dark launcher interface
+  Scenario: Play is the prominent call to action
+    Given the launcher with a configured game and an active profile
+    Then I see a "Play" button styled as the primary call to action
+    And it is enabled
+
+  Scenario: The status bar shows the game, the session and Play
+    Given the launcher with a configured game and an active profile
+    Then the status bar shows the game name and its store
+    And the status bar holds the active profile selector and the "Play" button
+    And the "Play" button is styled as the primary button
+    And the status bar says the launcher is ready to play
+
+  Scenario: The status bar guides the setup when no game is configured
+    Given the launcher without a configured game
+    Then the status bar says no game is selected
+    When I click "Set up game" in the status bar
+    Then the Settings item is marked as the current page
+
+  Scenario: Top navigation marks the current screen
+    Given the launcher open on the Library
+    Then the main navigation sits in the top bar with one tab per screen
+    When I select Settings in the navigation
+    Then the Settings item is marked as the current page
+    And the Library item is no longer marked
+
+  Scenario: Every screen has one visible title and a live subtitle
+    Given mods A and B in the library and only A in the active profile
+    Then the Library title is visible with the subtitle "2 mods · 1 in Mine"
+    When I open the Profiles screen
+    Then the Profiles title is visible with the subtitle "2 profiles · active: Mine"
+
+  Scenario: The library lists mods as dense rows
+    Given mods A and B in the library and only A in the active profile
+    When I open the Library
+    Then I see a list with one row per mod showing its name, size and file count
+    And the row for A says it is in the active profile
+    And the row for B says it is not in the active profile
+    And each row offers a remove button named after the mod
+
+  Scenario: Filter the library by name
+    Given mods "Yamaha Livery" and "Ducati Sound" in the library
+    When I type "duc" in the library search
+    Then only "Ducati Sound" is listed
+    When I type "zzz" in the library search
+    Then I see the no-results message
+
+  Scenario: Filter the library by active profile with counts
+    Given mods A and B in the library and only A in the active profile
+    Then I see the facets "All" 2, "In active profile" 1 and "Not in active profile" 1
+    And the "All" facet is selected
+    When I choose the "Not in active profile" facet
+    Then only "Mod B" is listed
+    When I type "Mod A" in the library search
+    Then I see the no-results message
+    When I clear the filters
+    Then both mods are listed again and the "All" facet is selected
+
+  Scenario: Empty library offers the next action
+    Given an empty library
+    Then I see the empty-library message
+    And an "Import mods" button that opens the import dialog
+
+  Scenario: Loading shows a skeleton instead of an empty screen
+    Given the launcher is still loading
+    Then the content area is marked busy and announces that it is loading
+    And the empty-library message is not shown
+
+  Scenario: Profiles show their mod counts and guide the selection
+    Given mods A and B in the library and only A in the active profile
+    When I open the Profiles screen
+    Then each profile in the list shows its mod count
+    And the active profile is marked as active
+    And the editor area asks me to select a profile
+
+  Scenario: Settings has a section navigation
+    Given the launcher open on the Settings screen
+    Then I see a "Settings sections" navigation with "Game" and "Preferences"
+    And the "Game" section is marked as the current location
+    When I select the "Preferences" section
+    Then the "Preferences" section is marked as the current location
+    And the language setting is a row with its help text
+
+  Scenario: Session status uses a variant per state
+    Given a running session
+    Then the session status announces it is running with the running variant
+
+  Scenario: Notices use banner variants
+    Given an error from the last command
+    Then I see an alert banner with the error variant
+    When the error is dismissed and a success notice arrives
+    Then I see a status banner with the success variant
+
+  Scenario: The design tokens meet WCAG AA contrast
+    Given the design tokens declared in styles.css
+    Then body text on the background and on every surface level has a contrast ratio of at least 4.5
+    And muted text on the surfaces has a contrast ratio of at least 4.5
+    And the Play label on the accent has a contrast ratio of at least 4.5
+    And the accent text on the surfaces has a contrast ratio of at least 4.5
+    And the focus ring on the background has a contrast ratio of at least 3
+
+  Scenario: Focus is always visible
+    Given the stylesheet
+    Then every :focus-visible rule draws an outline using the focus token
+    And no rule removes the outline without a replacement
+
+  Scenario: Motion respects the reduced-motion preference
+    Given the stylesheet
+    Then it declares a prefers-reduced-motion rule that disables animations and transitions
+
+  Scenario: The stylesheet stays restrained
+    Given the stylesheet
+    Then no rule uses clip-path
+    And the radius tokens are between 4px and 8px

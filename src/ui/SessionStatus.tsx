@@ -1,7 +1,9 @@
+import type { ReactNode } from 'react';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 
-export function SessionStatus() {
+/** Announces session changes; renders `fallback` (plain, not announced) while there is nothing to say. */
+export function SessionStatus({ fallback = null }: { fallback?: ReactNode }) {
   const { t } = useI18n();
   const { state } = useLauncher();
   const { session, error } = state;
@@ -29,9 +31,9 @@ export function SessionStatus() {
       break;
   }
 
-  if (text === null) return null;
+  if (text === null) return fallback;
   return (
-    <p role="status" className="session-status">
+    <p role="status" className={`session-status session-status-${session.kind}`}>
       {text}
     </p>
   );

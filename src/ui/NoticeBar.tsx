@@ -1,4 +1,5 @@
 import type { Notice } from '../application';
+import { BannerIcon } from './BannerIcon';
 import { useI18n } from './i18n';
 import type { Messages } from './i18n';
 import { useLauncher } from './LauncherContext';
@@ -35,19 +36,21 @@ export function NoticeBar() {
       <StaleSessionNotice />
       {error !== null && (
         <div role="alert" className="notice notice-error">
+          <BannerIcon variant="error" />
           <p>
             {t.errors[error.code]}
             {error.message !== '' && <span className="notice-detail"> {error.message}</span>}
           </p>
-          <button type="button" onClick={() => controller.dismissError()}>
+          <button type="button" className="btn btn-ghost" onClick={() => controller.dismissError()}>
             {t.dismiss}
           </button>
         </div>
       )}
       {error === null && notice !== null && (
         <div role="status" className="notice notice-success">
+          <BannerIcon variant="success" />
           <p>{noticeText(t, notice)}</p>
-          <button type="button" onClick={() => controller.dismissNotice()}>
+          <button type="button" className="btn btn-ghost" onClick={() => controller.dismissNotice()}>
             {t.dismiss}
           </button>
         </div>

@@ -33,6 +33,16 @@ export interface Messages {
     files: (count: number) => string;
     empty: string;
     dropHint: string;
+    name: string;
+    search: string;
+    searchPlaceholder: string;
+    noResults: string;
+    inActiveProfile: string;
+    notInActiveProfile: string;
+    summary: (total: number, inProfile: number, profileName: string | null) => string;
+    filterLabel: string;
+    filterAll: string;
+    clearFilters: string;
   };
   profiles: {
     title: string;
@@ -50,6 +60,13 @@ export interface Messages {
     mods: string;
     noMods: string;
     vanillaLocked: string;
+    createTitle: string;
+    createHint: string;
+    listTitle: string;
+    summary: (count: number, activeName: string | null) => string;
+    modCount: (count: number) => string;
+    active: string;
+    selectHint: string;
   };
   settings: {
     title: string;
@@ -63,8 +80,20 @@ export interface Messages {
     noDetections: string;
     useThis: string;
     chooseFolder: string;
+    gameHint: string;
+    preferences: string;
+    languageHint: string;
     language: string;
     languageNames: Record<Locale, string>;
+    subtitle: string;
+    sectionsLabel: string;
+    folderTitle: string;
+  };
+  statusBar: {
+    steam: string;
+    noGame: string;
+    setUp: string;
+    ready: string;
   };
   staleSession: {
     regionLabel: string;

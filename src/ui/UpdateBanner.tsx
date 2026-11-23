@@ -1,4 +1,5 @@
 import type { UpdateState } from '../application';
+import { BannerIcon } from './BannerIcon';
 import { useI18n } from './i18n';
 
 export interface UpdateBannerProps {
@@ -17,9 +18,14 @@ export function UpdateBanner({ state, installBlocked, onUpdate }: UpdateBannerPr
 
   return (
     <section
-      className={state.kind === 'error' ? 'update-banner update-banner-error' : 'update-banner'}
+      className={
+        state.kind === 'error'
+          ? 'update-banner update-banner-error banner banner-error'
+          : 'update-banner banner banner-info'
+      }
       aria-labelledby={info ? 'update-title' : undefined}
     >
+      <BannerIcon variant={state.kind === 'error' ? 'error' : 'info'} />
       {info && (
         <>
           <h2 id="update-title">{t.update.available(info.version)}</h2>
@@ -41,7 +47,7 @@ export function UpdateBanner({ state, installBlocked, onUpdate }: UpdateBannerPr
       {state.kind === 'error' && <p role="alert">{t.update.errors[state.error.kind]}</p>}
       {installBlocked && !busy && <p className="hint">{t.update.blockedBySession}</p>}
       {info !== null && (
-        <button type="button" disabled={!canUpdate} onClick={onUpdate}>
+        <button type="button" className="btn btn-primary" disabled={!canUpdate} onClick={onUpdate}>
           {t.update.button}
         </button>
       )}

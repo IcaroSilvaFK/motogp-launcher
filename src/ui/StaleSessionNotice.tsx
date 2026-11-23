@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { BannerIcon } from './BannerIcon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 
@@ -18,6 +19,7 @@ function StaleSessionPanel({ staleSession }: { staleSession: { modsDir: string; 
 
   return (
     <section role="region" aria-label={text.regionLabel} className="notice notice-warning stale-session">
+      <BannerIcon variant="warning" />
       <div>
         {confirming ? (
           <>
@@ -42,6 +44,7 @@ function StaleSessionPanel({ staleSession }: { staleSession: { modsDir: string; 
         {confirming ? (
           <>
             <button
+              className="btn btn-ghost"
               type="button"
               disabled={busy}
               onClick={() => {
@@ -51,16 +54,21 @@ function StaleSessionPanel({ staleSession }: { staleSession: { modsDir: string; 
             >
               {text.confirm}
             </button>
-            <button type="button" disabled={busy} onClick={() => setConfirming(false)}>
+            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setConfirming(false)}>
               {text.cancel}
             </button>
           </>
         ) : (
           <>
-            <button type="button" disabled={busy} onClick={() => void controller.forgetStaleSession()}>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              disabled={busy}
+              onClick={() => void controller.forgetStaleSession()}
+            >
               {text.forget}
             </button>
-            <button type="button" disabled={busy} onClick={() => setConfirming(true)}>
+            <button type="button" className="btn btn-ghost" disabled={busy} onClick={() => setConfirming(true)}>
               {text.clean}
             </button>
           </>

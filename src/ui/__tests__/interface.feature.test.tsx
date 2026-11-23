@@ -128,8 +128,11 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
 
     And('the current game is updated on screen', () => {
-      expect(screen.getByText('MotoGP 25')).toBeInTheDocument();
-      expect(screen.getByText('1234')).toBeInTheDocument();
+      // The Settings details; the status bar also names the game.
+      const settings = within(screen.getByRole('main'));
+      expect(settings.getByText('MotoGP 25')).toBeInTheDocument();
+      expect(settings.getByText('1234')).toBeInTheDocument();
+      expect(within(screen.getByRole('contentinfo')).getByText('MotoGP 25')).toBeInTheDocument();
     });
   });
 
@@ -146,7 +149,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
 
     Then('the library shows its name, size and file count', async () => {
-      const row = (await screen.findByText('Cool')).closest('tr') as HTMLElement;
+      const row = (await screen.findByText('Cool')).closest('li') as HTMLElement;
       expect(within(row).getByText('1 KB')).toBeInTheDocument();
       expect(within(row).getByText('1 file')).toBeInTheDocument();
     });
