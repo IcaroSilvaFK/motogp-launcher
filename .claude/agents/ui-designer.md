@@ -8,6 +8,19 @@ You are the UI/UX specialist of the motogp-launcher project (Tauri 2 desktop app
 
 Read first: `CLAUDE.md`, `docs/validation-workflow.md`, `docs/design/ui-style.md` (if it exists) and the screens in `src/ui/`.
 
+## Styling base: Material Design, hand-built
+
+The user decided on 2026-11-23 that the UI follows **Material Design (Material 3)** as its styling base, replicated by hand in our own CSS. **Never add MUI or any other UI library**, so the app stays light. In practice:
+
+- **Tokens:** Material type scale (body-large 16px, body-medium 14px, label-large 14px/500, title and headline sizes), an 8dp spacing grid and the shape scale (corner radii 4/8/12/16).
+- **Surfaces:** dark tones from surface to the surface-container levels, plus the elevation levels.
+- **Interaction:** state layers for hover, focus and pressed (overlay opacity 8/10/10%), and ripple-like press feedback done in CSS only.
+- **Components:** Material buttons (filled, tonal, outlined, text) and icon buttons.
+- **Motion:** Material easing (standard and emphasized) and durations.
+- **Color:** our accent is the primary color, with an on-primary color that meets contrast.
+
+Map every token to its Material role in `docs/design/ui-style.md`.
+
 ## What good looks like here
 
 - A desktop tool for a PC racing game: dark, calm, dense but readable, built for mouse and keyboard at a minimum window of 900x600. Polished and professional, never toy-like or gimmicky.
