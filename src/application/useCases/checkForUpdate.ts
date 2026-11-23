@@ -1,6 +1,6 @@
 import type { UpdateError, UpdateErrorKind, UpdateInfo, UpdateProgress } from '../../domain';
 import { isNewerVersion } from '../../domain';
-import type { UpdateController, UpdateDeps, UpdateState } from '../updateController';
+import type { CheckOptions, UpdateController, UpdateDeps, UpdateState } from '../updateController';
 
 const KNOWN_KINDS: readonly UpdateErrorKind[] = ['network', 'signature', 'install', 'busy', 'session'];
 
@@ -24,7 +24,7 @@ export function createUpdateController(deps: UpdateDeps): UpdateController {
     for (const listener of [...listeners]) listener();
   }
 
-  async function check(): Promise<void> {
+  async function check(options: CheckOptions = {}): Promise<void> {
     if (state.kind === 'downloading' || state.kind === 'installed') return;
     try {
       const info = await deps.service.check();
@@ -34,7 +34,13 @@ export function createUpdateController(deps: UpdateDeps): UpdateController {
         set({ kind: 'none' });
       }
     } catch (cause) {
-      set({ kind: 'error', info: null, error: toUpdateError(cause) });
+      const error = toUpdateError(cause);
+      if (options.background === true) {
+        console.warn(`Background update check failed (${error.kind}): ${error.message}`);
+        if (state.kind === 'idle') set({ kind: 'none' });
+        return;
+      }
+      set({ kind: 'error', info: null, error });
     }
   }
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { UpdateInfo } from '../../../domain';
 import { FakeUpdateService } from '../../__tests__/fakeUpdateService';
 import { createUpdateController } from '../checkForUpdate';
@@ -197,6 +197,68 @@ describe('checkForUpdate', () => {
     flags.clean = true;
     await controller.install();
     expect(service.downloadCalls).toBe(1);
+  });
+
+  describe('background check', () => {
+    const silence = () => vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('failure_from_idle_becomes_none_and_is_logged_once', async () => {
+      const warn = silence();
+      const { service, controller } = setup();
+      service.checkError = { kind: 'network', message: 'offline' };
+      await expect(controller.check({ background: true })).resolves.toBeUndefined();
+      expect(controller.getState()).toEqual({ kind: 'none' });
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0]?.join(' '))).toContain('network');
+      expect(String(warn.mock.calls[0]?.join(' '))).toContain('offline');
+    });
+
+    it('failure_keeps_an_available_update', async () => {
+      const warn = silence();
+      const { service, controller } = setup();
+      service.checkResult = NEWER;
+      await controller.check();
+      service.checkError = { kind: 'network', message: 'offline' };
+      await controller.check({ background: true });
+      expect(controller.getState()).toEqual({ kind: 'available', info: NEWER });
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
+
+    it('failure_keeps_an_install_error', async () => {
+      silence();
+      const { service, controller } = setup();
+      service.checkResult = NEWER;
+      await controller.check();
+      service.installError = { kind: 'install', message: 'disk full' };
+      await controller.install();
+      const before = controller.getState();
+      expect(before.kind).toBe('error');
+      service.checkError = { kind: 'network', message: 'offline' };
+      await controller.check({ background: true });
+      expect(controller.getState()).toBe(before);
+    });
+
+    it('success_behaves_like_a_user_check', async () => {
+      const warn = silence();
+      const { service, controller } = setup();
+      service.checkResult = NEWER;
+      await controller.check({ background: true });
+      expect(controller.getState()).toEqual({ kind: 'available', info: NEWER });
+      expect(warn).not.toHaveBeenCalled();
+    });
+
+    it('user_initiated_failure_still_enters_error', async () => {
+      const warn = silence();
+      const { service, controller } = setup();
+      service.checkError = { kind: 'network', message: 'offline' };
+      await controller.check({ background: false });
+      expect(controller.getState()).toMatchObject({ kind: 'error' });
+      expect(warn).not.toHaveBeenCalled();
+    });
   });
 
   it('subscribe returns a working unsubscribe', async () => {

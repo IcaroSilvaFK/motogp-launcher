@@ -11,7 +11,8 @@ import { describeFeature } from '@amiceli/vitest-cucumber';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
-import { expect, it } from 'vitest';
+import { expect, it, vi } from 'vitest';
+import type { MockInstance } from 'vitest';
 import { createLauncherController, createUpdateController, selectSessionClean } from '../../application';
 import type { LauncherController, UpdateController } from '../../application';
 import type { FakeGatewayOptions } from '../../application/__tests__/fakes';
@@ -52,11 +53,21 @@ interface World {
   user: ReturnType<typeof userEvent.setup>;
 }
 
-/** Mounts the real UI and runs the startup check the composition root performs. */
+/** The console.warn spy of the running scenario: failures of the background check land here. */
+let warnSpy: MockInstance<typeof console.warn> | null = null;
+
+const RAW_FEED_ERROR = 'Could not fetch a valid release JSON from the remote';
+
+/**
+ * Mounts the real UI and runs one update check. By default it is the silent startup check the
+ * composition root performs (`background: true`); `background: false` is a user-initiated check.
+ */
 async function startApp(
   configure: (service: RecordingUpdateService) => void,
   gatewayOptions: FakeGatewayOptions = {},
+  background = true,
 ): Promise<World> {
+  warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
   const service = new RecordingUpdateService();
   configure(service);
   const session = new FakeSessionEvents();
@@ -74,7 +85,7 @@ async function startApp(
   render(<App controller={launcher} updater={updater} locale="en" />);
   await waitFor(() => expect(launcher.getState().status).toBe('ready'));
   await act(async () => {
-    await updater.check();
+    await updater.check({ background });
   });
   return { service, launcher, updater, session, user };
 }
@@ -91,7 +102,11 @@ const feature = await loadFrontendFeature('auto-update');
 
 describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
   // Steps are separate tests: the DOM must survive between them, so clean up per scenario.
-  AfterEachScenario(cleanup);
+  AfterEachScenario(() => {
+    cleanup();
+    warnSpy?.mockRestore();
+    warnSpy = null;
+  });
 
   Scenario('Find and install a newer version', ({ Given, And, When, Then }) => {
     let configure: (service: RecordingUpdateService) => void = () => {};
@@ -182,9 +197,13 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
 
     When('I check for updates', async () => {
-      world = await startApp((service) => {
-        service.checkResult = release('1.9.0', '1.10.0');
-      });
+      world = await startApp(
+        (service) => {
+          service.checkResult = release('1.9.0', '1.10.0');
+        },
+        {},
+        false,
+      );
     });
 
     Then('the older release is not offered for installation', () => {
@@ -208,8 +227,9 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       });
     });
 
-    Then('I see a recoverable notice', async () => {
-      expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach the update server');
+    Then('no update banner is shown', () => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(banner()).not.toBeInTheDocument();
     });
 
     And('I can still use library, profiles and settings', async () => {
@@ -224,6 +244,55 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     And('no restart is requested', () => {
       expect(world.service.restartCalls).toBe(0);
       expect(world.service.downloadCalls).toBe(0);
+    });
+  });
+
+  Scenario('Stay silent when the update feed is not published', ({ Given, When, Then, And }) => {
+    let world: World;
+
+    Given('the feed query fails because the release JSON cannot be fetched', () => {
+      // The update service rejects the feed query: configured in the When step.
+    });
+
+    When('the app starts', async () => {
+      world = await startApp((service) => {
+        service.checkError = { kind: 'network', message: RAW_FEED_ERROR };
+      });
+    });
+
+    Then('no update banner is shown', () => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.queryByText(RAW_FEED_ERROR, { exact: false })).not.toBeInTheDocument();
+      expect(world.updater.getState().kind).toBe('none');
+    });
+
+    And('the failure is only logged to the console', () => {
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(String(warnSpy?.mock.calls[0]?.join(' '))).toContain(RAW_FEED_ERROR);
+    });
+  });
+
+  Scenario('Show only the translated message when the user checks for updates', ({ Given, When, Then, And }) => {
+    Given('the feed query fails due to the network', () => {
+      // The update service rejects the feed query: configured in the When step.
+    });
+
+    When('I check for updates', async () => {
+      await startApp(
+        (service) => {
+          service.checkError = { kind: 'network', message: RAW_FEED_ERROR };
+        },
+        {},
+        false,
+      );
+    });
+
+    Then('I see the translated network error', async () => {
+      expect(await screen.findByRole('alert')).toHaveTextContent('Could not reach the update server');
+    });
+
+    And('the raw error text from the updater is not shown', () => {
+      expect(screen.queryByText(RAW_FEED_ERROR, { exact: false })).not.toBeInTheDocument();
     });
   });
 
@@ -269,6 +338,10 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       expect(await screen.findByRole('alert')).toHaveTextContent('could not be installed');
       expect(world.updater.getState().kind).toBe('error');
       expect(screen.queryByRole('progressbar')).not.toBeInTheDocument();
+    });
+
+    And('the raw error text from the updater is not shown', () => {
+      expect(screen.queryByText('disk full', { exact: false })).not.toBeInTheDocument();
     });
 
     And('no restart is requested', () => {

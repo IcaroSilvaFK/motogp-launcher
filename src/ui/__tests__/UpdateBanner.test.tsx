@@ -67,7 +67,7 @@ describe('UpdateBanner', () => {
   it('update_error_is_accessible', async () => {
     const { onUpdate } = renderBanner({ kind: 'error', info, error: { kind: 'network', message: 'offline' } });
     const alert = screen.getByRole('alert');
-    expect(alert).toHaveTextContent('offline');
+    expect(alert).not.toHaveTextContent('offline');
     expect(alert).toHaveTextContent('Could not reach the update server');
     expect(screen.getByText(/1\.2\.0/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole('button', { name: 'Update' }));
@@ -75,7 +75,7 @@ describe('UpdateBanner', () => {
     cleanup();
     for (const kind of ['signature', 'install', 'session', 'busy', 'unknown'] as const) {
       renderBanner({ kind: 'error', info: null, error: { kind, message: `m-${kind}` } });
-      expect(screen.getByRole('alert')).toHaveTextContent(`m-${kind}`);
+      expect(screen.getByRole('alert')).not.toHaveTextContent(`m-${kind}`);
       expect(screen.queryByRole('button', { name: 'Update' })).not.toBeInTheDocument();
       cleanup();
     }
