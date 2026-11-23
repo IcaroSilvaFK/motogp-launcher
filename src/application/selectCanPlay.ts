@@ -7,4 +7,5 @@ export const selectCanPlay: SelectCanPlay = (state) =>
   !state.busy &&
   state.session.kind !== 'unavailable' &&
   state.session.kind !== 'starting' &&
-  state.session.kind !== 'running';
+  state.session.kind !== 'running' &&
+  state.staleSession === null;

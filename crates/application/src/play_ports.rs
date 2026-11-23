@@ -1,6 +1,8 @@
 //! Ports and narrow collaborator traits of the Play orchestrator. No Tauri,
 //! threads or fs here: the interface and infrastructure implement them.
-use crate::{AppError, DeployError, DeployMod, PlayError, SessionError, TrackOutcome};
+use crate::{
+    AppError, DeployError, DeployMod, DeploySession, PlayError, SessionError, TrackOutcome,
+};
 use motogp_domain::{GameInfo, WatchEvent};
 use std::path::Path;
 
@@ -98,6 +100,16 @@ pub trait Deployer: Send + Sync {
     fn clean(&self, mods_dir: &Path) -> Result<usize, DeployError>;
     /// `true` when the manifest tracks nothing.
     fn is_clean(&self) -> Result<bool, DeployError>;
+    /// Read-only: how the manifest relates to the authorized `~mods`.
+    fn session(&self, authorized_mods_dir: &Path) -> Result<DeploySession, DeployError>;
+    /// Drops a manifest of a previous game install without touching files.
+    fn forget_stale_session(&self, authorized_mods_dir: &Path) -> Result<(), DeployError>;
+    /// Cleans the previous install's `~mods` after the user confirmed it.
+    fn clean_stale_session(
+        &self,
+        authorized_mods_dir: &Path,
+        confirmed: &Path,
+    ) -> Result<usize, DeployError>;
 }
 
 /// Opens the game and follows its process.

@@ -68,6 +68,19 @@ export const en: Messages = {
     language: 'Language',
     languageNames: { 'pt-BR': 'Português (Brasil)', en: 'English' },
   },
+  staleSession: {
+    regionLabel: 'Old session pending',
+    title: 'A previous game folder still has launcher files',
+    description: (tracked) =>
+      `The launcher deployed ${tracked} ${plural(tracked, 'file', 'files')} into a game folder that is no longer configured. Play stays disabled until you resolve this.`,
+    folderLabel: 'Old folder:',
+    forget: 'Forget the old session',
+    clean: 'Clean the old folder',
+    confirmPrompt:
+      'Clean this folder? Only files the launcher deployed are removed; anything else in it stays untouched.',
+    confirm: 'Confirm',
+    cancel: 'Cancel',
+  },
   notices: {
     imported: (count) => `${count} ${plural(count, 'mod', 'mods')} imported`,
     modRemoved: 'Mod removed',
@@ -75,6 +88,8 @@ export const en: Messages = {
     profileSaved: 'Profile saved',
     recovered: (cleaned) => `Recovered from a previous session; ${cleaned} files removed`,
     gameRunning: 'The game is already running',
+    staleForgotten: 'Old session forgotten',
+    staleCleaned: (cleaned) => `Old folder cleaned; ${cleaned} ${plural(cleaned, 'file', 'files')} removed`,
   },
   errors: {
     read_failed: 'Could not read the launcher data.',
@@ -106,6 +121,7 @@ export const en: Messages = {
     deploy_invalid_path: 'Invalid path while deploying mods.',
     deploy_unauthorized_directory: 'The launcher is not allowed to use this directory.',
     deploy_cleanup_incomplete: 'Cleanup did not remove every deployed file.',
+    deploy_session_not_stale: 'This is the current mods folder; it cannot be forgotten.',
     session_error: 'The game session failed.',
     session_subscription_failed: 'Session events are unavailable.',
     recovery_failed: 'Recovery of a previous session failed.',

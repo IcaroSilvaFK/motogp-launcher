@@ -68,6 +68,19 @@ export const ptBR: Messages = {
     language: 'Idioma',
     languageNames: { 'pt-BR': 'Português (Brasil)', en: 'English' },
   },
+  staleSession: {
+    regionLabel: 'Sessão antiga pendente',
+    title: 'Uma pasta de jogo anterior ainda tem arquivos do launcher',
+    description: (tracked) =>
+      `O launcher implantou ${tracked} ${plural(tracked, 'arquivo', 'arquivos')} em uma pasta de jogo que não está mais configurada. O botão Jogar fica desativado até você resolver isso.`,
+    folderLabel: 'Pasta antiga:',
+    forget: 'Esquecer a sessão antiga',
+    clean: 'Limpar a pasta antiga',
+    confirmPrompt:
+      'Limpar esta pasta? Somente os arquivos que o launcher implantou serão removidos; todo o resto continua intacto.',
+    confirm: 'Confirmar',
+    cancel: 'Cancelar',
+  },
   notices: {
     imported: (count) => `${count} ${plural(count, 'mod importado', 'mods importados')}`,
     modRemoved: 'Mod removido',
@@ -75,6 +88,9 @@ export const ptBR: Messages = {
     profileSaved: 'Perfil salvo',
     recovered: (cleaned) => `Recuperado de uma sessão anterior; ${cleaned} arquivos removidos`,
     gameRunning: 'O jogo já está em execução',
+    staleForgotten: 'Sessão antiga esquecida',
+    staleCleaned: (cleaned) =>
+      `Pasta antiga limpa; ${cleaned} ${plural(cleaned, 'arquivo removido', 'arquivos removidos')}`,
   },
   errors: {
     read_failed: 'Não foi possível ler os dados do launcher.',
@@ -106,6 +122,7 @@ export const ptBR: Messages = {
     deploy_invalid_path: 'Caminho inválido ao implantar os mods.',
     deploy_unauthorized_directory: 'O launcher não tem permissão para usar este diretório.',
     deploy_cleanup_incomplete: 'A limpeza não removeu todos os arquivos implantados.',
+    deploy_session_not_stale: 'Esta é a pasta de mods atual; ela não pode ser esquecida.',
     session_error: 'A sessão do jogo falhou.',
     session_subscription_failed: 'Os eventos da sessão estão indisponíveis.',
     recovery_failed: 'A recuperação de uma sessão anterior falhou.',

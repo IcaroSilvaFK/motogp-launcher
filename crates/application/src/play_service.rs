@@ -3,7 +3,7 @@
 //! the domain it delegates to.
 use crate::ProcessInspector;
 use crate::{
-    AppError, BackgroundRunner, DeployError, DeployFiles, DeployMod, DeployService,
+    AppError, BackgroundRunner, DeployError, DeployFiles, DeployMod, DeployService, DeploySession,
     DeployedRepository, Deployer, ModPlanner, PlayError, PlayGame, RecoveryState, RecoveryStatus,
     SessionClock, SessionError, SessionEvent, SessionLock, SessionPublisher, SessionRuntime,
     SessionService, SessionState, TrackOutcome, UrlOpener,
@@ -165,6 +165,47 @@ impl PlayService {
     /// the events (a startup failure stays here).
     pub fn recovery_status(&self) -> RecoveryStatus {
         relock(&self.0.status).clone()
+    }
+
+    /// Read-only: how the manifest relates to the configured game install.
+    pub fn deploy_session(&self) -> Result<DeploySession, PlayError> {
+        let game = self.0.game.configured_game()?;
+        Ok(self.0.deployer.session(&game.mods_dir)?)
+    }
+
+    /// Recovery: drops a manifest of a previous game install without touching
+    /// any file. Refused while a game or session is active.
+    pub fn forget_stale_session(&self) -> Result<(), PlayError> {
+        self.recover_stale(|deployer, mods_dir| deployer.forget_stale_session(mods_dir).map(|()| 0))
+            .map(|_| ())
+    }
+
+    /// Recovery: cleans the folder of a previous game install, only if
+    /// `confirmed` is exactly the folder the manifest records. Returns the
+    /// number of files removed. Refused while a game or session is active.
+    pub fn clean_stale_session(&self, confirmed: &Path) -> Result<usize, PlayError> {
+        self.recover_stale(|deployer, mods_dir| deployer.clean_stale_session(mods_dir, confirmed))
+    }
+
+    fn recover_stale(
+        &self,
+        action: impl FnOnce(&dyn Deployer, &Path) -> Result<usize, DeployError>,
+    ) -> Result<usize, PlayError> {
+        let inner = &self.0;
+        if matches!(*relock(&inner.recovery), Recovery::GameRunning) {
+            return Err(PlayError::GameStillRunning);
+        }
+        let _guard = LockGuard::acquire(inner).ok_or(PlayError::AlreadyRunning)?;
+        let game = inner.game.configured_game()?;
+        let cleaned = action(inner.deployer.as_ref(), &game.mods_dir)?;
+        // The manifest is empty now: nothing is pending, so Play is allowed.
+        let mut recovery = relock(&inner.recovery);
+        if matches!(*recovery, Recovery::Blocked) {
+            *recovery = Recovery::Ready;
+            drop(recovery);
+            inner.set_status(RecoveryState::Recovered, None, cleaned);
+        }
+        Ok(cleaned)
     }
 
     /// Validates, deploys, opens the game and tracks the session in the
@@ -396,6 +437,22 @@ where
 
     fn is_clean(&self) -> Result<bool, DeployError> {
         DeployService::is_clean(self)
+    }
+
+    fn session(&self, authorized_mods_dir: &Path) -> Result<DeploySession, DeployError> {
+        DeployService::session(self, authorized_mods_dir)
+    }
+
+    fn forget_stale_session(&self, authorized_mods_dir: &Path) -> Result<(), DeployError> {
+        DeployService::forget_stale_session(self, authorized_mods_dir)
+    }
+
+    fn clean_stale_session(
+        &self,
+        authorized_mods_dir: &Path,
+        confirmed: &Path,
+    ) -> Result<usize, DeployError> {
+        DeployService::clean_stale_session(self, authorized_mods_dir, confirmed)
     }
 }
 

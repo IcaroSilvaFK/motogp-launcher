@@ -1,6 +1,7 @@
 import type {
   CommandError,
   Config,
+  DeploySession,
   GameInfo,
   ModEntry,
   Profile,
@@ -30,7 +31,19 @@ function modNameFromPath(path: string): string {
   return dot > 0 ? file.slice(0, dot) : file;
 }
 
+/** A deploy manifest left by a previous session. */
+export interface FakeManifest {
+  /** The `~mods` folder the manifest points to. */
+  mods_dir: string;
+  /** Number of files the manifest tracks. */
+  tracked: number;
+  /** The folder no longer exists on disk. */
+  vanished?: boolean;
+}
+
 export interface FakeGatewayOptions {
+  /** Starts with this manifest: current when `mods_dir` equals the game's, stale otherwise. */
+  manifest?: FakeManifest;
   config?: Config;
   game?: GameInfo | null;
   mods?: ModEntry[];
@@ -55,6 +68,8 @@ export class FakeGateway implements LauncherGateway {
   recovery: RecoveryStatus;
   /** `~mods` file names "deployed" by play; stays empty when play is refused. */
   deployed: string[] = [];
+  /** The persisted deploy manifest; `null` when there is none. */
+  manifest: FakeManifest | null;
 
   private readonly failures = new Map<string, CommandError>();
   private readonly options: FakeGatewayOptions;
@@ -69,6 +84,7 @@ export class FakeGateway implements LauncherGateway {
     this.mods = options.mods ? [...options.mods] : [];
     this.profiles = options.profiles ? [...options.profiles] : [{ id: VANILLA_ID, name: 'Vanilla', mod_ids: [] }];
     this.detected = options.detected ?? [];
+    this.manifest = options.manifest ? { ...options.manifest } : null;
     this.recovery = options.recovery ?? { state: 'not-run', error: null, cleaned_count: 0 };
   }
 
@@ -197,12 +213,54 @@ export class FakeGateway implements LauncherGateway {
           message: 'game App ID not found; open the game from Steam once',
         } satisfies CommandError;
       }
+      if (this.manifestState() === 'stale') {
+        throw { code: 'recovery_pending', message: 'a stale session is pending' } satisfies CommandError;
+      }
       this.requireProfile(profileId);
     });
   }
 
   recoveryStatus(): Promise<RecoveryStatus> {
     return this.run('recoveryStatus', [], () => ({ ...this.recovery }));
+  }
+
+  deploySession(): Promise<DeploySession> {
+    return this.run('deploySession', [], () => {
+      const state = this.manifestState();
+      return { state, mods_dir: this.manifest?.mods_dir ?? null, tracked: this.manifest?.tracked ?? 0 };
+    });
+  }
+
+  forgetStaleSession(): Promise<void> {
+    return this.run('forgetStaleSession', [], () => {
+      this.requireStale();
+      this.manifest = null;
+    });
+  }
+
+  cleanStaleSession(confirmedDir: string): Promise<number> {
+    return this.run('cleanStaleSession', [confirmedDir], () => {
+      const manifest = this.requireStale();
+      if (confirmedDir !== manifest.mods_dir) {
+        throw { code: 'deploy_unauthorized_directory', message: 'folder mismatch' } satisfies CommandError;
+      }
+      this.manifest = null;
+      return manifest.tracked;
+    });
+  }
+
+  /** Classifies the manifest against the current game, like the backend does. */
+  manifestState(): DeploySession['state'] {
+    if (!this.manifest) return 'none';
+    if (this.manifest.vanished) return 'vanished';
+    return this.game && this.manifest.mods_dir === this.game.mods_dir ? 'current' : 'stale';
+  }
+
+  private requireStale(): FakeManifest {
+    if (this.manifestState() !== 'stale' || !this.manifest) {
+      throw { code: 'deploy_session_not_stale', message: 'no stale session' } satisfies CommandError;
+    }
+    return this.manifest;
   }
 
   private requireProfile(id: string): Profile {

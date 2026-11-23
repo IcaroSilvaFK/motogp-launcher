@@ -6,7 +6,7 @@
 //! deploys, profiles, settings) is `async`: the blocking use case runs on the
 //! blocking pool, never on the main thread, and mutations are serialized
 //! through `AppState::write_lock` so they cannot lose each other's updates.
-use crate::dto::{ConfigDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto};
+use crate::dto::{ConfigDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto};
 use crate::{AppState, CommandError};
 use motogp_application::{import_mods as import_batch, remove_mod as remove_everywhere};
 use std::path::{Path, PathBuf};
@@ -153,6 +153,31 @@ pub fn recovery_status(state: State<'_, AppState>) -> RecoveryStatusDto {
     state.play.recovery_status().into()
 }
 
+/// How the deployment manifest relates to the current game install.
+#[tauri::command]
+pub fn deploy_session(state: State<'_, AppState>) -> CommandResult<DeploySessionDto> {
+    Ok(state.play.deploy_session()?.into())
+}
+
+/// Recovery: drops the manifest of a previous game install (no file is touched).
+#[tauri::command]
+pub async fn forget_stale_session(state: State<'_, AppState>) -> CommandResult<()> {
+    mutate(state, |state| Ok(state.play.forget_stale_session()?)).await
+}
+
+/// Recovery: cleans the previous install's `~mods`; `confirmed_dir` must be the
+/// folder the interface showed. Returns the number of files removed.
+#[tauri::command]
+pub async fn clean_stale_session(
+    state: State<'_, AppState>,
+    confirmed_dir: String,
+) -> CommandResult<usize> {
+    mutate(state, move |state| {
+        Ok(state.play.clean_stale_session(Path::new(&confirmed_dir))?)
+    })
+    .await
+}
+
 /// Registers every command on the builder; shared by the real app and the
 /// contract tests.
 pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
@@ -171,6 +196,9 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         set_profile_mods,
         set_active_profile,
         play,
-        recovery_status
+        recovery_status,
+        deploy_session,
+        forget_stale_session,
+        clean_stale_session
     ])
 }

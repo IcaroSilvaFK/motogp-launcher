@@ -1,6 +1,8 @@
 //! IPC data transfer objects. Fields are snake_case on the wire; the
 //! JS-side command arguments are camelCase (handled by `#[tauri::command]`).
-use motogp_application::{RecoveryState, RecoveryStatus, SessionEvent, SessionState};
+use motogp_application::{
+    DeploySession, RecoveryState, RecoveryStatus, SessionEvent, SessionState,
+};
 use motogp_domain::{Config, GameInfo, ModEntry, Profile};
 use serde::Serialize;
 
@@ -124,5 +126,79 @@ impl From<RecoveryStatus> for RecoveryStatusDto {
             error: status.error,
             cleaned_count: status.cleaned_count,
         }
+    }
+}
+
+/// Result of `deploy_session`: `state` is `none`, `current`, `stale` or
+/// `vanished`. `mods_dir` is the folder the manifest records, only for
+/// `stale` and `vanished`; `tracked` counts the files and pending entries of
+/// `current` and `stale` (0 otherwise).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DeploySessionDto {
+    pub state: &'static str,
+    pub mods_dir: Option<String>,
+    pub tracked: usize,
+}
+
+impl From<DeploySession> for DeploySessionDto {
+    fn from(session: DeploySession) -> Self {
+        let dir = |p: std::path::PathBuf| Some(p.to_string_lossy().into_owned());
+        match session {
+            DeploySession::None => DeploySessionDto {
+                state: "none",
+                mods_dir: None,
+                tracked: 0,
+            },
+            DeploySession::Current { tracked } => DeploySessionDto {
+                state: "current",
+                mods_dir: None,
+                tracked,
+            },
+            DeploySession::Stale { mods_dir, tracked } => DeploySessionDto {
+                state: "stale",
+                mods_dir: dir(mods_dir),
+                tracked,
+            },
+            DeploySession::Vanished { mods_dir } => DeploySessionDto {
+                state: "vanished",
+                mods_dir: dir(mods_dir),
+                tracked: 0,
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn dto(session: DeploySession) -> serde_json::Value {
+        serde_json::to_value(DeploySessionDto::from(session)).unwrap()
+    }
+
+    #[test]
+    fn deploy_session_dto_maps_every_state_to_snake_case_fields() {
+        assert_eq!(
+            dto(DeploySession::None),
+            serde_json::json!({ "state": "none", "mods_dir": null, "tracked": 0 })
+        );
+        assert_eq!(
+            dto(DeploySession::Current { tracked: 3 }),
+            serde_json::json!({ "state": "current", "mods_dir": null, "tracked": 3 })
+        );
+        assert_eq!(
+            dto(DeploySession::Stale {
+                mods_dir: PathBuf::from("old/~mods"),
+                tracked: 2
+            }),
+            serde_json::json!({ "state": "stale", "mods_dir": "old/~mods", "tracked": 2 })
+        );
+        assert_eq!(
+            dto(DeploySession::Vanished {
+                mods_dir: PathBuf::from("old/~mods")
+            }),
+            serde_json::json!({ "state": "vanished", "mods_dir": "old/~mods", "tracked": 0 })
+        );
     }
 }

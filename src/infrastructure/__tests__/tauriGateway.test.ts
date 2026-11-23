@@ -18,6 +18,9 @@ const CASES: [keyof LauncherGateway, unknown[], string, Record<string, unknown> 
   ['setActiveProfile', ['p1'], 'set_active_profile', { id: 'p1' }],
   ['play', ['p1'], 'play', { profileId: 'p1' }],
   ['recoveryStatus', [], 'recovery_status', undefined],
+  ['deploySession', [], 'deploy_session', undefined],
+  ['forgetStaleSession', [], 'forget_stale_session', undefined],
+  ['cleanStaleSession', ['D:/old/~mods'], 'clean_stale_session', { confirmedDir: 'D:/old/~mods' }],
 ];
 
 describe('Given the Tauri gateway', () => {
