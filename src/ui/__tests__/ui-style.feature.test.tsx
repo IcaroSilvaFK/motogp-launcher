@@ -59,6 +59,13 @@ function launch(patch: Partial<LauncherState> = {}) {
 
 const nav = () => within(screen.getByRole('navigation', { name: 'Main navigation' }));
 const statusBar = () => screen.getByRole('contentinfo');
+const sidebar = () => screen.getByRole('complementary');
+const sidebarToggle = () => within(sidebar()).getByRole('button', { name: /sidebar$/ });
+
+function expectCollapsed(collapsed: boolean) {
+  expect(sidebar()).toHaveAttribute('data-collapsed', String(collapsed));
+  expect(sidebarToggle()).toHaveAttribute('aria-expanded', String(!collapsed));
+}
 const libraryRows = () => within(screen.getByRole('list', { name: 'Library' })).getAllByRole('listitem');
 const facet = (name: RegExp) => within(screen.getByRole('group', { name: 'Filter' })).getByRole('button', { name });
 
@@ -102,7 +109,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       const bar = within(statusBar());
       expect(bar.getByLabelText('Active profile')).toHaveValue('vanilla');
       expect(bar.getByRole('button', { name: 'Play' })).toBeInTheDocument();
-      expect(within(screen.getByRole('banner')).queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
+      expect(within(sidebar()).queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
     });
     And('the "Play" button is styled as the primary button', () => {
       const play = screen.getByRole('button', { name: 'Play' });
@@ -133,18 +140,29 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
   });
 
-  Scenario('Top navigation marks the current screen', ({ Given, When, Then, And }) => {
+  Scenario('The sidebar navigation marks the current screen', ({ Given, When, Then, And }) => {
     Given('the launcher open on the Library', () => {
       launch();
       expect(nav().getByRole('button', { name: 'Library' })).toHaveAttribute('aria-current', 'page');
     });
-    Then('the main navigation sits in the top bar with one tab per screen', () => {
-      const topNav = within(screen.getByRole('banner')).getByRole('navigation', { name: 'Main navigation' });
+    Then('the main navigation sits in a left sidebar with one item per screen', () => {
+      const aside = sidebar();
+      expect(aside.tagName).toBe('ASIDE');
+      expect(aside).toHaveClass('sidebar');
+      const sideNav = within(aside).getByRole('navigation', { name: 'Main navigation' });
       expect(
-        within(topNav)
+        within(sideNav)
           .getAllByRole('button')
-          .map((tab) => tab.textContent),
+          .map((item) => item.textContent),
       ).toEqual(['Library', 'Profiles', 'Settings']);
+      // The single page h1 (the app name) lives in the sidebar brand.
+      expect(within(aside).getByRole('heading', { level: 1, name: 'MotoGP Launcher' })).toBeInTheDocument();
+      expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
+    });
+    And('there is no top tab bar', () => {
+      expect(screen.queryByRole('banner')).not.toBeInTheDocument();
+      expect(document.querySelector('.topbar, .top-nav, .nav-tab')).toBeNull();
+      expect(screen.getAllByRole('navigation', { name: 'Main navigation' })).toHaveLength(1);
     });
     When('I select Settings in the navigation', async () => {
       await user.click(nav().getByRole('button', { name: 'Settings' }));
@@ -154,6 +172,71 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
     And('the Library item is no longer marked', () => {
       expect(nav().getByRole('button', { name: 'Library' })).not.toHaveAttribute('aria-current');
+    });
+  });
+
+  Scenario('Collapse the sidebar to icons only', ({ Given, When, Then, And }) => {
+    Given('the launcher open on the Library with the sidebar expanded', () => {
+      launch();
+      expectCollapsed(false);
+    });
+    Then('the sidebar toggle is named "Collapse sidebar" and reports it is expanded', () => {
+      const toggle = within(sidebar()).getByRole('button', { name: 'Collapse sidebar' });
+      expect(toggle).toHaveAttribute('type', 'button');
+      expect(toggle).toHaveAttribute('aria-expanded', 'true');
+      expect(toggle).toHaveAttribute('title', 'Collapse sidebar');
+      const navId = screen.getByRole('navigation', { name: 'Main navigation' }).id;
+      expect(navId).not.toBe('');
+      expect(toggle).toHaveAttribute('aria-controls', navId);
+    });
+    When('I activate the sidebar toggle', async () => {
+      await user.click(sidebarToggle());
+    });
+    Then('the sidebar is collapsed', () => {
+      expectCollapsed(true);
+    });
+    And('the toggle is named "Expand sidebar" and reports it is collapsed', () => {
+      const toggle = within(sidebar()).getByRole('button', { name: 'Expand sidebar' });
+      expect(toggle).toHaveAttribute('aria-expanded', 'false');
+      expect(toggle).toHaveAttribute('title', 'Expand sidebar');
+    });
+    And('every navigation item keeps its accessible name and shows it as a tooltip', () => {
+      for (const name of ['Library', 'Profiles', 'Settings']) {
+        expect(nav().getByRole('button', { name })).toHaveAttribute('title', name);
+      }
+      // The h1 stays in the DOM (visually hidden) so the page keeps its single h1.
+      expect(screen.getByRole('heading', { level: 1, name: 'MotoGP Launcher' })).toHaveClass('visually-hidden');
+    });
+    When('I select Profiles in the navigation', async () => {
+      await user.click(nav().getByRole('button', { name: 'Profiles' }));
+    });
+    Then('the Profiles item is marked as the current page', () => {
+      expect(nav().getByRole('button', { name: 'Profiles' })).toHaveAttribute('aria-current', 'page');
+      expect(screen.getByRole('heading', { level: 2, name: 'Profiles' })).toBeInTheDocument();
+      expectCollapsed(true);
+    });
+  });
+
+  Scenario('The sidebar toggle works from the keyboard', ({ Given, When, Then }) => {
+    Given('the launcher open on the Library with the sidebar expanded', () => {
+      launch();
+      expectCollapsed(false);
+    });
+    When('I focus the sidebar toggle and press Enter', async () => {
+      sidebarToggle().focus();
+      expect(sidebarToggle()).toHaveFocus();
+      await user.keyboard('{Enter}');
+    });
+    Then('the sidebar is collapsed', () => {
+      expectCollapsed(true);
+      expect(sidebarToggle()).toHaveFocus();
+    });
+    When('I press Space', async () => {
+      await user.keyboard(' ');
+    });
+    Then('the sidebar is expanded', () => {
+      expectCollapsed(false);
+      expect(sidebarToggle()).toHaveFocus();
     });
   });
 

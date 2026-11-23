@@ -9,6 +9,8 @@ export interface Messages {
     library: string;
     profiles: string;
     settings: string;
+    collapse: string;
+    expand: string;
   };
   activeProfile: {
     label: string;

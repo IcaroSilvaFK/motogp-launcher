@@ -11,6 +11,8 @@ export const en: Messages = {
     library: 'Library',
     profiles: 'Profiles',
     settings: 'Settings',
+    collapse: 'Collapse sidebar',
+    expand: 'Expand sidebar',
   },
   activeProfile: {
     label: 'Active profile',

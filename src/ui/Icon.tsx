@@ -56,6 +56,8 @@ const GLYPHS = {
   filter: <path d="M3.5 5h13l-5 6v4.5l-3-1.5v-3z" />,
   up: <path d="M5.5 12.5L10 8l4.5 4.5" />,
   down: <path d="M5.5 7.5L10 12l4.5-4.5" />,
+  'chevron-left': <path d="M12.5 5.5L8 10l4.5 4.5" />,
+  'chevron-right': <path d="M7.5 5.5L12 10l-4.5 4.5" />,
   plus: <path d="M10 4.5v11M4.5 10h11" />,
   check: <path d="M4.5 10.5l3.5 3.5 7.5-8" />,
   info: (

@@ -11,6 +11,7 @@ import {
 } from './application';
 import {
   createLocalStorageLocaleStore,
+  createLocalStorageNavStore,
   createTauriAppInfo,
   createTauriDropEvents,
   createTauriGateway,
@@ -50,6 +51,7 @@ createRoot(container).render(
       onLocaleChange={(locale) => saveLocale(localeStore, locale)}
       updater={updater}
       appInfo={createTauriAppInfo()}
+      navStore={createLocalStorageNavStore()}
     />
   </StrictMode>,
 );

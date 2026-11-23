@@ -17,12 +17,30 @@ Feature: Polished dark launcher interface
     When I click "Set up game" in the status bar
     Then the Settings item is marked as the current page
 
-  Scenario: Top navigation marks the current screen
+  Scenario: The sidebar navigation marks the current screen
     Given the launcher open on the Library
-    Then the main navigation sits in the top bar with one tab per screen
+    Then the main navigation sits in a left sidebar with one item per screen
+    And there is no top tab bar
     When I select Settings in the navigation
     Then the Settings item is marked as the current page
     And the Library item is no longer marked
+
+  Scenario: Collapse the sidebar to icons only
+    Given the launcher open on the Library with the sidebar expanded
+    Then the sidebar toggle is named "Collapse sidebar" and reports it is expanded
+    When I activate the sidebar toggle
+    Then the sidebar is collapsed
+    And the toggle is named "Expand sidebar" and reports it is collapsed
+    And every navigation item keeps its accessible name and shows it as a tooltip
+    When I select Profiles in the navigation
+    Then the Profiles item is marked as the current page
+
+  Scenario: The sidebar toggle works from the keyboard
+    Given the launcher open on the Library with the sidebar expanded
+    When I focus the sidebar toggle and press Enter
+    Then the sidebar is collapsed
+    When I press Space
+    Then the sidebar is expanded
 
   Scenario: Every screen has one visible title and a live subtitle
     Given mods A and B in the library and only A in the active profile

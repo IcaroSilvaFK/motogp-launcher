@@ -13,7 +13,7 @@ Rules:
 - Dark only (`color-scheme: dark`; `index.html` sets the same body background as `--bg` to avoid a flash).
 - Colors, spacing, radii, type sizes, motion and the shell dimensions are tokens in the `:root` block; rules reference them. Only component-local sizes (hairlines, 2px indicator bars, tile and icon sizes, column minimums) are written in place.
 - No `clip-path`, no italic or uppercase display type, radii between 4px and 8px (enforced by the style feature test).
-- **One accent, used sparingly:** a warm racing red (`--accent`) fills only **Play** (and the update action inside its banner). It also draws the current-tab underline, the current facet/section/profile bar, the brand mark and icon tiles (`--accent-text`). A screen's own main action (Import on the empty library, Save in the profile editor) uses the accent **outline** (`btn-accent-outline`) so it never competes with Play.
+- **One accent, used sparingly:** a warm racing red (`--accent`) fills only **Play** (and the update action inside its banner). It also draws the current nav item bar, the current facet/section/profile bar, the brand mark and icon tiles (`--accent-text`). A screen's own main action (Import on the empty library, Save in the profile editor) uses the accent **outline** (`btn-accent-outline`) so it never competes with Play.
 - Destructive actions are outline buttons with danger text, never filled. In dense lists (library rows) they stay neutral until the row is hovered or the button is focused.
 - Minimum supported window is **900x600** (`src-tauri/tauri.conf.json`). Every screen fits without horizontal scroll: a 208px rail, a fluid content column capped at 1180px, ellipsis on long names.
 - `prefers-reduced-motion: reduce` disables every animation and transition (pulse dots, skeletons, hovers).
@@ -21,18 +21,21 @@ Rules:
 The domain has no mod category, version or per-mod enabled flag. "Enabled" means "in the active profile's `mod_ids`". Since #54 each library row has a **switch** bound to that: turning it on or off calls `controller.toggleModInActiveProfile(id)`, which saves the active profile (new mods go last in the load order) and sets no success notice (the row is the feedback; a failure shows the usual error notice). The facet counts, the subtitle and the current facet's list follow from the reloaded profiles. Search and facets filter on the client as UI-local state (`LibraryScreen`).
 
 - 2026-11-23 (issue #54): the row switch replaced the read-only profile badge in the same slot. It is a `<button role="switch" aria-checked>` named "Include <mod> in <profile>", with the state written next to it ("In active profile" / "Not in active profile"; the text sits outside the button so the accessible name stays short and label-in-name is not broken). When it cannot be used it gets `aria-disabled="true"` (not `disabled`, so it stays focusable and its `title` tooltip works in WebView2), a `title`, and `aria-describedby` pointing to one visible hint above the list: locked while a session is starting or running (`selectProfileLocked`), Vanilla active, or no active profile. While the controller is busy it is inert without a hint. The checked track uses `--running` (the same green as the running dot), not the accent, so the accent stays reserved for Play.
+- 2026-11-23 (issue #60): the main navigation moved from the top tab bar back to a **left sidebar** that collapses to icons only. The top bar row is gone; the status bar stays full width at the bottom. The choice is remembered (`NavPreferenceStore`, localStorage key `motogp-launcher.sidebar-collapsed`, `"true"`/`"false"`); without a store, or when it fails, the sidebar starts expanded. No auto-collapse on narrow windows: the toggle would then report a state the user did not choose, so the expanded sidebar (200px) is sized to fit the 900px minimum window with the 208px rail.
 
 ## Layout
 
 ```
-┌ topbar (48px): brand ─────── [Library] [Profiles] [Settings] ───────────────┐
-│ app-messages: stale-session notice, error/success notice, update banner     │
-│ main (scrolls): page head (h2 title + live subtitle, toolbar actions)       │
-│                 rail (208px) │ content                                       │
+┌ sidebar ──────┬ app-messages: stale-session notice, error/success notice, banner ┐
+│ ■ brand (h1)  │ main (scrolls): page head (h2 title + live subtitle, actions)    │
+│ ▌Library      │                 rail (208px) │ content                           │
+│  Profiles     │                                                                  │
+│  Settings     │                                                                  │
+│  ‹ Collapse   │                                                                  │
 └ statusbar (60px): game tile + name + store │ session status │ profile ▾ PLAY ┘
 ```
 
-- **Top bar** (`<header>`, role banner): brand (`<h1>`) and the main navigation (`TopNav`, `<nav aria-label={t.nav.label}>`), icon + label tabs with `aria-current="page"` and a 2px accent underline.
+- **Sidebar** (`Sidebar`, `<aside class="sidebar" data-collapsed>`, role complementary; 200px, 56px collapsed, full height above the status bar): brand (mark + `<h1>`), the main navigation (`<nav aria-label={t.nav.label}>`, one `nav-item` button per screen: 18px icon + label, `aria-current="page"`, `--surface-2` fill and a 2px accent bar on the left edge) and, pinned at the bottom, the **collapse toggle** (`sidebar-toggle`, a native button with `aria-expanded`, `aria-controls` = the nav id, chevron left/right, name and tooltip "Collapse sidebar" / "Expand sidebar"). Collapsed: icons only; the labels and the h1 stay in the DOM with `visually-hidden` (so names and the single h1 survive) and each item gets its label as `title`. Icons keep the same x position in both states (`--sidebar-inset`). The width animates with `--transition` (off under reduced motion). Focus rings are drawn inset because the sidebar clips its overflow.
 - **Status bar** (`StatusBar`, `<footer>`, role contentinfo), always visible:
   - left: game tile, game name (tooltip = root folder) and a `Steam` store badge when an App ID exists; without a game, "No game selected" plus a **Set up game** link-button that opens Settings; then the launcher version (`statusbar-version`, `v0.1.0`, 12px muted caption after a 1px hairline, tooltip "Launcher version"). The caption is not rendered while the version is unknown or could not be read (issue #53);
   - middle: `SessionStatus` (`role="status"`, announced) or, when nothing is happening and Play is possible, a plain "Ready to play" line (not announced);
@@ -42,7 +45,7 @@ The domain has no mod category, version or per-mod enabled flag. "Enabled" means
 - **Profiles:** rail with "Your profiles" (each row: name button with `aria-pressed`, mod count, `Active` badge) and the "New profile" form; content shows the editor (rename, mods checklist and load order side by side, Save) or an empty state asking to pick a profile.
 - **Settings:** section nav (`<nav aria-label="Settings sections">`, anchor links with `aria-current="location"`) + sections of **cards of rows** (`setting-row`: label + help text on the left, control on the right). Game: folder row (Detect games, Choose folder…), the current game details, detected games. Preferences: Language. About (always last, `AboutSection`): a "Launcher version" row (value on the right, "Unknown" muted when it cannot be read) and, only when an updater exists, an "Updates" row with a small outlined **Check for updates** button.
 - **Manual update check (Settings > About, issue #53):** user-initiated (`updater.check()` without `background`). While it runs the button is disabled and reads "Checking…". The result sits under the row in a polite live region (`role="status"`): "The launcher is up to date." with a green check glyph (only after a user check in this app session, because a failed silent startup check also ends in `none`; the flag lives in `AppInfoContext` so it survives leaving Settings), "Version X is available" (semibold) plus **Install update** (`btn btn-sm btn-accent-outline`: Play keeps the only fill; disabled with the session hint as its `aria-describedby` while a session is not clean), the downloading / restarting lines, or the translated `t.update.errors[kind]` in danger text (never the raw message). The update banner keeps its own behaviour; both read the same controller state.
-- **Notices and banners** sit between the top bar and the content, aligned to the content column.
+- **Notices and banners** sit at the top of the content column, aligned to the content column.
 - **Loading:** while `status === 'loading'`, `<main aria-busy="true">` shows "Loading…" and skeleton rows instead of a screen, so no empty state flashes.
 
 ## Tokens (`:root` in `styles.css`)
@@ -50,7 +53,7 @@ The domain has no mod category, version or per-mod enabled flag. "Enabled" means
 | Token                                         | Value                             | Purpose                                                |
 | --------------------------------------------- | --------------------------------- | ------------------------------------------------------ |
 | `--bg`                                        | `#0f1115`                         | Page background, inputs, inset lists                   |
-| `--surface-1`                                 | `#15181d`                         | Top bar, status bar, cards, panels, mod list           |
+| `--surface-1`                                 | `#15181d`                         | Sidebar, status bar, cards, panels, mod list           |
 | `--surface-2`                                 | `#1b1f25`                         | Hover, current facet/section                           |
 | `--surface-3`                                 | `#232830`                         | Button hover, tiles, selected profile, counts          |
 | `--border` / `--border-strong`                | `#262b33` / `#363c46`             | Separators / control and button borders                |
@@ -64,7 +67,8 @@ The domain has no mod category, version or per-mod enabled flag. "Enabled" means
 | `--info/success/warning/error-bg/fg/border`   | see file                          | Banners and badges                                     |
 | `--running`                                   | `#3ddc84`                         | Running / ready dot                                    |
 | `--space-1..6`                                | 4, 8, 12, 16, 24, 32px            | Spacing (4/8px grid)                                   |
-| `--topbar-height` / `--statusbar-height`      | 48px / 60px                       | Shell rows                                             |
+| `--sidebar-width` / `--sidebar-width-collapsed` | 200px / 56px                    | Sidebar column, expanded / collapsed                   |
+| `--sidebar-item-height` / `--statusbar-height` | 36px / 60px                     | Nav item and brand row / status bar row                |
 | `--rail-width` / `--content-max`              | 208px / 1180px                    | Rail column / content cap                              |
 | `--control-height(-sm)` / `--play-height`     | 32px (28px) / 40px                | Inputs and buttons / Play                              |
 | `--radius-sm/md/lg`                           | 4px / 6px / 8px                   | Corner radii                                           |
@@ -87,7 +91,7 @@ Banner pairs (`--*-fg` on `--*-bg`, all above 10) and the danger text on the sur
 
 ## Components
 
-- Shell: `app-shell`, `topbar`, `brand`, `top-nav`, `nav-tab`, `app-messages`, `statusbar` (`statusbar-game`, `game-tile`, `statusbar-game-name`, `statusbar-version`, `statusbar-message`, `statusbar-idle`, `statusbar-actions`), `profile-field`.
+- Shell: `app-shell`, `app-content`, `sidebar` (`data-collapsed`), `brand`, `side-nav`, `nav-item`, `nav-label`, `sidebar-toggle`, `app-messages`, `statusbar` (`statusbar-game`, `game-tile`, `statusbar-game-name`, `statusbar-version`, `statusbar-message`, `statusbar-idle`, `statusbar-actions`), `profile-field`.
 - Page: `page`, `page-head`, `page-heading`, `page-subtitle`, `page-actions`, `split`/`library-layout`, `split-rail`, `split-main`, `rail-title`, `panel`.
 - Buttons: `btn` (small outlined secondary), `btn-primary` (Play, update), `btn-accent-outline` (a screen's main action), `btn-ghost`, `btn-danger` (outline), `btn-sm`, `btn-icon`, `btn-link`; Play is `btn btn-primary play`.
 - Forms: `input`, `field` (inline label), `form-field` (stacked label, input), `form-row`, `section-title`, `hint`.
@@ -97,11 +101,11 @@ Banner pairs (`--*-fg` on `--*-bg`, all above 10) and the danger text on the sur
 - Badges: `badge badge-on|badge-off|badge-store`.
 - Switch: `toggle` (switch + state label), `switch` (`role="switch"`, `aria-checked`, `aria-disabled`; the button is a 32x24 hit target drawing a 28x16 track with `::before`), `switch-thumb`, `toggle-label` (+ `toggle-label-on`), `toggle-hint` (the visible reason the switches are unavailable). Off: `--surface-3` track, `--border-strong` border, `--text-muted` thumb. On: `--running` track, `--bg` thumb. Unavailable: 0.45 opacity, `not-allowed` cursor.
 - States: `empty-state` (+ `empty-state-compact`, `empty-icon`, `empty-title`), `loading-state`, `skeleton-list`, `skeleton-row`, `skeleton`; `session-status session-status-<kind>`, `notice notice-info|success|warning|error`, `banner banner-info|error` (update banner), `banner-icon`.
-- Icons: `Icon` (`icon`, `nav-icon`, `search-icon`), names: library, profiles, settings, search, import, play, game, folder, refresh, language, filter, up, down, plus, check (up-to-date result), info (About section).
+- Icons: `Icon` (`icon`, `nav-icon`, `search-icon`), names: library, profiles, settings, search, import, play, game, folder, refresh, language, filter, up, down, chevron-left, chevron-right (sidebar toggle), plus, check (up-to-date result), info (About section).
 
 ## Focus
 
-Every interactive element gets a `:focus-visible` outline using `--focus-ring` (tabs draw it inset so the top bar does not clip it). The style feature test checks that every `:focus-visible` rule uses the token and that no rule removes an outline without painting a replacement.
+Every interactive element gets a `:focus-visible` outline using `--focus-ring` (sidebar items draw it inset so the sidebar does not clip it). The style feature test checks that every `:focus-visible` rule uses the token and that no rule removes an outline without painting a replacement.
 
 ## Follow-ups (need application or infrastructure work)
 
