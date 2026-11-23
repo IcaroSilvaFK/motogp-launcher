@@ -15,7 +15,9 @@ export type Notice =
   | { kind: 'game-configured'; name: string }
   | { kind: 'profile-saved' }
   | { kind: 'recovered'; cleaned: number }
-  | { kind: 'game-running' };
+  | { kind: 'game-running' }
+  | { kind: 'stale-forgotten' }
+  | { kind: 'stale-cleaned'; cleaned: number };
 
 export interface LauncherState {
   status: 'loading' | 'ready';
@@ -28,6 +30,8 @@ export interface LauncherState {
   busy: boolean;
   session: SessionPhase;
   recovery: RecoveryStatus | null;
+  /** Set when the deploy manifest points to another game install and needs the user's decision. */
+  staleSession: { modsDir: string; tracked: number } | null;
   error: CommandError | null;
   notice: Notice | null;
 }
@@ -54,6 +58,10 @@ export interface LauncherController {
   deleteProfile(id: string): Promise<void>;
   setProfileMods(id: string, modIds: string[]): Promise<void>;
   setActiveProfile(id: string): Promise<void>;
+  /** Drops the stale manifest without touching files; no-op without a stale session. */
+  forgetStaleSession(): Promise<void>;
+  /** Cleans the stale folder, confirming the folder shown in the notice; no-op without a stale session. */
+  cleanStaleSession(): Promise<void>;
   play(): Promise<void>;
   dismissError(): void;
   dismissNotice(): void;

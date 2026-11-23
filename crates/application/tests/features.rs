@@ -22,6 +22,8 @@ mod profiles;
 mod session_tracking;
 #[path = "bdd/stale_manifest.rs"]
 mod stale_manifest;
+#[path = "bdd/stale_session_recovery.rs"]
+mod stale_session_recovery;
 
 #[path = "support/config_fakes.rs"]
 pub mod config_fakes;
@@ -44,6 +46,9 @@ const FEATURES: &[(&str, Runner)] = &[
         Box::pin(commands_and_recovery::run())
     }),
     ("stale-manifest", || Box::pin(stale_manifest::run())),
+    ("stale-session-recovery", || {
+        Box::pin(stale_session_recovery::run())
+    }),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

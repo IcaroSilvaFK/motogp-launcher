@@ -66,6 +66,17 @@ export interface Messages {
     language: string;
     languageNames: Record<Locale, string>;
   };
+  staleSession: {
+    regionLabel: string;
+    title: string;
+    description: (tracked: number) => string;
+    folderLabel: string;
+    forget: string;
+    clean: string;
+    confirmPrompt: string;
+    confirm: string;
+    cancel: string;
+  };
   notices: {
     imported: (count: number) => string;
     modRemoved: string;
@@ -73,6 +84,8 @@ export interface Messages {
     profileSaved: string;
     recovered: (cleaned: number) => string;
     gameRunning: string;
+    staleForgotten: string;
+    staleCleaned: (cleaned: number) => string;
   };
   errors: Record<ErrorCode, string>;
 }

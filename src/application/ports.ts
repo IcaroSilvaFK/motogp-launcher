@@ -1,5 +1,6 @@
 import type {
   Config,
+  DeploySession,
   GameInfo,
   Locale,
   ModEntry,
@@ -28,6 +29,10 @@ export interface LauncherGateway {
   setActiveProfile(id: string): Promise<void>;
   play(profileId: string): Promise<void>;
   recoveryStatus(): Promise<RecoveryStatus>;
+  deploySession(): Promise<DeploySession>;
+  forgetStaleSession(): Promise<void>;
+  /** Cleans the stale folder; `confirmedDir` must equal the manifest's folder. Resolves with the files removed. */
+  cleanStaleSession(confirmedDir: string): Promise<number>;
 }
 
 /** `null` means the user cancelled the dialog. */

@@ -2,6 +2,7 @@ import type { Notice } from '../application';
 import { useI18n } from './i18n';
 import type { Messages } from './i18n';
 import { useLauncher } from './LauncherContext';
+import { StaleSessionNotice } from './StaleSessionNotice';
 
 function noticeText(t: Messages, notice: Notice): string {
   switch (notice.kind) {
@@ -17,6 +18,10 @@ function noticeText(t: Messages, notice: Notice): string {
       return t.notices.recovered(notice.cleaned);
     case 'game-running':
       return t.notices.gameRunning;
+    case 'stale-forgotten':
+      return t.notices.staleForgotten;
+    case 'stale-cleaned':
+      return t.notices.staleCleaned(notice.cleaned);
   }
 }
 
@@ -27,6 +32,7 @@ export function NoticeBar() {
 
   return (
     <div className="notices">
+      <StaleSessionNotice />
       {error !== null && (
         <div role="alert" className="notice notice-error">
           <p>
