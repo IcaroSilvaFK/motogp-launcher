@@ -27,6 +27,8 @@ mod profile_service;
 mod session_error;
 mod session_ports;
 mod session_service;
+mod storage_ports;
+mod storage_service;
 
 pub use config_service::ConfigService;
 pub use deploy_error::DeployError;
@@ -56,3 +58,5 @@ pub use profile_service::{ProfileService, ProfileServiceError};
 pub use session_error::SessionError;
 pub use session_ports::{ProcessInspector, SessionClock, TrackOutcome, UrlOpener, POLL};
 pub use session_service::SessionService;
+pub use storage_ports::{FolderOpener, ScannedEntry, StorageScanner};
+pub use storage_service::StorageService;

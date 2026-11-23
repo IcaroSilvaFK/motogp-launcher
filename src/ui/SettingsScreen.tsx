@@ -6,12 +6,14 @@ import type { IconName } from './Icon';
 import { LOCALES, useI18n } from './i18n';
 import type { Locale } from './i18n';
 import { useLauncher } from './LauncherContext';
+import { StorageSection } from './StorageSection';
 
-type SectionId = 'game' | 'preferences' | 'about';
+type SectionId = 'game' | 'preferences' | 'storage' | 'about';
 
 const SECTIONS: readonly { id: SectionId; icon: IconName }[] = [
   { id: 'game', icon: 'game' },
   { id: 'preferences', icon: 'language' },
+  { id: 'storage', icon: 'storage' },
   { id: 'about', icon: 'info' },
 ];
 
@@ -23,6 +25,7 @@ export function SettingsScreen() {
   const sectionTitle: Record<SectionId, string> = {
     game: t.settings.game,
     preferences: t.settings.preferences,
+    storage: t.storage.title,
     about: t.about.title,
   };
 
@@ -152,6 +155,8 @@ export function SettingsScreen() {
               </div>
             </div>
           </section>
+
+          <StorageSection />
 
           <AboutSection />
         </div>

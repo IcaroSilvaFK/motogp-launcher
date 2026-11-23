@@ -22,6 +22,15 @@ const initialState: LauncherState = {
   notice: null,
 };
 
+/** Calls the gateway without touching the state; any rejection becomes a CommandError for the caller. */
+async function passThrough<T>(call: () => Promise<T>): Promise<T> {
+  try {
+    return await call();
+  } catch (caught) {
+    throw toCommandError(caught);
+  }
+}
+
 /** Framework-free observable store holding the launcher state and its use cases. */
 export function createLauncherController(deps: LauncherDeps): LauncherController {
   const { gateway, picker, session, drop } = deps;
@@ -276,6 +285,8 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         set({ session: { kind: 'idle' }, error: toCommandError(caught) });
       }
     },
+    getStorageUsage: () => passThrough(() => gateway.getStorageUsage()),
+    openDataFolder: () => passThrough(() => gateway.openDataFolder()),
     dismissError() {
       set({ error: null });
     },

@@ -24,6 +24,8 @@ mod session_tracking;
 mod stale_manifest;
 #[path = "bdd/stale_session_recovery.rs"]
 mod stale_session_recovery;
+#[path = "bdd/storage.rs"]
+mod storage;
 
 #[path = "support/config_fakes.rs"]
 pub mod config_fakes;
@@ -46,6 +48,7 @@ const FEATURES: &[(&str, Runner)] = &[
         Box::pin(commands_and_recovery::run())
     }),
     ("stale-manifest", || Box::pin(stale_manifest::run())),
+    ("storage", || Box::pin(storage::run())),
     ("stale-session-recovery", || {
         Box::pin(stale_session_recovery::run())
     }),

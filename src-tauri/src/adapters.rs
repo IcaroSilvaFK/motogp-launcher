@@ -1,7 +1,8 @@
 //! Tauri adapters of the application ports: event publishing and the Steam
 //! opener. They are the only code that touches `AppHandle`.
 use crate::dto::{SessionErrorDto, SessionEventDto};
-use motogp_application::{AppError, SessionEvent, SessionPublisher, UrlOpener};
+use motogp_application::{AppError, FolderOpener, SessionEvent, SessionPublisher, UrlOpener};
+use std::path::Path;
 use tauri::{AppHandle, Emitter, Runtime};
 use tauri_plugin_opener::OpenerExt;
 
@@ -71,6 +72,30 @@ impl<R: Runtime> UrlOpener for TauriOpener<R> {
             .open_url(url, None::<&str>)
             .map_err(|error| AppError::Read {
                 location: url.to_string(),
+                detail: error.to_string(),
+            })
+    }
+}
+
+/// `FolderOpener` backed by the Tauri opener plugin. It opens a path from
+/// Rust, so the frontend capability stays limited to `steam://` URLs.
+pub struct TauriFolderOpener<R: Runtime> {
+    handle: AppHandle<R>,
+}
+
+impl<R: Runtime> TauriFolderOpener<R> {
+    pub fn new(handle: AppHandle<R>) -> Self {
+        Self { handle }
+    }
+}
+
+impl<R: Runtime> FolderOpener for TauriFolderOpener<R> {
+    fn open_folder(&self, path: &Path) -> Result<(), AppError> {
+        self.handle
+            .opener()
+            .open_path(path.to_string_lossy(), None::<&str>)
+            .map_err(|error| AppError::Read {
+                location: path.display().to_string(),
                 detail: error.to_string(),
             })
     }

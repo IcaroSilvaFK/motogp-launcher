@@ -54,6 +54,20 @@ export interface RecoveryStatus {
   cleaned_count: number;
 }
 
+/** Storage categories of the launcher data folder, in their fixed display order. */
+export const STORAGE_CATEGORIES = ['mods', 'launcher_data', 'other'] as const;
+
+export type StorageCategory = (typeof STORAGE_CATEGORIES)[number];
+
+/** Disk usage of the launcher data folder (camelCase: mapped from the backend DTO by the gateway). */
+export interface StorageUsage {
+  root: string;
+  totalBytes: number;
+  /** `null` when the free space of the drive could not be read. */
+  freeBytes: number | null;
+  categories: { category: StorageCategory; bytes: number }[];
+}
+
 export const BACKEND_ERROR_CODES = [
   'read_failed',
   'write_failed',

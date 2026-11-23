@@ -3,7 +3,7 @@
 use motogp_application::{
     DeploySession, RecoveryState, RecoveryStatus, SessionEvent, SessionState,
 };
-use motogp_domain::{Config, GameInfo, ModEntry, Profile};
+use motogp_domain::{Config, GameInfo, ModEntry, Profile, StorageCategory, StorageUsage};
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -168,6 +168,46 @@ impl From<DeploySession> for DeploySessionDto {
     }
 }
 
+/// One row of the storage breakdown; `category` is `mods`, `launcher_data`
+/// or `other`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct StorageCategoryDto {
+    pub category: &'static str,
+    pub bytes: u64,
+}
+
+/// Result of `get_storage_usage`. Every category is present, in the fixed
+/// order `mods`, `launcher_data`, `other`; `free_bytes` is null when unknown.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct StorageUsageDto {
+    pub root: String,
+    pub total_bytes: u64,
+    pub free_bytes: Option<u64>,
+    pub categories: Vec<StorageCategoryDto>,
+}
+
+impl From<StorageUsage> for StorageUsageDto {
+    fn from(usage: StorageUsage) -> Self {
+        StorageUsageDto {
+            total_bytes: usage.total_bytes(),
+            root: usage.root.to_string_lossy().into_owned(),
+            free_bytes: usage.free_bytes,
+            categories: usage
+                .categories
+                .iter()
+                .map(|(category, bytes)| StorageCategoryDto {
+                    category: match category {
+                        StorageCategory::Mods => "mods",
+                        StorageCategory::LauncherData => "launcher_data",
+                        StorageCategory::Other => "other",
+                    },
+                    bytes: *bytes,
+                })
+                .collect(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -199,6 +239,29 @@ mod tests {
                 mods_dir: PathBuf::from("old/~mods")
             }),
             serde_json::json!({ "state": "vanished", "mods_dir": "old/~mods", "tracked": 0 })
+        );
+    }
+
+    #[test]
+    fn storage_usage_dto_keeps_the_category_order_and_snake_case_fields() {
+        use motogp_domain::{StorageCategory, StorageUsage};
+        let usage = StorageUsage::from_entries(
+            PathBuf::from("data"),
+            [(StorageCategory::Other, 5), (StorageCategory::Mods, 300)],
+            None,
+        );
+        assert_eq!(
+            serde_json::to_value(StorageUsageDto::from(usage)).unwrap(),
+            serde_json::json!({
+                "root": "data",
+                "total_bytes": 305,
+                "free_bytes": null,
+                "categories": [
+                    { "category": "mods", "bytes": 300 },
+                    { "category": "launcher_data", "bytes": 0 },
+                    { "category": "other", "bytes": 5 }
+                ]
+            })
         );
     }
 }

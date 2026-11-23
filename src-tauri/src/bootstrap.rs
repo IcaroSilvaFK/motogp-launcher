@@ -2,7 +2,7 @@
 //! `scripts/check-rust-coverage.mjs` and `docs/validation-workflow.md`): it
 //! only runs with a real window and WebView2; everything it wires is tested
 //! through `compose`, `commands`, `adapters` and `startup`.
-use crate::adapters::{TauriEvents, TauriOpener};
+use crate::adapters::{TauriEvents, TauriFolderOpener, TauriOpener};
 use crate::{compose, configure, run_recovery};
 use motogp_application::{InstanceGuard, InstanceLock};
 use motogp_infrastructure::{
@@ -53,6 +53,7 @@ pub fn run() {
             &data,
             steam_libraries(),
             TauriOpener::new(handle.clone()),
+            Arc::new(TauriFolderOpener::new(handle.clone())),
             SysinfoProcesses::default(),
             Arc::new(TauriEvents::new(handle)),
             Arc::new(ThreadRunner),

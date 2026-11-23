@@ -21,6 +21,7 @@ const CASES: [keyof LauncherGateway, unknown[], string, Record<string, unknown> 
   ['deploySession', [], 'deploy_session', undefined],
   ['forgetStaleSession', [], 'forget_stale_session', undefined],
   ['cleanStaleSession', ['D:/old/~mods'], 'clean_stale_session', { confirmedDir: 'D:/old/~mods' }],
+  ['openDataFolder', [], 'open_data_folder', undefined],
 ];
 
 describe('Given the Tauri gateway', () => {
@@ -50,6 +51,37 @@ describe('Given the Tauri gateway', () => {
     await expect(createTauriGateway(invoke).play('p1')).rejects.toEqual({
       code: 'unknown',
       message: 'boom',
+    });
+  });
+
+  it('When the storage usage is requested Then get_storage_usage is invoked and the DTO is mapped to camelCase', async () => {
+    // An accented Windows profile folder on purpose: real users have them and the path must pass through as is.
+    const root = 'C:\\Users\\Usuário Padrão\\AppData\\Roaming\\motogp-launcher';
+    const categories = [
+      { category: 'mods', bytes: 1000 },
+      { category: 'launcher_data', bytes: 30 },
+      { category: 'other', bytes: 5 },
+    ];
+    const invoke = vi.fn().mockResolvedValue({ root, total_bytes: 1035, free_bytes: null, categories });
+    await expect(createTauriGateway(invoke).getStorageUsage()).resolves.toEqual({
+      root,
+      totalBytes: 1035,
+      freeBytes: null,
+      categories,
+    });
+    expect(invoke.mock.calls[0]).toEqual(['get_storage_usage']);
+  });
+
+  it('When the backend reports the free space Then it is kept as a number', async () => {
+    const invoke = vi.fn().mockResolvedValue({ root: 'C:/d', total_bytes: 0, free_bytes: 4096, categories: [] });
+    await expect(createTauriGateway(invoke).getStorageUsage()).resolves.toMatchObject({ freeBytes: 4096 });
+  });
+
+  it('When get_storage_usage rejects Then the error is normalized', async () => {
+    const invoke = vi.fn().mockRejectedValue({ code: 'read_failed', message: 'denied' });
+    await expect(createTauriGateway(invoke).getStorageUsage()).rejects.toEqual({
+      code: 'read_failed',
+      message: 'denied',
     });
   });
 });

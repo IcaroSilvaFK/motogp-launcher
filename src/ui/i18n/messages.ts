@@ -1,4 +1,4 @@
-import type { ErrorCode, Locale, UpdateErrorKind } from '../../domain';
+import type { ErrorCode, Locale, StorageCategory, UpdateErrorKind } from '../../domain';
 
 export interface Messages {
   appName: string;
@@ -95,6 +95,23 @@ export interface Messages {
     subtitle: string;
     sectionsLabel: string;
     folderTitle: string;
+  };
+  storage: {
+    title: string;
+    folderLabel: string;
+    folderHint: string;
+    openFolder: string;
+    openFailed: string;
+    totalUsed: string;
+    freeSpace: string;
+    unavailable: string;
+    refresh: string;
+    measuring: string;
+    breakdownLabel: string;
+    categories: Record<StorageCategory, string>;
+    categoryHints: Record<StorageCategory, string>;
+    measureFailed: string;
+    retry: string;
   };
   statusBar: {
     steam: string;

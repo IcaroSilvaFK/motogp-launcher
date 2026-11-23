@@ -1,4 +1,4 @@
-import type { CommandError, Config, GameInfo, ModEntry, Profile, RecoveryStatus } from '../domain';
+import type { CommandError, Config, GameInfo, ModEntry, Profile, RecoveryStatus, StorageUsage } from '../domain';
 import type { DropEvents, FilePicker, LauncherGateway, SessionEvents, Unsubscribe } from './ports';
 
 export type SessionPhase =
@@ -68,6 +68,13 @@ export interface LauncherController {
   /** Cleans the stale folder, confirming the folder shown in the notice; no-op without a stale session. */
   cleanStaleSession(): Promise<void>;
   play(): Promise<void>;
+  /**
+   * Measures the launcher data folder. A plain pass-through: no state change, no global error;
+   * rejects with a CommandError so the caller shows the failure inline.
+   */
+  getStorageUsage(): Promise<StorageUsage>;
+  /** Opens the launcher data folder; rejects with a CommandError, no global error. */
+  openDataFolder(): Promise<void>;
   dismissError(): void;
   dismissNotice(): void;
 }
