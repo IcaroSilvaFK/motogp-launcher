@@ -8,7 +8,20 @@ import { describe, expect, it } from 'vitest';
 const here = dirname(fileURLToPath(import.meta.url));
 const fixtures = join(here, '..', '..', 'tests', 'fixtures', 'boundaries');
 
-async function lint(fixture: string) {
+// ESLint with the boundaries plugin is slow to start, so each fixture is linted once and shared.
+const TEST_TIMEOUT_MS = 30_000;
+const cache = new Map<string, ReturnType<typeof runLint>>();
+
+function lint(fixture: string) {
+  let pending = cache.get(fixture);
+  if (!pending) {
+    pending = runLint(fixture);
+    cache.set(fixture, pending);
+  }
+  return pending;
+}
+
+async function runLint(fixture: string) {
   const cwd = join(fixtures, fixture);
   const eslint = new ESLint({ cwd, overrideConfigFile: join(cwd, 'eslint.config.mjs') });
   const results = await eslint.lintFiles(['src']);
@@ -17,7 +30,7 @@ async function lint(fixture: string) {
   );
 }
 
-describe('frontend architecture (eslint-plugin-boundaries)', () => {
+describe('frontend architecture (eslint-plugin-boundaries)', { timeout: TEST_TIMEOUT_MS }, () => {
   it('rejects_ui_importing_infrastructure', async () => {
     const messages = await lint('violations');
     const uiToInfra = messages.filter(
