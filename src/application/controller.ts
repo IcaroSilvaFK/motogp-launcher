@@ -58,6 +58,11 @@ export interface LauncherController {
   deleteProfile(id: string): Promise<void>;
   setProfileMods(id: string, modIds: string[]): Promise<void>;
   setActiveProfile(id: string): Promise<void>;
+  /**
+   * Adds the mod to (or removes it from) the active profile, silently (no notice). No-op without an
+   * active profile, on Vanilla, or while a session is starting or running.
+   */
+  toggleModInActiveProfile(modId: string): Promise<void>;
   /** Drops the stale manifest without touching files; no-op without a stale session. */
   forgetStaleSession(): Promise<void>;
   /** Cleans the stale folder, confirming the folder shown in the notice; no-op without a stale session. */

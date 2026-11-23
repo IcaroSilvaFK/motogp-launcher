@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { selectProfileLocked } from '../application';
+import { isVanilla } from '../domain';
 import { Icon } from './Icon';
 import { formatSize, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
@@ -49,6 +51,16 @@ export function LibraryScreen() {
       mod.name.toLocaleLowerCase().includes(query) &&
       (facet === 'all' || (facet === 'in') === activeModIds.has(mod.id)),
   );
+
+  // Why the row switches cannot be used right now (null when they can, or only while busy).
+  const toggleBlocker = selectProfileLocked(state)
+    ? t.library.toggleLocked
+    : !activeProfile
+      ? t.library.toggleNoProfile
+      : isVanilla(activeProfile)
+        ? t.library.toggleVanilla
+        : null;
+  const toggleInert = toggleBlocker !== null || state.busy;
 
   const clearFilters = () => {
     setSearch('');
@@ -140,39 +152,64 @@ export function LibraryScreen() {
               </button>
             </div>
           ) : (
-            <ul className="mod-list" aria-labelledby="library-title">
-              {visible.map((mod) => {
-                const enabled = activeModIds.has(mod.id);
-                return (
-                  <li key={mod.id} className="mod-row">
-                    <span className="mod-tile" aria-hidden="true">
-                      {mod.name.trim().charAt(0).toLocaleUpperCase()}
-                    </span>
-                    <div className="mod-main">
-                      <span className="mod-name" title={mod.name}>
-                        {mod.name}
+            <>
+              {toggleBlocker !== null && (
+                <p id="library-toggle-hint" className="hint toggle-hint">
+                  {toggleBlocker}
+                </p>
+              )}
+              <ul className="mod-list" aria-labelledby="library-title">
+                {visible.map((mod) => {
+                  const enabled = activeModIds.has(mod.id);
+                  return (
+                    <li key={mod.id} className="mod-row">
+                      <span className="mod-tile" aria-hidden="true">
+                        {mod.name.trim().charAt(0).toLocaleUpperCase()}
                       </span>
-                      <span className="mod-meta">
-                        <span className="num">{formatSize(mod.size_bytes, locale)}</span>
-                        <span className="dot" aria-hidden="true" />
-                        <span className="num">{t.library.files(mod.files.length)}</span>
+                      <div className="mod-main">
+                        <span className="mod-name" title={mod.name}>
+                          {mod.name}
+                        </span>
+                        <span className="mod-meta">
+                          <span className="num">{formatSize(mod.size_bytes, locale)}</span>
+                          <span className="dot" aria-hidden="true" />
+                          <span className="num">{t.library.files(mod.files.length)}</span>
+                        </span>
+                      </div>
+                      <span className="toggle">
+                        {/* aria-disabled (not disabled) keeps it focusable so the tooltip and hint still reach the user. */}
+                        <button
+                          type="button"
+                          role="switch"
+                          className="switch"
+                          aria-checked={enabled}
+                          aria-label={t.library.toggleNamed(mod.name, activeProfile?.name ?? null)}
+                          aria-disabled={toggleInert || undefined}
+                          aria-describedby={toggleBlocker === null ? undefined : 'library-toggle-hint'}
+                          title={toggleBlocker ?? undefined}
+                          onClick={() => {
+                            if (!toggleInert) void controller.toggleModInActiveProfile(mod.id);
+                          }}
+                        >
+                          <span className="switch-thumb" aria-hidden="true" />
+                        </button>
+                        <span className={enabled ? 'toggle-label toggle-label-on' : 'toggle-label'}>
+                          {enabled ? t.library.inActiveProfile : t.library.notInActiveProfile}
+                        </span>
                       </span>
-                    </div>
-                    <span className={enabled ? 'badge badge-on' : 'badge badge-off'}>
-                      {enabled ? t.library.inActiveProfile : t.library.notInActiveProfile}
-                    </span>
-                    <button
-                      type="button"
-                      className="btn btn-danger btn-sm"
-                      aria-label={t.library.removeNamed(mod.name)}
-                      onClick={() => void controller.removeMod(mod.id)}
-                    >
-                      {t.library.remove}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        aria-label={t.library.removeNamed(mod.name)}
+                        onClick={() => void controller.removeMod(mod.id)}
+                      >
+                        {t.library.remove}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </div>
       </div>

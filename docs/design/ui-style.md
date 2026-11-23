@@ -18,7 +18,9 @@ Rules:
 - Minimum supported window is **900x600** (`src-tauri/tauri.conf.json`). Every screen fits without horizontal scroll: a 208px rail, a fluid content column capped at 1180px, ellipsis on long names.
 - `prefers-reduced-motion: reduce` disables every animation and transition (pulse dots, skeletons, hovers).
 
-The domain has no mod category, version or per-mod enabled flag. The "In active profile" / "Not in active profile" badge and facet are a presentation-only read of the active profile's `mod_ids`. Search and facets filter on the client as UI-local state (`LibraryScreen`); the application layer is untouched.
+The domain has no mod category, version or per-mod enabled flag. "Enabled" means "in the active profile's `mod_ids`". Since #54 each library row has a **switch** bound to that: turning it on or off calls `controller.toggleModInActiveProfile(id)`, which saves the active profile (new mods go last in the load order) and sets no success notice (the row is the feedback; a failure shows the usual error notice). The facet counts, the subtitle and the current facet's list follow from the reloaded profiles. Search and facets filter on the client as UI-local state (`LibraryScreen`).
+
+- 2026-11-23 (issue #54): the row switch replaced the read-only profile badge in the same slot. It is a `<button role="switch" aria-checked>` named "Include <mod> in <profile>", with the state written next to it ("In active profile" / "Not in active profile"; the text sits outside the button so the accessible name stays short and label-in-name is not broken). When it cannot be used it gets `aria-disabled="true"` (not `disabled`, so it stays focusable and its `title` tooltip works in WebView2), a `title`, and `aria-describedby` pointing to one visible hint above the list: locked while a session is starting or running (`selectProfileLocked`), Vanilla active, or no active profile. While the controller is busy it is inert without a hint. The checked track uses `--running` (the same green as the running dot), not the accent, so the accent stays reserved for Play.
 
 ## Layout
 
@@ -36,7 +38,7 @@ The domain has no mod category, version or per-mod enabled flag. The "In active 
   - middle: `SessionStatus` (`role="status"`, announced) or, when nothing is happening and Play is possible, a plain "Ready to play" line (not announced);
   - right: the active-profile select (`#active-profile`, visible label) and **Play** (`btn btn-primary play`, 40px, filled play glyph).
 - **Page head** on every screen: one visible `<h2>` (the screen title, also the `aria-labelledby` target) and a `page-subtitle` with live counts (`2 mods · 1 in Mine`, `2 profiles · active: Mine`, a short description for Settings). Toolbar actions sit on the right.
-- **Library:** filter rail (search, `Filter` group of facet buttons with counts: All / In active profile / Not in active profile, `aria-pressed`; the drop hint as a dashed drop zone) + mod list (tile with the initial, name, size · file count, profile badge, Remove). No results shows the message with **Clear filters**.
+- **Library:** filter rail (search, `Filter` group of facet buttons with counts: All / In active profile / Not in active profile, `aria-pressed`; the drop hint as a dashed drop zone) + mod list (tile with the initial, name, size · file count, active-profile switch with its state label, Remove). No results shows the message with **Clear filters**.
 - **Profiles:** rail with "Your profiles" (each row: name button with `aria-pressed`, mod count, `Active` badge) and the "New profile" form; content shows the editor (rename, mods checklist and load order side by side, Save) or an empty state asking to pick a profile.
 - **Settings:** section nav (`<nav aria-label="Settings sections">`, anchor links with `aria-current="location"`) + sections of **cards of rows** (`setting-row`: label + help text on the left, control on the right). Game: folder row (Detect games, Choose folder…), the current game details, detected games. Preferences: Language.
 - **Notices and banners** sit between the top bar and the content, aligned to the content column.
@@ -80,7 +82,7 @@ Type scale: page title 20px semibold, section and group titles 15px semibold, bo
 - `--on-accent` on `--accent` (4.81) and `--accent-hover` (6.21): at least 4.5.
 - `--focus-ring` on `--bg` and `--surface-1`: at least 3.
 
-Banner pairs (`--*-fg` on `--*-bg`, all above 10) and the danger text on the surfaces (8.07) were checked by hand.
+Banner pairs (`--*-fg` on `--*-bg`, all above 10) and the danger text on the surfaces (8.07) were checked by hand. Row switch (#54, no new tokens): the on track `--running` against the row surfaces and the `--bg` thumb on it are far above the 3:1 non-text minimum; the off thumb `--text-muted` on the `--surface-3` track is 5.75; the state label uses `--text-muted` / `--success-fg`, already above 4.5 on the surfaces.
 
 ## Components
 
@@ -92,6 +94,7 @@ Banner pairs (`--*-fg` on `--*-bg`, all above 10) and the danger text on the sur
 - Lists: `mod-list`, `mod-row`, `mod-tile`, `mod-main`, `mod-name`, `mod-meta`, `dot`; `profile-list`, `profile-item`, `profile-select`, `profile-meta`; `check-list`, `check-row`, `order-list`, `detected-list`.
 - Settings: `section-nav`, `section-link` (`aria-current="location"`), `settings-section`, `group-title`, `card rows`, `setting-row`, `setting-row-block`, `setting-text`, `setting-label`, `setting-control`, `details`.
 - Badges: `badge badge-on|badge-off|badge-store`.
+- Switch: `toggle` (switch + state label), `switch` (`role="switch"`, `aria-checked`, `aria-disabled`; the button is a 32x24 hit target drawing a 28x16 track with `::before`), `switch-thumb`, `toggle-label` (+ `toggle-label-on`), `toggle-hint` (the visible reason the switches are unavailable). Off: `--surface-3` track, `--border-strong` border, `--text-muted` thumb. On: `--running` track, `--bg` thumb. Unavailable: 0.45 opacity, `not-allowed` cursor.
 - States: `empty-state` (+ `empty-state-compact`, `empty-icon`, `empty-title`), `loading-state`, `skeleton-list`, `skeleton-row`, `skeleton`; `session-status session-status-<kind>`, `notice notice-info|success|warning|error`, `banner banner-info|error` (update banner), `banner-icon`.
 - Icons: `Icon` (`icon`, `nav-icon`, `search-icon`), names: library, profiles, settings, search, import, play, game, folder, refresh, language, filter, up, down, plus.
 
@@ -109,4 +112,3 @@ Not implemented in #48, suggested as separate issues:
 - Library load-order view per profile (drag to reorder) and a conflicts check between mods that ship the same files.
 - Storage usage (library size, per-category bars) and an "open mods folder" action.
 - Notifications history (a popover of past notices).
-- Mod enable/disable directly from the library row (today it is edited in the profile).
