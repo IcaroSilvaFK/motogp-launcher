@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { selectCanPlay, selectSessionClean, useLauncherState } from '../application';
+import { selectSessionClean, useLauncherState } from '../application';
 import type { LauncherController, UpdateController } from '../application';
 import { I18nProvider, useI18n } from './i18n';
 import type { Locale } from './i18n';
@@ -7,10 +7,10 @@ import { LauncherContext } from './LauncherContext';
 import { LibraryScreen } from './LibraryScreen';
 import { NoticeBar } from './NoticeBar';
 import { ProfilesScreen } from './ProfilesScreen';
-import { SessionStatus } from './SessionStatus';
 import { SettingsScreen } from './SettingsScreen';
-import { Sidebar } from './Sidebar';
-import type { ScreenId } from './Sidebar';
+import { StatusBar } from './StatusBar';
+import { TopNav } from './TopNav';
+import type { ScreenId } from './TopNav';
 import { UpdateBanner } from './UpdateBanner';
 import './styles.css';
 
@@ -19,11 +19,31 @@ function UpdateSlot({ updater, installBlocked }: { updater: UpdateController; in
   return <UpdateBanner state={state} installBlocked={installBlocked} onUpdate={() => void updater.install()} />;
 }
 
+/** Placeholder rows shown while the launcher data loads, so no screen flashes its empty state. */
+function LoadingState() {
+  const { t } = useI18n();
+  return (
+    <div className="loading-state">
+      <p className="hint">{t.loading}</p>
+      <div className="skeleton-list" aria-hidden="true">
+        {[0, 1, 2, 3].map((row) => (
+          <div key={row} className="skeleton-row">
+            <span className="skeleton skeleton-tile" />
+            <span className="skeleton skeleton-line" />
+            <span className="skeleton skeleton-chip" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Shell({ controller, updater }: { controller: LauncherController; updater?: UpdateController }) {
   const { t } = useI18n();
   const state = useLauncherState(controller);
   const [screen, setScreen] = useState<ScreenId>('library');
   const value = useMemo(() => ({ controller, state }), [controller, state]);
+  const loading = state.status === 'loading';
 
   useEffect(() => {
     void controller.start();
@@ -32,38 +52,33 @@ function Shell({ controller, updater }: { controller: LauncherController; update
 
   return (
     <LauncherContext.Provider value={value}>
-      <header className="app-header">
-        <h1>{t.appName}</h1>
-        <div className="field">
-          <label htmlFor="active-profile">{t.activeProfile.label}</label>
-          <select
-            id="active-profile"
-            value={state.config.active_profile ?? ''}
-            onChange={(event) => void controller.setActiveProfile(event.target.value)}
-          >
-            {state.config.active_profile === null && <option value="" disabled />}
-            {state.profiles.map((profile) => (
-              <option key={profile.id} value={profile.id}>
-                {profile.name}
-              </option>
-            ))}
-          </select>
+      <div className="app-shell">
+        <header className="topbar">
+          <div className="brand">
+            <svg className="brand-mark" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <rect x="2" y="2" width="16" height="16" rx="4" />
+              <path d="M6 13.5l2.6-7 1.4 3.6 1.4-3.6 2.6 7" />
+            </svg>
+            <h1>{t.appName}</h1>
+          </div>
+          <TopNav current={screen} onSelect={setScreen} />
+        </header>
+        <div className="app-messages">
+          <NoticeBar />
+          {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
         </div>
-        <button type="button" className="play" disabled={!selectCanPlay(state)} onClick={() => void controller.play()}>
-          {t.play.button}
-        </button>
-        <SessionStatus />
-      </header>
-      <NoticeBar />
-      {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
-      <div className="layout">
-        <Sidebar current={screen} onSelect={setScreen} />
-        <main>
-          {state.status === 'loading' ? <p>{t.loading}</p> : null}
-          {screen === 'library' && <LibraryScreen />}
-          {screen === 'profiles' && <ProfilesScreen />}
-          {screen === 'settings' && <SettingsScreen />}
+        <main aria-busy={loading ? 'true' : undefined}>
+          {loading ? (
+            <LoadingState />
+          ) : (
+            <>
+              {screen === 'library' && <LibraryScreen />}
+              {screen === 'profiles' && <ProfilesScreen />}
+              {screen === 'settings' && <SettingsScreen />}
+            </>
+          )}
         </main>
+        <StatusBar onSetUpGame={() => setScreen('settings')} />
       </div>
     </LauncherContext.Provider>
   );

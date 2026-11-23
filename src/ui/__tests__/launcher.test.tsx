@@ -37,7 +37,8 @@ describe('Given the Settings screen', () => {
     const { user, controller } = renderApp(createFakeController({ game: fakeGame }));
     await openScreen(user, 'Settings');
 
-    expect(screen.getByText('MotoGPFake')).toBeInTheDocument();
+    // The Settings details; the status bar also names the game.
+    expect(within(screen.getByRole('main')).getByText('MotoGPFake')).toBeInTheDocument();
     expect(screen.getByText(fakeGame.mods_dir)).toBeInTheDocument();
     expect(screen.getByText('not found')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Choose folder…' }));
@@ -73,7 +74,7 @@ describe('Given the Library screen', () => {
   it('library_shows_mod_metadata: When mods exist Then I see name, size and file count and can remove', async () => {
     const { user, controller } = renderApp(createFakeController({ mods: [modA, modB] }));
 
-    const row = screen.getByText('Mod A').closest('tr') as HTMLElement;
+    const row = screen.getByText('Mod A').closest('li') as HTMLElement;
     expect(within(row).getByText('2 KB')).toBeInTheDocument();
     expect(within(row).getByText('2 files')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove Mod A' }));
