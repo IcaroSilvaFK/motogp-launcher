@@ -9,6 +9,8 @@ use std::pin::Pin;
 
 #[path = "bdd/deploy_names.rs"]
 mod deploy_names;
+#[path = "bdd/load_order.rs"]
+mod load_order;
 #[path = "bdd/mod_grouping.rs"]
 mod mod_grouping;
 #[path = "bdd/session_state.rs"]
@@ -25,6 +27,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("storage-classification", || {
         Box::pin(storage_classification::run())
     }),
+    ("load-order", || Box::pin(load_order::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

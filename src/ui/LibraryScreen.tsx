@@ -1,13 +1,51 @@
 import { useEffect, useState } from 'react';
 import { selectProfileLocked } from '../application';
-import { isVanilla } from '../domain';
+import type { FileConflict, ModEntry } from '../domain';
+import { conflictsOfMod, isVanilla, modConflictStatus } from '../domain';
 import { Icon } from './Icon';
+import type { Messages } from './i18n';
 import { formatSize, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 
 type Facet = 'all' | 'in' | 'out';
 
 const FACETS: readonly Facet[] = ['all', 'in', 'out'];
+
+/** Badge of a row whose mod shares files in the active profile's load order; null without conflicts. */
+function ConflictBadge({
+  mod,
+  conflicts,
+  nameOf,
+  t,
+}: {
+  mod: ModEntry;
+  conflicts: FileConflict[];
+  nameOf: (id: string) => string;
+  t: Messages;
+}) {
+  const status = modConflictStatus(conflicts, mod.id);
+  if (status === 'none') return null;
+  const involved = conflictsOfMod(conflicts, mod.id);
+  const unique = (ids: string[]) => [...new Set(ids)].map(nameOf);
+  let label: string;
+  let detail: string;
+  if (status === 'wins') {
+    const others = unique(involved.flatMap((conflict) => conflict.mod_ids.filter((id) => id !== mod.id)));
+    label = t.library.conflictWins;
+    detail = t.library.conflictWinsDetail(involved.length, others);
+  } else {
+    const lost = involved.filter((conflict) => conflict.winner !== mod.id);
+    label = t.library.conflictOverridden;
+    detail = t.library.conflictOverriddenDetail(lost.length, unique(lost.map((conflict) => conflict.winner)));
+  }
+  // The visible word is for sighted users; screen readers get the full sentence instead.
+  return (
+    <span className={`badge badge-conflict badge-${status === 'wins' ? 'info' : 'warning'}`} title={detail}>
+      <span aria-hidden="true">{label}</span>
+      <span className="visually-hidden">{detail}</span>
+    </span>
+  );
+}
 
 export function LibraryScreen() {
   const { t, locale } = useI18n();
@@ -61,6 +99,9 @@ export function LibraryScreen() {
         ? t.library.toggleVanilla
         : null;
   const toggleInert = toggleBlocker !== null || state.busy;
+
+  const modNames = new Map(state.mods.map((mod) => [mod.id, mod.name]));
+  const nameOf = (id: string) => modNames.get(id) ?? id;
 
   const clearFilters = () => {
     setSearch('');
@@ -176,6 +217,9 @@ export function LibraryScreen() {
                           <span className="num">{t.library.files(mod.files.length)}</span>
                         </span>
                       </div>
+                      <span className="mod-flags">
+                        <ConflictBadge mod={mod} conflicts={state.conflicts} nameOf={nameOf} t={t} />
+                      </span>
                       <span className="toggle">
                         {/* aria-disabled (not disabled) keeps it focusable so the tooltip and hint still reach the user. */}
                         <button

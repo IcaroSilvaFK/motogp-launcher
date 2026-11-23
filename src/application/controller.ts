@@ -1,4 +1,13 @@
-import type { CommandError, Config, GameInfo, ModEntry, Profile, RecoveryStatus, StorageUsage } from '../domain';
+import type {
+  CommandError,
+  Config,
+  FileConflict,
+  GameInfo,
+  ModEntry,
+  Profile,
+  RecoveryStatus,
+  StorageUsage,
+} from '../domain';
 import type { DropEvents, FilePicker, LauncherGateway, SessionEvents, Unsubscribe } from './ports';
 
 export type SessionPhase =
@@ -25,6 +34,8 @@ export interface LauncherState {
   game: GameInfo | null;
   mods: ModEntry[];
   profiles: Profile[];
+  /** Conflicts of the active profile load order; empty without an active profile or mods. */
+  conflicts: FileConflict[];
   /** `null` until detection has run. */
   detected: GameInfo[] | null;
   busy: boolean;
@@ -63,6 +74,8 @@ export interface LauncherController {
    * active profile, on Vanilla, or while a session is starting or running.
    */
   toggleModInActiveProfile(modId: string): Promise<void>;
+  /** Conflicts of an unsaved draft order; leaves state untouched and resolves `[]` on failure. */
+  previewConflicts(modIds: string[]): Promise<FileConflict[]>;
   /** Drops the stale manifest without touching files; no-op without a stale session. */
   forgetStaleSession(): Promise<void>;
   /** Cleans the stale folder, confirming the folder shown in the notice; no-op without a stale session. */

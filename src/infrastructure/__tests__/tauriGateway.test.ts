@@ -16,6 +16,7 @@ const CASES: [keyof LauncherGateway, unknown[], string, Record<string, unknown> 
   ['deleteProfile', ['p1'], 'delete_profile', { id: 'p1' }],
   ['setProfileMods', ['p1', ['m1', 'm2']], 'set_profile_mods', { id: 'p1', modIds: ['m1', 'm2'] }],
   ['setActiveProfile', ['p1'], 'set_active_profile', { id: 'p1' }],
+  ['listConflicts', [['m1', 'm2']], 'list_conflicts', { modIds: ['m1', 'm2'] }],
   ['play', ['p1'], 'play', { profileId: 'p1' }],
   ['recoveryStatus', [], 'recovery_status', undefined],
   ['deploySession', [], 'deploy_session', undefined],

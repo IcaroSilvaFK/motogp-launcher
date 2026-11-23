@@ -87,6 +87,48 @@ fn mods_are(w: &mut ProfilePersistenceWorld, a: String, b: String, c: String) {
     assert_eq!(profiles[1].mod_ids, [a, b, c]);
 }
 
+// ---------- Load order migration (issue #55) ----------
+
+#[given(expr = "a legacy profiles.json with the profile {string} listing {string}")]
+fn legacy_file(w: &mut ProfilePersistenceWorld, id: String, mods: String) {
+    let quoted: Vec<String> = mods
+        .split(',')
+        .map(|m| format!("\"{}\"", m.trim()))
+        .collect();
+    let content = format!(
+        r#"[{{"id":"{id}","name":"Old","mod_ids":[{}]}}]"#,
+        quoted.join(",")
+    );
+    fs::write(w.path(), content.as_bytes()).unwrap();
+    w.bytes_before = Some(content.into_bytes());
+}
+
+#[when("I load the profiles from the store")]
+fn load_from_store(w: &mut ProfilePersistenceWorld) {
+    w.reread = Some(w.store().load().unwrap());
+}
+
+#[then(expr = "the load order of {string} is {string}, {string}, {string}")]
+fn load_order_three(w: &mut ProfilePersistenceWorld, id: String, a: String, b: String, c: String) {
+    assert_eq!(order_of(w, &id), [a, b, c]);
+}
+
+#[then(expr = "the load order of {string} is {string}, {string}")]
+fn load_order_two(w: &mut ProfilePersistenceWorld, id: String, a: String, b: String) {
+    assert_eq!(order_of(w, &id), [a, b]);
+}
+
+fn order_of(w: &ProfilePersistenceWorld, id: &str) -> Vec<String> {
+    w.reread
+        .as_ref()
+        .expect("not loaded")
+        .iter()
+        .find(|p| p.id == id)
+        .expect("profile not found")
+        .mod_ids
+        .clone()
+}
+
 // ---------- Invalid data is never reseeded ----------
 
 #[then("I receive a corrupted data error")]

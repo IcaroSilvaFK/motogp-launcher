@@ -1,6 +1,7 @@
 import type { Messages } from './messages';
 
 const plural = (count: number, one: string, other: string) => (count === 1 ? one : other);
+const names = (list: string[]) => new Intl.ListFormat('pt-BR', { type: 'conjunction' }).format(list);
 
 export const ptBR: Messages = {
   appName: 'MotoGP Launcher',
@@ -53,6 +54,11 @@ export const ptBR: Messages = {
     toggleLocked: 'As alterações de perfil ficam bloqueadas enquanto o jogo está em execução.',
     toggleVanilla: 'O Vanilla sempre roda sem mods. Escolha outro perfil para adicionar mods.',
     toggleNoProfile: 'Selecione um perfil primeiro.',
+    conflictWins: 'Vence',
+    conflictOverridden: 'Sobrescrito',
+    conflictWinsDetail: (count, others) => `Vence ${names(others)} em ${count} ${plural(count, 'arquivo', 'arquivos')}`,
+    conflictOverriddenDetail: (count, winners) =>
+      `${count} ${plural(count, 'arquivo sobrescrito', 'arquivos sobrescritos')} por ${names(winners)}`,
   },
   profiles: {
     title: 'Perfis',
@@ -78,6 +84,13 @@ export const ptBR: Messages = {
     modCount: (count) => `${count} ${plural(count, 'mod', 'mods')}`,
     active: 'Ativo',
     selectHint: 'Selecione um perfil para editar os mods e a ordem de carregamento.',
+    orderHint: 'Mods mais abaixo na lista carregam depois e vencem os conflitos.',
+    conflictsTitle: 'Conflitos',
+    conflictsSummary: (count) =>
+      count === 0 ? 'Nenhum conflito' : `${count} ${plural(count, 'arquivo em conflito', 'arquivos em conflito')}`,
+    conflictsHint: 'Arquivos que mais de um mod desta ordem inclui. Vence o mod que carrega por último.',
+    conflictsEmpty: 'Nenhum par de mods desta ordem inclui o mesmo arquivo.',
+    conflictWinner: 'Vence',
   },
   settings: {
     title: 'Configurações',

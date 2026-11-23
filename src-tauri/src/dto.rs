@@ -3,7 +3,9 @@
 use motogp_application::{
     DeploySession, RecoveryState, RecoveryStatus, SessionEvent, SessionState,
 };
-use motogp_domain::{Config, GameInfo, ModEntry, Profile, StorageCategory, StorageUsage};
+use motogp_domain::{
+    Config, FileConflict, GameInfo, ModEntry, Profile, StorageCategory, StorageUsage,
+};
 use serde::Serialize;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -72,6 +74,24 @@ impl From<Profile> for ProfileDto {
             id: profile.id,
             name: profile.name,
             mod_ids: profile.mod_ids,
+        }
+    }
+}
+
+/// A file shipped by two or more mods of a load order; `winner` loads last.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ConflictDto {
+    pub path: String,
+    pub mod_ids: Vec<String>,
+    pub winner: String,
+}
+
+impl From<FileConflict> for ConflictDto {
+    fn from(conflict: FileConflict) -> Self {
+        ConflictDto {
+            winner: conflict.winner().to_string(),
+            path: conflict.path,
+            mod_ids: conflict.mod_ids,
         }
     }
 }

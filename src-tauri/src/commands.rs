@@ -7,7 +7,7 @@
 //! blocking pool, never on the main thread, and mutations are serialized
 //! through `AppState::write_lock` so they cannot lose each other's updates.
 use crate::dto::{
-    ConfigDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto,
+    ConfigDto, ConflictDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto,
     StorageUsageDto,
 };
 use crate::{AppState, CommandError};
@@ -136,6 +136,20 @@ pub async fn set_profile_mods(
     .await
 }
 
+/// File conflicts of a candidate load order (read only, stateless).
+#[tauri::command]
+pub fn list_conflicts(
+    state: State<'_, AppState>,
+    mod_ids: Vec<String>,
+) -> CommandResult<Vec<ConflictDto>> {
+    Ok(state
+        .library
+        .list_conflicts(&mod_ids)?
+        .into_iter()
+        .map(Into::into)
+        .collect())
+}
+
 #[tauri::command]
 pub async fn set_active_profile(state: State<'_, AppState>, id: String) -> CommandResult<()> {
     mutate(state, move |state| {
@@ -226,6 +240,7 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         rename_profile,
         delete_profile,
         set_profile_mods,
+        list_conflicts,
         set_active_profile,
         play,
         recovery_status,

@@ -13,6 +13,7 @@ const initialState: LauncherState = {
   game: null,
   mods: [],
   profiles: [],
+  conflicts: [],
   detected: null,
   busy: false,
   session: { kind: 'idle' },
@@ -89,8 +90,28 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     if (failed) throw failed.reason;
   }
 
+  /** Recomputes the conflicts of the active profile load order; on failure clears them and rethrows. */
+  async function refreshConflicts(): Promise<void> {
+    const active = state.profiles.find((profile) => profile.id === state.config.active_profile);
+    const modIds = active?.mod_ids ?? [];
+    if (modIds.length === 0) {
+      set({ conflicts: [] });
+      return;
+    }
+    try {
+      set({ conflicts: await gateway.listConflicts(modIds) });
+    } catch (caught) {
+      set({ conflicts: [] });
+      throw caught;
+    }
+  }
+
   /** Runs a mutation: busy flag, error normalization, and a reload that always happens. */
-  async function mutate(reload: Reload[], action: () => Promise<Notice | null | undefined>): Promise<void> {
+  async function mutate(
+    reload: Reload[],
+    action: () => Promise<Notice | null | undefined>,
+    withConflicts = false,
+  ): Promise<void> {
     set({ busy: true, error: null, notice: null });
     let notice: Notice | null = null;
     let error: CommandError | null = null;
@@ -103,6 +124,13 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
       if (reload.length > 0) await load(reload);
     } catch (caught) {
       error ??= toCommandError(caught);
+    }
+    if (withConflicts) {
+      try {
+        await refreshConflicts();
+      } catch (caught) {
+        error ??= toCommandError(caught);
+      }
     }
     set({ busy: false, error, notice: error ? null : notice });
   }
@@ -150,6 +178,11 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     } catch (caught) {
       error ??= toCommandError(caught);
     }
+    try {
+      await refreshConflicts();
+    } catch (caught) {
+      error ??= toCommandError(caught);
+    }
     // The stale-session notice explains a failed recovery caused by a manifest from another install.
     if (error?.code === 'recovery_failed' && state.staleSession !== null) error = null;
     set({
@@ -165,10 +198,14 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
   async function importPaths(paths: string[]): Promise<void> {
     const supported = paths.filter(isSupportedModFile);
     if (supported.length === 0) return;
-    await mutate(['mods'], async () => {
-      const imported = await gateway.importMods(supported);
-      return { kind: 'imported', count: imported.length };
-    });
+    await mutate(
+      ['mods'],
+      async () => {
+        const imported = await gateway.importMods(supported);
+        return { kind: 'imported', count: imported.length };
+      },
+      true,
+    );
   }
 
   async function configureGame(path: string): Promise<void> {
@@ -224,10 +261,14 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
       return release;
     },
     removeMod: (id) =>
-      mutate(['mods', 'profiles'], async () => {
-        await gateway.removeMod(id);
-        return { kind: 'mod-removed' };
-      }),
+      mutate(
+        ['mods', 'profiles'],
+        async () => {
+          await gateway.removeMod(id);
+          return { kind: 'mod-removed' };
+        },
+        true,
+      ),
     createProfile: (name) =>
       mutate(['profiles'], async () => {
         await gateway.createProfile(name);
@@ -239,28 +280,53 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         return null;
       }),
     deleteProfile: (id) =>
-      mutate(['profiles', 'config'], async () => {
-        await gateway.deleteProfile(id);
-        return null;
-      }),
+      mutate(
+        ['profiles', 'config'],
+        async () => {
+          await gateway.deleteProfile(id);
+          return null;
+        },
+        true,
+      ),
     setProfileMods: (id, modIds) =>
-      mutate(['profiles'], async () => {
-        await gateway.setProfileMods(id, modIds);
-        return { kind: 'profile-saved' };
-      }),
+      mutate(
+        ['profiles'],
+        async () => {
+          await gateway.setProfileMods(id, modIds);
+          return { kind: 'profile-saved' };
+        },
+        true,
+      ),
     toggleModInActiveProfile: async (modId) => {
       const active = state.profiles.find((p) => p.id === state.config.active_profile);
       if (!active || isVanilla(active) || selectProfileLocked(state)) return;
-      await mutate(['profiles'], async () => {
-        await gateway.setProfileMods(active.id, toggleMod(active.mod_ids, modId));
-        return null;
-      });
+      await mutate(
+        ['profiles'],
+        async () => {
+          await gateway.setProfileMods(active.id, toggleMod(active.mod_ids, modId));
+          return null;
+        },
+        true,
+      );
     },
     setActiveProfile: (id) =>
-      mutate(['config'], async () => {
-        await gateway.setActiveProfile(id);
-        return null;
-      }),
+      mutate(
+        ['config'],
+        async () => {
+          await gateway.setActiveProfile(id);
+          return null;
+        },
+        true,
+      ),
+    async previewConflicts(modIds) {
+      if (modIds.length === 0) return [];
+      try {
+        return await gateway.listConflicts(modIds);
+      } catch (caught) {
+        set({ error: toCommandError(caught) });
+        return [];
+      }
+    },
     async forgetStaleSession() {
       if (state.staleSession === null) return;
       await mutate(['game'], async () => {

@@ -32,7 +32,21 @@ impl std::error::Error for ProfileError {}
 pub struct Profile {
     pub id: String,
     pub name: String,
+    /// The load order: index 0 loads first and the last one loads last, so
+    /// later mods win file conflicts. Never holds duplicates when set through
+    /// `set_load_order`.
     pub mod_ids: Vec<String>,
+}
+
+/// Removes duplicate IDs, keeping the first occurrence and the order.
+pub fn normalize_load_order(ids: Vec<String>) -> Vec<String> {
+    let mut result: Vec<String> = Vec::with_capacity(ids.len());
+    for id in ids {
+        if !result.contains(&id) {
+            result.push(id);
+        }
+    }
+    result
 }
 
 /// Trims `name`; a blank result is `ProfileError::EmptyName`.
@@ -46,6 +60,11 @@ pub fn normalize_name(name: &str) -> Result<String, ProfileError> {
 }
 
 impl Profile {
+    /// Replaces the load order, deduplicated (first occurrence wins).
+    pub fn set_load_order(&mut self, ids: Vec<String>) {
+        self.mod_ids = normalize_load_order(ids);
+    }
+
     /// New profile without mods; the name is trimmed and must not be blank.
     pub fn new(id: impl Into<String>, name: &str) -> Result<Profile, ProfileError> {
         Ok(Profile {
@@ -135,6 +154,20 @@ mod tests {
         assert_eq!(profile.mod_ids, ["c", "b"]);
         assert!(!profile.remove_mod("zzz"));
         assert_eq!(profile.mod_ids, ["c", "b"]);
+    }
+
+    #[test]
+    fn set_load_order_dedupes_keeping_first_occurrence() {
+        let mut profile = Profile::new("p1", "x").unwrap();
+        profile.set_load_order(["c", "a", "c", "b"].map(String::from).to_vec());
+        assert_eq!(profile.mod_ids, ["c", "a", "b"]);
+    }
+
+    #[test]
+    fn normalize_load_order_keeps_unique_input_untouched() {
+        let ids = ["z", "y", "x"].map(String::from).to_vec();
+        assert_eq!(normalize_load_order(ids.clone()), ids);
+        assert!(normalize_load_order(vec![]).is_empty());
     }
 
     #[test]

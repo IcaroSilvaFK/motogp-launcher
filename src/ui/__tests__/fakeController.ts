@@ -27,6 +27,7 @@ export const initialState: LauncherState = {
   session: { kind: 'idle' },
   recovery: null,
   staleSession: null,
+  conflicts: [],
   error: null,
   notice: null,
 };
@@ -84,6 +85,7 @@ export function createFakeController(patch: Partial<LauncherState> = {}): FakeCo
     setProfileMods: action(),
     setActiveProfile: action(),
     toggleModInActiveProfile: action(),
+    previewConflicts: vi.fn(() => Promise.resolve([])),
     forgetStaleSession: action(),
     cleanStaleSession: action(),
     play: action(),

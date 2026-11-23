@@ -2,6 +2,7 @@ import type {
   CommandError,
   Config,
   DeploySession,
+  FileConflict,
   GameInfo,
   ModEntry,
   Profile,
@@ -49,6 +50,8 @@ export interface FakeGatewayOptions {
   game?: GameInfo | null;
   mods?: ModEntry[];
   profiles?: Profile[];
+  /** Computes what `listConflicts` returns; defaults to none. */
+  conflictsFor?: (modIds: string[]) => FileConflict[];
   detected?: GameInfo[];
   recovery?: RecoveryStatus;
   /** Overrides per path of what `setGameDir` returns (partial GameInfo); e.g. `{ 'C:/g': { app_id: 123 } }`. */
@@ -174,6 +177,10 @@ export class FakeGateway implements LauncherGateway {
         mod_ids: profile.mod_ids.filter((modId) => modId !== id),
       }));
     });
+  }
+
+  listConflicts(modIds: string[]): Promise<FileConflict[]> {
+    return this.run('listConflicts', [[...modIds]], () => this.options.conflictsFor?.(modIds) ?? []);
   }
 
   listProfiles(): Promise<Profile[]> {

@@ -1,20 +1,30 @@
 //! Turns a profile into the ordered list of mods to deploy.
 use crate::{
-    Clock, DeployMod, ModPlanner, ModRepository, PlayError, ProfileRepository, ProfileService,
+    Clock, DeployMod, LibraryError, ModPlanner, ModRepository, PlayError, ProfileRepository,
+    ProfileService,
 };
-use motogp_domain::{ModEntry, Profile};
+use motogp_domain::{detect_conflicts, normalize_load_order, FileConflict, ModEntry, Profile};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
+/// Lists the file conflicts of a candidate load order against the library.
+pub fn list_conflicts(
+    library: &impl ModRepository,
+    order: &[String],
+) -> Result<Vec<FileConflict>, LibraryError> {
+    Ok(detect_conflicts(order, &library.list()?))
+}
+
 /// Keeps the profile order and skips IDs that are no longer in the library.
-/// Each mod's files are read from `library_dir/<id>`.
+/// A repeated ID is deployed once (first occurrence wins), so positions stay
+/// consecutive over the resolved mods. Each mod's files are read from
+/// `library_dir/<id>`.
 pub fn resolve_profile_mods(
     profile: &Profile,
     library: &[ModEntry],
     library_dir: &Path,
 ) -> Vec<DeployMod> {
-    profile
-        .mod_ids
+    normalize_load_order(profile.mod_ids.clone())
         .iter()
         .filter_map(|id| library.iter().find(|entry| entry.id == *id))
         .map(|entry| DeployMod {

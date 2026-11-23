@@ -43,6 +43,36 @@ fn resolve_profile_mods_keeps_order_and_skips_missing() {
 }
 
 #[test]
+fn resolve_profile_mods_deploys_a_repeated_id_once() {
+    let mut profile = Profile::new("p1", "Race").unwrap();
+    profile.mod_ids = vec![
+        "bbbbbbbbbbbb".into(),
+        "aaaaaaaaaaaa".into(),
+        "bbbbbbbbbbbb".into(),
+    ];
+    let library = vec![entry("aaaaaaaaaaaa", "A"), entry("bbbbbbbbbbbb", "B")];
+
+    let resolved = resolve_profile_mods(&profile, &library, Path::new("lib"));
+
+    let ids: Vec<&str> = resolved.iter().map(|m| m.id.as_str()).collect();
+    assert_eq!(ids, vec!["bbbbbbbbbbbb", "aaaaaaaaaaaa"]);
+}
+
+#[test]
+fn list_conflicts_reads_the_library_and_follows_the_candidate_order() {
+    let state = fakes::new_state();
+    state.borrow_mut().index = vec![entry("aaaaaaaaaaaa", "X"), entry("bbbbbbbbbbbb", "X")];
+    let repo = fakes::FakeRepo(state);
+    let order = vec!["aaaaaaaaaaaa".to_string(), "bbbbbbbbbbbb".to_string()];
+
+    let found = motogp_application::list_conflicts(&repo, &order).unwrap();
+
+    assert_eq!(found.len(), 1);
+    assert_eq!(found[0].path, "X.pak");
+    assert_eq!(found[0].winner(), "bbbbbbbbbbbb");
+}
+
+#[test]
 fn set_game_dir_inspects_before_saving() {
     let config = FakeConfig::default();
     let settings = settings(&config, FakeGameFiles::default());

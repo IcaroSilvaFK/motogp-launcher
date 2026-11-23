@@ -29,3 +29,15 @@ Feature: Persist profiles safely
     When I list the profiles
     Then I receive a corrupted data error
     And the original file remains intact
+
+  Scenario: A legacy profiles file keeps its implicit order
+    Given a legacy profiles.json with the profile "p1" listing "z, y, x"
+    When I load the profiles from the store
+    Then the load order of "p1" is "z", "y", "x"
+    And the original file remains intact
+
+  Scenario: Duplicate IDs in a legacy file collapse to the first occurrence
+    Given a legacy profiles.json with the profile "p1" listing "a, b, a"
+    When I load the profiles from the store
+    Then the load order of "p1" is "a", "b"
+    And the original file remains intact

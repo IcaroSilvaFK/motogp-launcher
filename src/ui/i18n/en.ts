@@ -1,6 +1,7 @@
 import type { Messages } from './messages';
 
 const plural = (count: number, one: string, other: string) => (count === 1 ? one : other);
+const names = (list: string[]) => new Intl.ListFormat('en', { type: 'conjunction' }).format(list);
 
 export const en: Messages = {
   appName: 'MotoGP Launcher',
@@ -52,6 +53,11 @@ export const en: Messages = {
     toggleLocked: 'Profile changes are locked while the game is running.',
     toggleVanilla: 'Vanilla always runs without mods. Pick another profile to add mods.',
     toggleNoProfile: 'Select a profile first.',
+    conflictWins: 'Wins',
+    conflictOverridden: 'Overridden',
+    conflictWinsDetail: (count, others) => `Wins ${count} ${plural(count, 'file', 'files')} over ${names(others)}`,
+    conflictOverriddenDetail: (count, winners) =>
+      `${count} ${plural(count, 'file', 'files')} overridden by ${names(winners)}`,
   },
   profiles: {
     title: 'Profiles',
@@ -77,6 +83,13 @@ export const en: Messages = {
     modCount: (count) => `${count} ${plural(count, 'mod', 'mods')}`,
     active: 'Active',
     selectHint: 'Select a profile to edit its mods and load order.',
+    orderHint: 'Mods lower in the list load later and win conflicts.',
+    conflictsTitle: 'Conflicts',
+    conflictsSummary: (count) =>
+      count === 0 ? 'No conflicts' : `${count} conflicting ${plural(count, 'file', 'files')}`,
+    conflictsHint: 'Files shipped by more than one mod in this order. The mod that loads last wins.',
+    conflictsEmpty: 'No two mods in this load order ship the same file.',
+    conflictWinner: 'Wins',
   },
   settings: {
     title: 'Settings',

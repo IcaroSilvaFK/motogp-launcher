@@ -52,7 +52,7 @@ pub use play_ports::{
 };
 pub use play_service::PlayService;
 pub use ports::ConfigRepository;
-pub use profile_mods::{resolve_profile_mods, ProfileModPlanner};
+pub use profile_mods::{list_conflicts, resolve_profile_mods, ProfileModPlanner};
 pub use profile_ports::{Clock, ProfileRepository};
 pub use profile_service::{ProfileService, ProfileServiceError};
 pub use session_error::SessionError;

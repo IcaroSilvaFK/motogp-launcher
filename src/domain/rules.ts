@@ -1,5 +1,5 @@
 import { ERROR_CODES, VANILLA_ID } from './types';
-import type { CommandError, ErrorCode, Profile } from './types';
+import type { CommandError, ErrorCode, FileConflict, Profile } from './types';
 
 export const SUPPORTED_MOD_EXTENSIONS = ['pak', 'utoc', 'ucas', 'zip'] as const;
 
@@ -44,4 +44,18 @@ export function toggleMod(modIds: readonly string[], id: string): string[] {
 
 export function isVanilla(profile: Profile): boolean {
   return profile.id === VANILLA_ID;
+}
+
+export type ModConflictStatus = 'none' | 'wins' | 'overridden';
+
+/** Conflicts that involve the mod. */
+export function conflictsOfMod(conflicts: FileConflict[], modId: string): FileConflict[] {
+  return conflicts.filter((conflict) => conflict.mod_ids.includes(modId));
+}
+
+/** `overridden` if another mod wins any of its files, `wins` if it only wins, `none` without conflicts. */
+export function modConflictStatus(conflicts: FileConflict[], modId: string): ModConflictStatus {
+  const involved = conflictsOfMod(conflicts, modId);
+  if (involved.length === 0) return 'none';
+  return involved.some((conflict) => conflict.winner !== modId) ? 'overridden' : 'wins';
 }
