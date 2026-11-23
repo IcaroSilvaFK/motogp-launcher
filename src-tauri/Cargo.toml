@@ -19,10 +19,16 @@ motogp-domain = { path = "../crates/domain" }
 motogp-application = { path = "../crates/application" }
 motogp-infrastructure = { path = "../crates/infrastructure" }
 serde = { version = "1", features = ["derive"] }
+# Needed by tauri::generate_context! once tauri.conf.json has a plugins section.
+serde_json = "=1.0.154"
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
+tauri-plugin-process = "=2.4.0"
+tauri-plugin-updater = "=2.14.1"
 
 [dev-dependencies]
+base64 = "=0.23.1"
+minisign-verify = "=0.3.0"
 cucumber = "0.21"
 futures = "0.3"
 serde_json = "1"

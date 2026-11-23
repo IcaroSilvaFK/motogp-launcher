@@ -115,3 +115,30 @@ td {
 .hint {
   opacity: 0.8;
 }
+
+.update-banner {
+  margin: 0.5rem 1rem;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  background: #e8f0fe;
+  color: #12306b;
+}
+
+.update-banner h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}
+
+.update-banner .update-notes {
+  white-space: pre-wrap;
+  margin: 0.25rem 0;
+}
+
+.update-banner progress {
+  width: 100%;
+}
+
+.update-banner-error {
+  background: #fde8e8;
+  color: #7a1212;
+}

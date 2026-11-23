@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { selectCanPlay, useLauncherState } from '../application';
-import type { LauncherController } from '../application';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { selectCanPlay, selectSessionClean, useLauncherState } from '../application';
+import type { LauncherController, UpdateController } from '../application';
 import { I18nProvider, useI18n } from './i18n';
 import type { Locale } from './i18n';
 import { LauncherContext } from './LauncherContext';
@@ -11,9 +11,15 @@ import { SessionStatus } from './SessionStatus';
 import { SettingsScreen } from './SettingsScreen';
 import { Sidebar } from './Sidebar';
 import type { ScreenId } from './Sidebar';
+import { UpdateBanner } from './UpdateBanner';
 import './styles.css';
 
-function Shell({ controller }: { controller: LauncherController }) {
+function UpdateSlot({ updater, installBlocked }: { updater: UpdateController; installBlocked: boolean }) {
+  const state = useSyncExternalStore(updater.subscribe, updater.getState);
+  return <UpdateBanner state={state} installBlocked={installBlocked} onUpdate={() => void updater.install()} />;
+}
+
+function Shell({ controller, updater }: { controller: LauncherController; updater?: UpdateController }) {
   const { t } = useI18n();
   const state = useLauncherState(controller);
   const [screen, setScreen] = useState<ScreenId>('library');
@@ -49,6 +55,7 @@ function Shell({ controller }: { controller: LauncherController }) {
         <SessionStatus />
       </header>
       <NoticeBar />
+      {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
       <div className="layout">
         <Sidebar current={screen} onSelect={setScreen} />
         <main>
@@ -66,14 +73,16 @@ export function App({
   controller,
   locale,
   onLocaleChange,
+  updater,
 }: {
   controller: LauncherController;
   locale?: Locale;
   onLocaleChange?: (locale: Locale) => void;
+  updater?: UpdateController;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
-      <Shell controller={controller} />
+      <Shell controller={controller} updater={updater} />
     </I18nProvider>
   );
 }

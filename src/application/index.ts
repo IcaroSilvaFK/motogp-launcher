@@ -11,3 +11,7 @@ export { loadLocale, saveLocale } from './localePreference';
 export { createLauncherController } from './createLauncherController';
 export { selectCanPlay } from './selectCanPlay';
 export { useLauncherState } from './useLauncherState';
+export type { UpdateService } from './ports/UpdateService';
+export type { UpdateController, UpdateDeps, UpdateState } from './updateController';
+export { createUpdateController } from './useCases/checkForUpdate';
+export { selectSessionClean } from './selectSessionClean';

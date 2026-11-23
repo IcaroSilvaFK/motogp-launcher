@@ -1,4 +1,4 @@
-import type { ErrorCode, Locale } from '../../domain';
+import type { ErrorCode, Locale, UpdateErrorKind } from '../../domain';
 
 export interface Messages {
   appName: string;
@@ -86,6 +86,16 @@ export interface Messages {
     gameRunning: string;
     staleForgotten: string;
     staleCleaned: (cleaned: number) => string;
+  };
+  update: {
+    available: (version: string) => string;
+    currentVersion: (version: string) => string;
+    button: string;
+    downloading: string;
+    progressLabel: string;
+    restarting: string;
+    blockedBySession: string;
+    errors: Record<UpdateErrorKind, string>;
   };
   errors: Record<ErrorCode, string>;
 }

@@ -2,13 +2,20 @@
 // infrastructure together (Tauri adapters are injected into the controller here).
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { createLauncherController, loadLocale, saveLocale } from './application';
+import {
+  createLauncherController,
+  createUpdateController,
+  loadLocale,
+  saveLocale,
+  selectSessionClean,
+} from './application';
 import {
   createLocalStorageLocaleStore,
   createTauriDropEvents,
   createTauriGateway,
   createTauriPicker,
   createTauriSessionEvents,
+  createTauriUpdateService,
 } from './infrastructure';
 import { App } from './ui/App';
 
@@ -26,12 +33,21 @@ const controller = createLauncherController({
 
 const localeStore = createLocalStorageLocaleStore();
 
+const updater = createUpdateController({
+  service: createTauriUpdateService(),
+  isSessionClean: () => selectSessionClean(controller.getState()),
+});
+
+// Fire-and-forget: the check never blocks the launcher; failures become a recoverable notice.
+void updater.check();
+
 createRoot(container).render(
   <StrictMode>
     <App
       controller={controller}
       locale={loadLocale(localeStore)}
       onLocaleChange={(locale) => saveLocale(localeStore, locale)}
+      updater={updater}
     />
   </StrictMode>,
 );
