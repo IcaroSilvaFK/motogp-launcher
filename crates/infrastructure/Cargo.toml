@@ -1,0 +1,31 @@
+[package]
+name = "motogp-infrastructure"
+description = "Adapters (fs, JSON, ZIP, Steam, processes) that implement the ports."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+motogp-domain = { path = "../domain" }
+motogp-application = { path = "../application" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+same-file = "1"
+sha2 = "0.10"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+sysinfo = { version = "0.33", default-features = false, features = ["system"] }
+fs2 = "0.4"
+
+[target.'cfg(windows)'.dependencies]
+winreg = "0.55"
+
+[dev-dependencies]
+cucumber = "0.21"
+futures = "0.3"
+tempfile = "3"
+
+# BDD runner (cucumber) without the default libtest harness.
+[[test]]
+name = "features"
+harness = false

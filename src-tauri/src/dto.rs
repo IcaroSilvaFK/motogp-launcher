@@ -1,0 +1,204 @@
+//! IPC data transfer objects. Fields are snake_case on the wire; the
+//! JS-side command arguments are camelCase (handled by `#[tauri::command]`).
+use motogp_application::{
+    DeploySession, RecoveryState, RecoveryStatus, SessionEvent, SessionState,
+};
+use motogp_domain::{Config, GameInfo, ModEntry, Profile};
+use serde::Serialize;
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ConfigDto {
+    pub game_dir: Option<String>,
+    pub active_profile: Option<String>,
+}
+
+impl From<Config> for ConfigDto {
+    fn from(config: Config) -> Self {
+        ConfigDto {
+            game_dir: config.game_dir.map(|p| p.to_string_lossy().into_owned()),
+            active_profile: config.active_profile,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct GameInfoDto {
+    pub name: String,
+    pub root: String,
+    pub mods_dir: String,
+    pub app_id: Option<u32>,
+}
+
+impl From<GameInfo> for GameInfoDto {
+    fn from(game: GameInfo) -> Self {
+        GameInfoDto {
+            name: game.name,
+            root: game.root.to_string_lossy().into_owned(),
+            mods_dir: game.mods_dir.to_string_lossy().into_owned(),
+            app_id: game.app_id,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ModDto {
+    pub id: String,
+    pub name: String,
+    pub files: Vec<String>,
+    pub size_bytes: u64,
+}
+
+impl From<ModEntry> for ModDto {
+    fn from(entry: ModEntry) -> Self {
+        ModDto {
+            id: entry.id,
+            name: entry.name,
+            files: entry.files,
+            size_bytes: entry.size_bytes,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ProfileDto {
+    pub id: String,
+    pub name: String,
+    pub mod_ids: Vec<String>,
+}
+
+impl From<Profile> for ProfileDto {
+    fn from(profile: Profile) -> Self {
+        ProfileDto {
+            id: profile.id,
+            name: profile.name,
+            mod_ids: profile.mod_ids,
+        }
+    }
+}
+
+/// Payload of the `session` event: `state` is `started`, `ended` or `never-started`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SessionEventDto {
+    pub state: &'static str,
+    pub cleaned: usize,
+}
+
+impl From<SessionEvent> for SessionEventDto {
+    fn from(event: SessionEvent) -> Self {
+        let state = match event.state {
+            SessionState::Started => "started",
+            SessionState::Ended => "ended",
+            SessionState::NeverStarted => "never-started",
+        };
+        SessionEventDto {
+            state,
+            cleaned: event.cleaned,
+        }
+    }
+}
+
+/// Payload of the `session-error` event (the visible error channel).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct SessionErrorDto {
+    pub message: String,
+}
+
+/// Result of `recovery_status`: `state` is `not-run`, `recovered`,
+/// `game-running` or `failed`. The frontend reads it after subscribing to the
+/// events, so a failure at startup is never lost.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RecoveryStatusDto {
+    pub state: &'static str,
+    pub error: Option<String>,
+    pub cleaned_count: usize,
+}
+
+impl From<RecoveryStatus> for RecoveryStatusDto {
+    fn from(status: RecoveryStatus) -> Self {
+        let state = match status.state {
+            RecoveryState::NotRun => "not-run",
+            RecoveryState::Recovered => "recovered",
+            RecoveryState::GameRunning => "game-running",
+            RecoveryState::Failed => "failed",
+        };
+        RecoveryStatusDto {
+            state,
+            error: status.error,
+            cleaned_count: status.cleaned_count,
+        }
+    }
+}
+
+/// Result of `deploy_session`: `state` is `none`, `current`, `stale` or
+/// `vanished`. `mods_dir` is the folder the manifest records, only for
+/// `stale` and `vanished`; `tracked` counts the files and pending entries of
+/// `current` and `stale` (0 otherwise).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DeploySessionDto {
+    pub state: &'static str,
+    pub mods_dir: Option<String>,
+    pub tracked: usize,
+}
+
+impl From<DeploySession> for DeploySessionDto {
+    fn from(session: DeploySession) -> Self {
+        let dir = |p: std::path::PathBuf| Some(p.to_string_lossy().into_owned());
+        match session {
+            DeploySession::None => DeploySessionDto {
+                state: "none",
+                mods_dir: None,
+                tracked: 0,
+            },
+            DeploySession::Current { tracked } => DeploySessionDto {
+                state: "current",
+                mods_dir: None,
+                tracked,
+            },
+            DeploySession::Stale { mods_dir, tracked } => DeploySessionDto {
+                state: "stale",
+                mods_dir: dir(mods_dir),
+                tracked,
+            },
+            DeploySession::Vanished { mods_dir } => DeploySessionDto {
+                state: "vanished",
+                mods_dir: dir(mods_dir),
+                tracked: 0,
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn dto(session: DeploySession) -> serde_json::Value {
+        serde_json::to_value(DeploySessionDto::from(session)).unwrap()
+    }
+
+    #[test]
+    fn deploy_session_dto_maps_every_state_to_snake_case_fields() {
+        assert_eq!(
+            dto(DeploySession::None),
+            serde_json::json!({ "state": "none", "mods_dir": null, "tracked": 0 })
+        );
+        assert_eq!(
+            dto(DeploySession::Current { tracked: 3 }),
+            serde_json::json!({ "state": "current", "mods_dir": null, "tracked": 3 })
+        );
+        assert_eq!(
+            dto(DeploySession::Stale {
+                mods_dir: PathBuf::from("old/~mods"),
+                tracked: 2
+            }),
+            serde_json::json!({ "state": "stale", "mods_dir": "old/~mods", "tracked": 2 })
+        );
+        assert_eq!(
+            dto(DeploySession::Vanished {
+                mods_dir: PathBuf::from("old/~mods")
+            }),
+            serde_json::json!({ "state": "vanished", "mods_dir": "old/~mods", "tracked": 0 })
+        );
+    }
+}

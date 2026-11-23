@@ -1,0 +1,21 @@
+[package]
+name = "motogp-application"
+description = "Use cases and ports (traits) of MotoGP Launcher."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+# Architecture rule: the only production dependency is the domain.
+[dependencies]
+motogp-domain = { path = "../domain" }
+
+# Test tooling (BDD) lives only in dev-dependencies.
+[dev-dependencies]
+cucumber = "0.21"
+futures = "0.3"
+
+# BDD dispatcher (cucumber) without the default libtest harness.
+[[test]]
+name = "features"
+harness = false
