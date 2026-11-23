@@ -16,6 +16,7 @@ const initialState: LauncherState = {
   busy: false,
   session: { kind: 'idle' },
   recovery: null,
+  staleSession: null,
   error: null,
   notice: null,
 };
@@ -50,7 +51,21 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
       tasks.push(gateway.getConfig().then((config) => void (patch.config = config)));
     }
     if (wanted.has('game')) {
-      tasks.push(gateway.getGame().then((game) => void (patch.game = game)));
+      tasks.push(
+        gateway.getGame().then(async (game) => {
+          patch.game = game;
+          // The deploy session only matters against a configured game; skip the backend otherwise.
+          if (game === null) {
+            patch.staleSession = null;
+            return;
+          }
+          const deploy = await gateway.deploySession();
+          patch.staleSession =
+            deploy.state === 'stale' && deploy.mods_dir !== null
+              ? { modsDir: deploy.mods_dir, tracked: deploy.tracked }
+              : null;
+        }),
+      );
     }
     if (wanted.has('mods')) {
       tasks.push(gateway.listMods().then((mods) => void (patch.mods = mods)));
@@ -125,6 +140,8 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     } catch (caught) {
       error ??= toCommandError(caught);
     }
+    // The stale-session notice explains a failed recovery caused by a manifest from another install.
+    if (error?.code === 'recovery_failed' && state.staleSession !== null) error = null;
     set({
       status: 'ready',
       recovery,
@@ -226,6 +243,21 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         await gateway.setActiveProfile(id);
         return null;
       }),
+    async forgetStaleSession() {
+      if (state.staleSession === null) return;
+      await mutate(['game'], async () => {
+        await gateway.forgetStaleSession();
+        return { kind: 'stale-forgotten' };
+      });
+    },
+    async cleanStaleSession() {
+      const stale = state.staleSession;
+      if (stale === null) return;
+      await mutate(['game'], async () => {
+        const cleaned = await gateway.cleanStaleSession(stale.modsDir);
+        return { kind: 'stale-cleaned', cleaned };
+      });
+    },
     async play() {
       if (!selectCanPlay(state)) return;
       set({ error: null, notice: null, session: { kind: 'starting' } });

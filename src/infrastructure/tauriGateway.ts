@@ -29,5 +29,8 @@ export function createTauriGateway(invoke: InvokeFn = tauriInvoke): LauncherGate
     setActiveProfile: (id) => call('set_active_profile', { id }),
     play: (profileId) => call('play', { profileId }),
     recoveryStatus: () => call('recovery_status'),
+    deploySession: () => call('deploy_session'),
+    forgetStaleSession: () => call('forget_stale_session'),
+    cleanStaleSession: (confirmedDir) => call('clean_stale_session', { confirmedDir }),
   };
 }

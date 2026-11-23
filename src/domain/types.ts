@@ -38,6 +38,14 @@ export interface SessionErrorEvent {
   message: string;
 }
 
+export type DeploySessionState = 'none' | 'current' | 'stale' | 'vanished';
+
+export interface DeploySession {
+  state: DeploySessionState;
+  mods_dir: string | null;
+  tracked: number;
+}
+
 export type RecoveryState = 'not-run' | 'recovered' | 'game-running' | 'failed';
 
 export interface RecoveryStatus {
@@ -76,6 +84,7 @@ export const BACKEND_ERROR_CODES = [
   'deploy_invalid_path',
   'deploy_unauthorized_directory',
   'deploy_cleanup_incomplete',
+  'deploy_session_not_stale',
 ] as const;
 
 export const FRONTEND_ERROR_CODES = [
