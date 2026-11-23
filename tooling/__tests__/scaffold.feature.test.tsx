@@ -32,7 +32,10 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
 
     Then('I see the accessible MotoGP Launcher shell', () => {
-      expect(screen.getByRole('banner')).toBeInTheDocument();
+      // Since #60 the shell landmarks are the sidebar (with the main navigation), main and the status bar.
+      expect(screen.getByRole('complementary')).toBeInTheDocument();
+      expect(screen.getByRole('navigation', { name: 'Navegação principal' })).toBeInTheDocument();
+      expect(screen.getByRole('contentinfo')).toBeInTheDocument();
       expect(screen.getByRole('heading', { level: 1, name: 'MotoGP Launcher' })).toBeInTheDocument();
       expect(screen.getByRole('main')).toBeInTheDocument();
     });

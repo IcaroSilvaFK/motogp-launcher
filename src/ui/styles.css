@@ -16,7 +16,7 @@
   --text: #e7e9ec;
   --text-muted: #9aa2ad;
 
-  /* Accent (warm racing red, used sparingly): Play, current tab/section bar, brand mark */
+  /* Accent (warm racing red, used sparingly): Play, current nav item/section bar, brand mark */
   --accent: #d23a1e;
   --accent-hover: #b52f17;
   --on-accent: #ffffff;
@@ -53,7 +53,9 @@
   --space-6: 32px;
 
   /* Layout */
-  --topbar-height: 48px;
+  --sidebar-width: 200px;
+  --sidebar-width-collapsed: 56px;
+  --sidebar-item-height: 36px;
   --statusbar-height: 60px;
   --rail-width: 208px;
   --content-max: 1180px;
@@ -178,26 +180,54 @@ code {
 
 /* ---------- App shell ---------- */
 
+/* Sidebar (full height above the status bar) | content column; the status bar spans both. */
 .app-shell {
   display: grid;
-  grid-template-rows: var(--topbar-height) auto minmax(0, 1fr) var(--statusbar-height);
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) var(--statusbar-height);
   height: 100vh;
 }
 
-.topbar {
+.app-shell > .statusbar {
+  grid-column: 1 / -1;
+}
+
+.app-content {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: stretch;
-  padding: 0 var(--space-4);
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- Sidebar ---------- */
+
+.sidebar {
+  /* Item inset that centres an 18px icon in the collapsed width, so icons never move. */
+  --sidebar-inset: calc((var(--sidebar-width-collapsed) - 2 * var(--space-2) - 18px) / 2);
+
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  width: var(--sidebar-width);
+  min-height: 0;
+  padding: var(--space-3) var(--space-2);
+  overflow: hidden auto;
   background: var(--surface-1);
-  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  transition: width var(--transition);
+}
+
+.sidebar[data-collapsed='true'] {
+  width: var(--sidebar-width-collapsed);
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: var(--space-2);
+  gap: var(--space-3);
   min-width: 0;
+  height: var(--sidebar-item-height);
+  padding: 0 calc(var(--sidebar-inset) - 1px);
 }
 
 .brand-mark {
@@ -215,58 +245,81 @@ code {
   white-space: nowrap;
 }
 
-.top-nav {
+.side-nav {
   display: flex;
-  align-items: stretch;
+  flex-direction: column;
   gap: var(--space-1);
 }
 
-.nav-tab {
+.nav-item,
+.sidebar-toggle {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: var(--space-2);
-  padding: 0 var(--space-4);
+  gap: var(--space-3);
+  width: 100%;
+  height: var(--sidebar-item-height);
+  padding: 0 var(--sidebar-inset);
   border: 0;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-muted);
   font: inherit;
   font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     color var(--transition),
     background var(--transition);
 }
 
-.nav-tab .nav-icon {
+.nav-item .nav-icon,
+.sidebar-toggle .nav-icon {
   width: 18px;
   height: 18px;
 }
 
-.nav-tab:hover {
+.nav-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-item:hover,
+.sidebar-toggle:hover {
   color: var(--text);
   background: var(--surface-2);
 }
 
-.nav-tab:focus-visible {
+/* Inset: the sidebar clips its overflow, so an outer ring would be cut. */
+.nav-item:focus-visible,
+.sidebar-toggle:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
 }
 
-.nav-tab[aria-current='page'] {
+.nav-item[aria-current='page'] {
   color: var(--text);
+  background: var(--surface-2);
 }
 
-/* Current tab: a 2px accent underline on the bottom edge. */
-.nav-tab[aria-current='page']::after {
+/* Current item: a 2px accent bar on the left edge. */
+.nav-item[aria-current='page']::before {
   content: '';
   position: absolute;
-  left: var(--space-3);
-  right: var(--space-3);
-  bottom: 0;
-  height: 2px;
-  border-radius: 2px 2px 0 0;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  left: 0;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
   background: var(--accent);
+}
+
+/* Pinned to the bottom of the sidebar, quieter than the navigation. */
+.sidebar-toggle {
+  margin-top: auto;
+  font-size: var(--fs-small);
 }
 
 .app-messages {

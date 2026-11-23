@@ -11,6 +11,8 @@ export const ptBR: Messages = {
     library: 'Biblioteca',
     profiles: 'Perfis',
     settings: 'Configurações',
+    collapse: 'Recolher menu lateral',
+    expand: 'Expandir menu lateral',
   },
   activeProfile: {
     label: 'Perfil ativo',

@@ -56,3 +56,9 @@ export interface LocaleStore {
   load(): Locale | null;
   save(locale: Locale): void;
 }
+
+/** Whether the sidebar is collapsed. Synchronous so the first render already has the right width. */
+export interface NavPreferenceStore {
+  load(): boolean | null;
+  save(collapsed: boolean): void;
+}

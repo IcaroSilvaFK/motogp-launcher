@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { readAppVersion, selectSessionClean, useLauncherState } from '../application';
-import type { AppInfo, LauncherController, UpdateController } from '../application';
+import {
+  loadSidebarCollapsed,
+  readAppVersion,
+  saveSidebarCollapsed,
+  selectSessionClean,
+  useLauncherState,
+} from '../application';
+import type { AppInfo, LauncherController, NavPreferenceStore, UpdateController } from '../application';
 import { AppInfoContext } from './AppInfoContext';
 import { I18nProvider, useI18n } from './i18n';
 import type { Locale } from './i18n';
@@ -9,9 +15,9 @@ import { LibraryScreen } from './LibraryScreen';
 import { NoticeBar } from './NoticeBar';
 import { ProfilesScreen } from './ProfilesScreen';
 import { SettingsScreen } from './SettingsScreen';
+import { Sidebar } from './Sidebar';
+import type { ScreenId } from './Sidebar';
 import { StatusBar } from './StatusBar';
-import { TopNav } from './TopNav';
-import type { ScreenId } from './TopNav';
 import { UpdateBanner } from './UpdateBanner';
 import './styles.css';
 
@@ -43,14 +49,23 @@ function Shell({
   controller,
   updater,
   appInfo,
+  navStore,
 }: {
   controller: LauncherController;
   updater?: UpdateController;
   appInfo?: AppInfo;
+  navStore?: NavPreferenceStore;
 }) {
-  const { t } = useI18n();
   const state = useLauncherState(controller);
   const [screen, setScreen] = useState<ScreenId>('library');
+  // Read once on mount; without a store the choice lives in memory and starts expanded.
+  const [collapsed, setCollapsed] = useState(() => (navStore ? loadSidebarCollapsed(navStore) : false));
+  // The save stays out of the state updater, which StrictMode may run twice.
+  const toggleSidebar = useCallback(() => {
+    const next = !collapsed;
+    setCollapsed(next);
+    if (navStore) saveSidebarCollapsed(navStore, next);
+  }, [collapsed, navStore]);
   const [version, setVersion] = useState<string | null>(null);
   const [userChecked, setUserChecked] = useState(false);
   const value = useMemo(() => ({ controller, state }), [controller, state]);
@@ -82,31 +97,24 @@ function Shell({
     <AppInfoContext.Provider value={info}>
       <LauncherContext.Provider value={value}>
         <div className="app-shell">
-          <header className="topbar">
-            <div className="brand">
-              <svg className="brand-mark" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-                <rect x="2" y="2" width="16" height="16" rx="4" />
-                <path d="M6 13.5l2.6-7 1.4 3.6 1.4-3.6 2.6 7" />
-              </svg>
-              <h1>{t.appName}</h1>
+          <Sidebar current={screen} onSelect={setScreen} collapsed={collapsed} onToggle={toggleSidebar} />
+          <div className="app-content">
+            <div className="app-messages">
+              <NoticeBar />
+              {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
             </div>
-            <TopNav current={screen} onSelect={setScreen} />
-          </header>
-          <div className="app-messages">
-            <NoticeBar />
-            {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
+            <main aria-busy={loading ? 'true' : undefined}>
+              {loading ? (
+                <LoadingState />
+              ) : (
+                <>
+                  {screen === 'library' && <LibraryScreen />}
+                  {screen === 'profiles' && <ProfilesScreen />}
+                  {screen === 'settings' && <SettingsScreen />}
+                </>
+              )}
+            </main>
           </div>
-          <main aria-busy={loading ? 'true' : undefined}>
-            {loading ? (
-              <LoadingState />
-            ) : (
-              <>
-                {screen === 'library' && <LibraryScreen />}
-                {screen === 'profiles' && <ProfilesScreen />}
-                {screen === 'settings' && <SettingsScreen />}
-              </>
-            )}
-          </main>
           <StatusBar onSetUpGame={() => setScreen('settings')} />
         </div>
       </LauncherContext.Provider>
@@ -120,16 +128,18 @@ export function App({
   onLocaleChange,
   updater,
   appInfo,
+  navStore,
 }: {
   controller: LauncherController;
   locale?: Locale;
   onLocaleChange?: (locale: Locale) => void;
   updater?: UpdateController;
   appInfo?: AppInfo;
+  navStore?: NavPreferenceStore;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
-      <Shell controller={controller} updater={updater} appInfo={appInfo} />
+      <Shell controller={controller} updater={updater} appInfo={appInfo} navStore={navStore} />
     </I18nProvider>
   );
 }
