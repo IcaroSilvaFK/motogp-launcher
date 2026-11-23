@@ -26,7 +26,7 @@ Import, profiles, Steam detection, deploy, session and updater. Do not install t
 
 ## Acceptance criteria (Gherkin)
 
-Rust: `src-tauri/tests/features/scaffold.feature`, `cucumber` runner; frontend: `src/ui/__tests__/scaffold.test.tsx`, Vitest + Testing Library. The workspace/tooling checks are interface integration tests, with no I/O in the core tests. The command and CI scenarios must run the real checks; opening the window has a smoke test on Windows.
+Rust: `src-tauri/tests/features/scaffold.feature`, `cucumber` runner; frontend: `tooling/__tests__/scaffold.feature.test.tsx` (bound with `@amiceli/vitest-cucumber`), Vitest + Testing Library. The workspace/tooling checks are interface integration tests, with no I/O in the core tests. The command and CI scenarios must run the real checks; opening the window has a smoke test on Windows.
 
 ```gherkin
 Feature: Start the project with boundaries and mandatory validation
@@ -62,8 +62,8 @@ Feature: Start the project with boundaries and mandatory validation
 
 The plan did not name tests for this task. Write the scaffold checks first, without inventing business rules to fill coverage:
 
-- **Architecture tooling:** `rejects_ui_importing_infrastructure` and `rejects_outward_cargo_dependencies`, with isolated fixtures that do not make the main project invalid.
-- **Frontend/ui:** `renders_launcher_shell`, an accessible render smoke test in Vitest.
+- **Architecture tooling:** the scenario "Reject an import from ui to infrastructure" (`tooling/__tests__/scaffold.feature.test.tsx`) and `rejects_outward_cargo_dependencies`, with isolated fixtures that do not make the main project invalid.
+- **Frontend/ui:** scenario `Render the launcher shell` (`scaffold.feature.test.tsx`), an accessible render smoke test in Vitest.
 - **Tooling integration:** `workspace_members_are_registered` and `coverage_thresholds_reject_insufficient_coverage`, checking metadata/configuration and the failure behavior of the gates. They are not business unit tests.
 - Record Red → Green → Refactor; while there is no measurable core code, document that condition without creating artificial rules or relaxing the limits for the next issues.
 

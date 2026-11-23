@@ -59,7 +59,18 @@ export const boundariesConfig = [
             },
             {
               from: { file: { categories: 'test' } },
-              allow: { to: { module: { origin: 'external', source: ['vitest', '@testing-library/**'] } } },
+              allow: {
+                to: [
+                  {
+                    module: {
+                      origin: 'external',
+                      source: ['vitest', '@testing-library/**', '@amiceli/vitest-cucumber'],
+                    },
+                  },
+                  // Step definitions read feature files and fixtures from disk.
+                  { module: { origin: 'core', source: 'node:**' } },
+                ],
+              },
             },
             {
               from: { element: { types: ['domain', 'application', 'ui'] } },
