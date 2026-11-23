@@ -44,6 +44,11 @@
   --error-border: #64292c;
   --running: #3ddc84;
 
+  /* Usage meters (Storage): neutral on purpose, the accent stays reserved for Play */
+  --meter-track: #232830;
+  --meter-fill: #9aa2ad;
+  --meter-height: 6px;
+
   /* Spacing scale (4/8px grid) */
   --space-1: 4px;
   --space-2: 8px;
@@ -1540,6 +1545,131 @@ button {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
+}
+
+/* ---------- Settings > Storage ---------- */
+
+.storage-path {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow-wrap: normal;
+}
+
+.storage-inline-error {
+  color: var(--error-fg);
+  font-size: var(--fs-caption);
+}
+
+.storage-card .setting-text {
+  flex: 1 1 auto;
+}
+
+/* Always the card's first row: round its top corners inside the 1px card border. */
+.storage-error {
+  border-radius: calc(var(--radius-lg) - 1px) calc(var(--radius-lg) - 1px) 0 0;
+  background: var(--error-bg);
+  color: var(--error-fg);
+}
+
+.storage-error .setting-label,
+.storage-error .hint {
+  color: inherit;
+}
+
+.storage-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-6);
+  min-width: 0;
+  margin: 0;
+}
+
+.storage-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.storage-stat dt {
+  color: var(--text-muted);
+  font-size: var(--fs-caption);
+}
+
+.storage-stat dd {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--fs-section);
+  font-weight: 600;
+}
+
+.storage-skeleton {
+  display: inline-block;
+  width: 120px;
+  max-width: 100%;
+}
+
+.storage-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.storage-category {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(64px, 1fr) 72px 40px;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.storage-category-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.storage-category-name {
+  color: var(--text);
+}
+
+.storage-category-text .hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.storage-meter {
+  height: var(--meter-height);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--meter-track);
+}
+
+.storage-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--meter-fill);
+  transition: width var(--transition);
+}
+
+.storage-meter-fill[data-filled] {
+  min-width: 2px;
+}
+
+.storage-size,
+.storage-share {
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.storage-size {
+  color: var(--text);
 }
 
 /* ---------- Cards, lists, details ---------- */

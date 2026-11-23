@@ -13,6 +13,8 @@ mod deploy_names;
 mod mod_grouping;
 #[path = "bdd/session_state.rs"]
 mod session_state;
+#[path = "bdd/storage_classification.rs"]
+mod storage_classification;
 
 type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
@@ -20,6 +22,9 @@ const FEATURES: &[(&str, Runner)] = &[
     ("mod_grouping", || Box::pin(mod_grouping::run())),
     ("session-state", || Box::pin(session_state::run())),
     ("deploy_names", || Box::pin(deploy_names::run())),
+    ("storage-classification", || {
+        Box::pin(storage_classification::run())
+    }),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

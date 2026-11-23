@@ -2,18 +2,20 @@
 //! varies between production and tests (Steam, opener, process table,
 //! background execution, events) is injected.
 use motogp_application::{
-    BackgroundRunner, DeployService, GameService, GameSettings, PlayService, ProcessInspector,
-    ProfileModPlanner, ProfileService, SessionPublisher, SessionService, UrlOpener,
+    BackgroundRunner, DeployService, FolderOpener, GameService, GameSettings, PlayService,
+    ProcessInspector, ProfileModPlanner, ProfileService, SessionPublisher, SessionService,
+    StorageService, UrlOpener,
 };
 use motogp_infrastructure::{
-    mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsGameFiles, JsonConfigStore,
-    JsonDeployedRepository, JsonModRepository, JsonProfileStore, ModLibrary, MonotonicClock,
-    SteamLibraries, SystemClock,
+    mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsGameFiles, FsStorageScanner,
+    JsonConfigStore, JsonDeployedRepository, JsonModRepository, JsonProfileStore, ModLibrary,
+    MonotonicClock, SteamLibraries, SystemClock,
 };
 use std::sync::{Arc, Mutex};
 
 pub type Profiles = ProfileService<JsonProfileStore, SystemClock>;
 pub type Settings = GameSettings<JsonConfigStore, SteamLibraries, FsGameFiles>;
+pub type Storage = StorageService<FsStorageScanner, Arc<dyn FolderOpener + Send + Sync>>;
 
 /// Everything the commands need. Managed as Tauri state; cheap to clone so
 /// blocking use cases can run off the main thread.
@@ -25,6 +27,8 @@ pub struct AppState {
     /// For use cases that update the configuration next to the profiles.
     pub config: JsonConfigStore,
     pub play: PlayService,
+    /// Read-only: measuring never takes `write_lock`.
+    pub storage: Arc<Storage>,
     /// Serializes every mutation of the shared JSON stores, so concurrent
     /// commands cannot lose each other's updates.
     pub write_lock: Arc<Mutex<()>>,
@@ -34,6 +38,7 @@ pub fn compose<O, P>(
     data: &DataDir,
     steam: SteamLibraries,
     opener: O,
+    folder_opener: Arc<dyn FolderOpener + Send + Sync>,
     inspector: P,
     publisher: Arc<dyn SessionPublisher>,
     runner: Arc<dyn BackgroundRunner>,
@@ -76,5 +81,10 @@ where
         write_lock: Arc::default(),
         config: JsonConfigStore::new(data.config_file()),
         play,
+        storage: Arc::new(StorageService::new(
+            data.root().to_path_buf(),
+            FsStorageScanner,
+            folder_opener,
+        )),
     }
 }

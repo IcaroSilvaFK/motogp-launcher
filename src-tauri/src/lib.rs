@@ -13,13 +13,15 @@ mod error_play;
 mod error_profiles;
 mod startup;
 
-pub use adapters::{is_steam_url, TauriEvents, TauriOpener, SESSION_ERROR_EVENT, SESSION_EVENT};
+pub use adapters::{
+    is_steam_url, TauriEvents, TauriFolderOpener, TauriOpener, SESSION_ERROR_EVENT, SESSION_EVENT,
+};
 pub use bootstrap::run;
 pub use commands::configure;
-pub use compose::{compose, AppState, Profiles, Settings};
+pub use compose::{compose, AppState, Profiles, Settings, Storage};
 pub use dto::{
     ConfigDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto,
-    SessionErrorDto, SessionEventDto,
+    SessionErrorDto, SessionEventDto, StorageCategoryDto, StorageUsageDto,
 };
 pub use error::CommandError;
 pub use startup::run_recovery;

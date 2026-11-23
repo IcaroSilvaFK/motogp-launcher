@@ -6,7 +6,10 @@
 //! deploys, profiles, settings) is `async`: the blocking use case runs on the
 //! blocking pool, never on the main thread, and mutations are serialized
 //! through `AppState::write_lock` so they cannot lose each other's updates.
-use crate::dto::{ConfigDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto};
+use crate::dto::{
+    ConfigDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto,
+    StorageUsageDto,
+};
 use crate::{AppState, CommandError};
 use motogp_application::{import_mods as import_batch, remove_mod as remove_everywhere};
 use std::path::{Path, PathBuf};
@@ -178,6 +181,35 @@ pub async fn clean_stale_session(
     .await
 }
 
+/// Runs a read-only blocking use case off the caller's thread. It never takes
+/// `write_lock`: a long measurement must not wait for, or hold up, a mutation.
+async fn read_blocking<T, F>(state: State<'_, AppState>, job: F) -> CommandResult<T>
+where
+    T: Send + 'static,
+    F: FnOnce(&AppState) -> CommandResult<T> + Send + 'static,
+{
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || job(&state))
+        .await
+        .map_err(|error| CommandError {
+            code: "task_failed".to_string(),
+            message: format!("the operation did not finish: {error}"),
+        })?
+}
+
+/// Size of the launcher data folder, grouped by category.
+#[tauri::command]
+pub async fn get_storage_usage(state: State<'_, AppState>) -> CommandResult<StorageUsageDto> {
+    read_blocking(state, |state| Ok(state.storage.usage()?.into())).await
+}
+
+/// Shows the data folder in the file manager. Takes no argument: the path is
+/// never chosen by the frontend.
+#[tauri::command]
+pub async fn open_data_folder(state: State<'_, AppState>) -> CommandResult<()> {
+    read_blocking(state, |state| Ok(state.storage.open_data_folder()?)).await
+}
+
 /// Registers every command on the builder; shared by the real app and the
 /// contract tests.
 pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
@@ -199,6 +231,8 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         recovery_status,
         deploy_session,
         forget_stale_session,
-        clean_stale_session
+        clean_stale_session,
+        get_storage_usage,
+        open_data_folder
     ])
 }

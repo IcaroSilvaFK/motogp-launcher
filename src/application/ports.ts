@@ -8,6 +8,7 @@ import type {
   RecoveryStatus,
   SessionErrorEvent,
   SessionEvent,
+  StorageUsage,
 } from '../domain';
 
 export type Unsubscribe = () => void;
@@ -33,6 +34,10 @@ export interface LauncherGateway {
   forgetStaleSession(): Promise<void>;
   /** Cleans the stale folder; `confirmedDir` must equal the manifest's folder. Resolves with the files removed. */
   cleanStaleSession(confirmedDir: string): Promise<number>;
+  /** Measures the launcher data folder (read-only; never waits for a running mutation). */
+  getStorageUsage(): Promise<StorageUsage>;
+  /** Opens the launcher data folder in the system file manager; the backend decides the path. */
+  openDataFolder(): Promise<void>;
 }
 
 /** `null` means the user cancelled the dialog. */

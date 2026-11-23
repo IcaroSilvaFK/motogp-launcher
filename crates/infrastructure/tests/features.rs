@@ -18,6 +18,8 @@ mod file_import;
 mod processes;
 #[path = "bdd/stale_manifest.rs"]
 mod stale_manifest;
+#[path = "bdd/storage_scan.rs"]
+mod storage_scan;
 
 #[path = "bdd/persistence.rs"]
 mod persistence;
@@ -36,6 +38,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("file_import", || Box::pin(file_import::run())),
     ("file_deploy", || Box::pin(file_deploy::run())),
     ("stale-manifest", || Box::pin(stale_manifest::run())),
+    ("storage-scan", || Box::pin(storage_scan::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

@@ -428,7 +428,13 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
     Then('I see a "Settings sections" navigation with "Game", "Preferences" and "About"', () => {
       const sections = within(screen.getByRole('navigation', { name: 'Settings sections' }));
-      expect(sections.getAllByRole('link').map((link) => link.textContent)).toEqual(['Game', 'Preferences', 'About']);
+      // Storage (issue #56) sits between Preferences and About.
+      expect(sections.getAllByRole('link').map((link) => link.textContent)).toEqual([
+        'Game',
+        'Preferences',
+        'Storage',
+        'About',
+      ]);
     });
     And('the "Game" section is marked as the current location', () => {
       const sections = within(screen.getByRole('navigation', { name: 'Settings sections' }));

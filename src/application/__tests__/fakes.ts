@@ -8,6 +8,7 @@ import type {
   RecoveryStatus,
   SessionErrorEvent,
   SessionEvent,
+  StorageUsage,
 } from '../../domain';
 import { VANILLA_ID } from '../../domain';
 import type { DropEvents, FilePicker, LauncherGateway, SessionEvents, Unsubscribe } from '../ports';
@@ -56,7 +57,20 @@ export interface FakeGatewayOptions {
   gameFor?: (path: string) => GameInfo;
   /** Shared log of ordered events (`gateway.<method>`) to assert subscription order across fakes. */
   log?: string[];
+  /** What `getStorageUsage` reports; defaults to an empty data folder. */
+  storage?: StorageUsage;
 }
+
+const EMPTY_STORAGE: StorageUsage = {
+  root: 'C:/launcher-data',
+  totalBytes: 0,
+  freeBytes: null,
+  categories: [
+    { category: 'mods', bytes: 0 },
+    { category: 'launcher_data', bytes: 0 },
+    { category: 'other', bytes: 0 },
+  ],
+};
 
 export class FakeGateway implements LauncherGateway {
   readonly calls: RecordedCall[] = [];
@@ -70,6 +84,7 @@ export class FakeGateway implements LauncherGateway {
   deployed: string[] = [];
   /** The persisted deploy manifest; `null` when there is none. */
   manifest: FakeManifest | null;
+  storage: StorageUsage;
 
   private readonly failures = new Map<string, CommandError>();
   private readonly options: FakeGatewayOptions;
@@ -86,6 +101,7 @@ export class FakeGateway implements LauncherGateway {
     this.detected = options.detected ?? [];
     this.manifest = options.manifest ? { ...options.manifest } : null;
     this.recovery = options.recovery ?? { state: 'not-run', error: null, cleaned_count: 0 };
+    this.storage = options.storage ?? EMPTY_STORAGE;
   }
 
   /** Makes the next call of `method` reject once with `error`. */
@@ -247,6 +263,17 @@ export class FakeGateway implements LauncherGateway {
       this.manifest = null;
       return manifest.tracked;
     });
+  }
+
+  getStorageUsage(): Promise<StorageUsage> {
+    return this.run('getStorageUsage', [], () => ({
+      ...this.storage,
+      categories: this.storage.categories.map((entry) => ({ ...entry })),
+    }));
+  }
+
+  openDataFolder(): Promise<void> {
+    return this.run('openDataFolder', [], () => undefined);
   }
 
   /** Classifies the manifest against the current game, like the backend does. */

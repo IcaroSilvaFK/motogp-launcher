@@ -1,8 +1,26 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
 import type { LauncherGateway } from '../application/ports';
 import { toCommandError } from '../domain';
+import type { StorageCategory, StorageUsage } from '../domain';
 
 export type InvokeFn = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
+
+/** Wire shape of `get_storage_usage` (snake_case, as serialized by the backend). */
+interface StorageUsageDto {
+  root: string;
+  total_bytes: number;
+  free_bytes: number | null;
+  categories: { category: StorageCategory; bytes: number }[];
+}
+
+function toStorageUsage(dto: StorageUsageDto): StorageUsage {
+  return {
+    root: dto.root,
+    totalBytes: dto.total_bytes,
+    freeBytes: dto.free_bytes,
+    categories: dto.categories.map(({ category, bytes }) => ({ category, bytes })),
+  };
+}
 
 export function createTauriGateway(invoke: InvokeFn = tauriInvoke): LauncherGateway {
   async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
@@ -32,5 +50,7 @@ export function createTauriGateway(invoke: InvokeFn = tauriInvoke): LauncherGate
     deploySession: () => call('deploy_session'),
     forgetStaleSession: () => call('forget_stale_session'),
     cleanStaleSession: (confirmedDir) => call('clean_stale_session', { confirmedDir }),
+    getStorageUsage: async () => toStorageUsage(await call<StorageUsageDto>('get_storage_usage')),
+    openDataFolder: () => call('open_data_folder'),
   };
 }

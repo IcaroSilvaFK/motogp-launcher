@@ -398,3 +398,38 @@ Gherkin: `tests/features/frontend/about.feature`, bound end to end by `src/ui/__
 | A manual check that fails shows a translated error | e2e "Scenario: A manual check that fails shows a translated error" (pt-BR network message, raw updater text absent from the page) |
 | A failed background check does not claim the launcher is up to date | e2e "Scenario: A failed background check does not claim the launcher is up to date" (controller in `none` after the silent check, About shows neither "up to date" nor an error) |
 | Install from About is blocked during a game session | e2e "Scenario: Install from About is blocked during a game session" (install disabled, `aria-describedby` = the session hint, no download) |
+
+### Scenario traceability (issue #56)
+
+Storage usage in Settings. Gherkin: `crates/domain/tests/features/storage-classification.feature`, `crates/application/tests/features/storage.feature`, `crates/infrastructure/tests/features/storage-scan.feature` (cucumber runners `storage_classification`, `storage`, `storage_scan`) and the IPC contract in `src-tauri/tests/storage_contract.rs`. Domain and application use fakes only; the infrastructure scenarios use temp dirs; the IPC tests use the Tauri mock runtime and a fake folder opener. No new `AppError` variant or error code: failures reuse `read_failed` and `task_failed`.
+
+#### Rust
+
+| Scenario | Tests |
+|----------|-------|
+| Imported mods are counted as mods | `library_directory_is_mods_in_any_case`, `a_library_file_is_other` (domain), cucumber "Imported mods are counted as mods" |
+| Launcher state files are counted as launcher data | `state_files_and_their_tmp_siblings_are_launcher_data` (domain), cucumber "Launcher state files are counted as launcher data" |
+| Anything else is counted as other | `other_entries_are_other` (domain), cucumber "Anything else is counted as other" |
+| The total is the sum of the categories | `usage_keeps_every_category_in_order_even_when_empty`, `usage_sums_entries_per_category`, `sums_saturate_instead_of_overflowing` (domain), cucumber "The total is the sum of the categories" |
+| Usage is grouped per category | `groups_and_sums_entries` (application), cucumber "Usage is grouped per category" (accented path), IPC `get_storage_usage_returns_the_dto`, `storage_usage_dto_keeps_the_category_order_and_snake_case_fields` |
+| An empty data folder reports zero in every category | cucumber "An empty data folder reports zero in every category" |
+| Free space that cannot be read does not fail the usage | `unknown_free_space_is_none` (application), cucumber "Free space that cannot be read does not fail the usage" |
+| A data folder that cannot be read is an error | `a_scan_failure_is_an_error` (application), `a_root_that_is_a_file_is_a_read_error` (infrastructure), cucumber "A data folder that cannot be read is an error" |
+| Open folder opens the data folder | `opens_only_the_data_folder_and_reports_failures` (application), cucumber "Open folder opens the data folder", IPC `open_data_folder_opens_only_the_data_folder` |
+| Sizes are measured recursively in a path with accents | `measures_children_recursively` (infrastructure), cucumber "Sizes are measured recursively in a path with accents" |
+| A missing data folder is empty, not an error | `a_missing_root_is_empty_and_still_reports_free_space` (infrastructure), cucumber "A missing data folder is empty, not an error" |
+| Links are not followed | cucumber "Links are not followed" (junction on Windows via `mklink /J`, symlink elsewhere; skipped with a printed note when the OS refuses the link), `symlinks_are_not_followed` (infrastructure, unix) |
+| Measuring does not wait for a running mutation | IPC `measuring_does_not_wait_for_a_running_mutation` (holds `write_lock` while invoking `get_storage_usage`) |
+
+#### Frontend
+
+Gherkin: `tests/features/frontend/storage.feature`, bound by `src/ui/__tests__/storage.feature.test.tsx` (real UI over the fake controller, measurement resolved, pending or rejected by the test). Edge cases in `src/ui/__tests__/StorageSection.test.tsx`; pure rules in `src/domain/__tests__/storage.test.ts`; controller pass-through in `src/application/__tests__/storage.test.ts`; DTO mapping in `src/infrastructure/__tests__/tauriGateway.test.ts`.
+
+| Scenario | Tests |
+|----------|-------|
+| The section shows the data folder, totals and the breakdown | vitest-cucumber "The section shows the data folder, totals and the breakdown" (accented path, `role="meter"` per category, `<1%` share), `storageBreakdown` / `storageShare` (domain), gateway "DTO is mapped to camelCase" |
+| Open folder asks the backend to open the data folder | vitest-cucumber "Open folder asks the backend to open the data folder", "When opening the folder fails Then an inline message is shown" (StorageSection), controller "the gateway is called with no path", gateway `open_data_folder` case |
+| Refresh measures again without blocking the screen | vitest-cucumber "Refresh measures again without blocking the screen", "When an older answer arrives after a newer one Then the older answer is ignored", "When the first measurement is running Then skeletons are shown" (StorageSection) |
+| Unknown free space is shown as unavailable | vitest-cucumber "Unknown free space is shown as unavailable", gateway "free space is kept as a number" |
+| A failed measurement shows an inline error with retry | vitest-cucumber "A failed measurement shows an inline error with retry", "When Retry succeeds after a failure", "When a refresh fails after a successful measurement" (StorageSection), controller "no global error is set" |
+| The section is translated | vitest-cucumber "The section is translated" (pt-BR labels and `1,5 GB`) |

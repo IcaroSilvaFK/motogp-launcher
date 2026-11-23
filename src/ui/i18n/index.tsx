@@ -62,3 +62,10 @@ export function formatSize(bytes: number, locale: Locale): string {
   const number = new Intl.NumberFormat(locale, { maximumFractionDigits: unit === 0 ? 0 : 1 }).format(value);
   return `${number} ${UNITS[unit]}`;
 }
+
+/** Formats a 0..1 share as a whole percent; a non-zero share under 1% reads "<1%", never "0%". */
+export function formatShare(share: number, locale: Locale): string {
+  const percent = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 0 });
+  if (share > 0 && share < 0.01) return `<${percent.format(0.01)}`;
+  return percent.format(share);
+}

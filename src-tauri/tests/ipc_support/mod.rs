@@ -3,7 +3,8 @@
 //! opener / process / background / event ports. No real window, Steam or game.
 #![allow(dead_code)]
 use motogp_application::{
-    AppError, BackgroundRunner, ProcessInspector, SessionEvent, SessionPublisher, UrlOpener,
+    AppError, BackgroundRunner, FolderOpener, ProcessInspector, SessionEvent, SessionPublisher,
+    UrlOpener,
 };
 use motogp_infrastructure::{DataDir, SteamLibraries};
 use motogp_launcher_lib::{compose, configure, run_recovery, AppState};
@@ -20,11 +21,25 @@ use tempfile::TempDir;
 #[derive(Clone, Default)]
 pub struct FakeOpener {
     pub opened: Arc<Mutex<Vec<String>>>,
+    pub folders_opened: Arc<Mutex<Vec<PathBuf>>>,
 }
 
 impl UrlOpener for FakeOpener {
     fn open(&self, url: &str) -> Result<(), AppError> {
         self.opened.lock().unwrap().push(url.to_string());
+        Ok(())
+    }
+}
+
+/// Records the folders it was asked to open instead of starting a file manager.
+#[derive(Clone, Default)]
+pub struct FakeFolderOpener {
+    pub opened: Arc<Mutex<Vec<PathBuf>>>,
+}
+
+impl FolderOpener for FakeFolderOpener {
+    fn open_folder(&self, path: &Path) -> Result<(), AppError> {
+        self.opened.lock().unwrap().push(path.to_path_buf());
         Ok(())
     }
 }
@@ -86,6 +101,7 @@ pub fn invoke_on(
 pub struct Harness {
     pub tmp: TempDir,
     pub opened: Arc<Mutex<Vec<String>>>,
+    pub folders_opened: Arc<Mutex<Vec<PathBuf>>>,
     pub runner: Arc<ManualRunner>,
     pub recorder: Arc<Recorder>,
     pub app: App<MockRuntime>,
@@ -99,12 +115,15 @@ impl Harness {
         fs::create_dir_all(data.root()).unwrap();
         let opener = FakeOpener::default();
         let opened = opener.opened.clone();
+        let folder_opener = FakeFolderOpener::default();
+        let folders_opened = folder_opener.opened.clone();
         let runner = Arc::new(ManualRunner::default());
         let recorder = Arc::new(Recorder::default());
         let state = compose(
             &data,
             SteamLibraries::new(None),
             opener,
+            Arc::new(folder_opener),
             NoProcesses,
             recorder.clone(),
             runner.clone(),
@@ -119,6 +138,7 @@ impl Harness {
         Harness {
             tmp,
             opened,
+            folders_opened,
             runner,
             recorder,
             app,

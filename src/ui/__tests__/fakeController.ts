@@ -1,5 +1,20 @@
 import { vi } from 'vitest';
 import type { LauncherController, LauncherState } from '../../application';
+import type { StorageUsage } from '../../domain';
+
+/** An empty data folder: what the Storage section measures unless a test overrides `getStorageUsage`. */
+export function emptyStorage(): StorageUsage {
+  return {
+    root: 'C:/launcher-data',
+    totalBytes: 0,
+    freeBytes: null,
+    categories: [
+      { category: 'mods', bytes: 0 },
+      { category: 'launcher_data', bytes: 0 },
+      { category: 'other', bytes: 0 },
+    ],
+  };
+}
 
 export const initialState: LauncherState = {
   status: 'ready',
@@ -72,6 +87,8 @@ export function createFakeController(patch: Partial<LauncherState> = {}): FakeCo
     forgetStaleSession: action(),
     cleanStaleSession: action(),
     play: action(),
+    getStorageUsage: vi.fn(() => Promise.resolve(emptyStorage())),
+    openDataFolder: action(),
     dismissError: vi.fn(),
     dismissNotice: vi.fn(),
   };
