@@ -16,3 +16,5 @@ export type { UpdateController, UpdateDeps, UpdateState } from './updateControll
 export { createUpdateController } from './useCases/checkForUpdate';
 export { selectSessionClean } from './selectSessionClean';
 export { selectProfileLocked } from './selectProfileLocked';
+export type { AppInfo } from './ports/AppInfo';
+export { readAppVersion } from './useCases/readAppVersion';

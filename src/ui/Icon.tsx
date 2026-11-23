@@ -57,6 +57,13 @@ const GLYPHS = {
   up: <path d="M5.5 12.5L10 8l4.5 4.5" />,
   down: <path d="M5.5 7.5L10 12l4.5-4.5" />,
   plus: <path d="M10 4.5v11M4.5 10h11" />,
+  check: <path d="M4.5 10.5l3.5 3.5 7.5-8" />,
+  info: (
+    <>
+      <circle cx="10" cy="10" r="6.5" />
+      <path d="M10 9v4.5M10 6.5h.01" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof GLYPHS;

@@ -383,3 +383,18 @@ Gherkin: `tests/features/frontend/auto-update.feature` (frontend) and `src-tauri
 | Publish the feed only through the production flow | Rust cucumber only: "Publish the update feed only after validation on main" (`release_job_requires_successful_validation`), "Configure the updater with the production public key" (`updater_config_contains_public_key_and_endpoint`), "Grant the window only the updater permissions it needs" (`updater_capabilities_are_minimal`) (`src-tauri/tests/features/updater.feature`); the bound frontend scenario only asserts that this Rust feature still states the same rules |
 
 The scenario "Configure the updater with the production public key" stays red on purpose until the real signing key pair exists and its public key replaces the placeholder in `plugins.updater.pubkey` (external setup, see [auto-update.md](auto-update.md)). The real two-version update (install, restart on the new version) is validated in issue #11.
+
+### Issue #53: scenario traceability
+
+Gherkin: `tests/features/frontend/about.feature`, bound end to end by `src/ui/__tests__/about.feature.test.tsx` (`@amiceli/vitest-cucumber`, one `Scenario` per scenario) over the real launcher controller, the real update controller (`createUpdateController` with `FakeUpdateService`, extended in the test so `check()` can be held open) and an inline fake `AppInfo`. The version is read by `readAppVersion` (`src/application/useCases/__tests__/readAppVersion.test.ts`) through `createTauriAppInfo` (`src/infrastructure/__tests__/tauriAppInfo.test.ts`, `@tauri-apps/api/app` mocked at the boundary). Only `src/main.tsx` wires `createTauriAppInfo()` into the `App`.
+
+| Scenario | Tests |
+|----------|-------|
+| The status bar shows the launcher version | "returns the trimmed version" (application), "resolves the SDK version" (infrastructure), e2e "Scenario: The status bar shows the launcher version" (`v0.1.0` inside the status bar game block) |
+| Settings About shows the launcher version | e2e "Scenario: Settings About shows the launcher version" (About link current, version row labelled "Launcher version"); "About shows the version and no update check without an updater" (trimmed version, no check row) |
+| The version stays hidden when it cannot be read | "returns null and warns when the port rejects", "returns null and warns when getVersion throws synchronously", "returns null for an empty or whitespace version" (application), "propagates a rejection" (infrastructure), e2e "Scenario: The version stays hidden when it cannot be read" (no caption, Play enabled, About and Library reachable) |
+| Checking manually when already up to date | e2e "Scenario: Checking manually when already up to date" (button disabled as "Checking…" while the held check runs, then the polite status says up to date) |
+| Checking manually finds a newer version | e2e "Scenario: Checking manually finds a newer version" (status says "Version 0.2.0 is available"; "Install update" is an accent outline, downloads and restarts through the controller) |
+| A manual check that fails shows a translated error | e2e "Scenario: A manual check that fails shows a translated error" (pt-BR network message, raw updater text absent from the page) |
+| A failed background check does not claim the launcher is up to date | e2e "Scenario: A failed background check does not claim the launcher is up to date" (controller in `none` after the silent check, About shows neither "up to date" nor an error) |
+| Install from About is blocked during a game session | e2e "Scenario: Install from About is blocked during a game session" (install disabled, `aria-describedby` = the session hint, no download) |

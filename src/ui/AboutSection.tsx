@@ -1,0 +1,129 @@
+import { useState, useSyncExternalStore } from 'react';
+import { selectSessionClean } from '../application';
+import type { UpdateController, UpdateState } from '../application';
+import { useAppInfo } from './AppInfoContext';
+import { Icon } from './Icon';
+import { useI18n } from './i18n';
+import { useLauncher } from './LauncherContext';
+
+/** Settings > About: the launcher version and, when the updater exists, a manual update check. */
+export function AboutSection() {
+  const { t } = useI18n();
+  const { version, updater } = useAppInfo();
+
+  return (
+    <section id="settings-about" aria-labelledby="settings-about-title" className="settings-section">
+      <h3 id="settings-about-title" className="group-title">
+        {t.about.title}
+      </h3>
+      <div className="card rows">
+        <div className="setting-row">
+          <div className="setting-text">
+            <p className="setting-label">{t.about.versionLabel}</p>
+            <p className="hint">{t.about.versionHint}</p>
+          </div>
+          <div className="setting-control">
+            {version === null ? (
+              <span className="setting-value muted">{t.about.versionUnknown}</span>
+            ) : (
+              <span className="setting-value num">{version}</span>
+            )}
+          </div>
+        </div>
+        {updater && <UpdateCheckRow updater={updater} />}
+      </div>
+    </section>
+  );
+}
+
+function UpdateCheckRow({ updater }: { updater: UpdateController }) {
+  const { t } = useI18n();
+  const { state: launcher } = useLauncher();
+  const { userChecked, markUserChecked } = useAppInfo();
+  const state = useSyncExternalStore(updater.subscribe, updater.getState);
+  const [checking, setChecking] = useState(false);
+
+  const busy = state.kind === 'downloading' || state.kind === 'installed';
+  const info = state.kind === 'available' || state.kind === 'error' ? state.info : null;
+  const sessionBlocked = !selectSessionClean(launcher);
+
+  const check = async () => {
+    setChecking(true);
+    try {
+      await updater.check();
+    } finally {
+      setChecking(false);
+      markUserChecked();
+    }
+  };
+
+  return (
+    <div className="setting-row setting-row-block setting-row-stack">
+      <div className="setting-row-line">
+        <div className="setting-text">
+          <p className="setting-label">{t.about.updatesLabel}</p>
+          <p className="hint">{t.about.updatesHint}</p>
+        </div>
+        <div className="setting-control">
+          <button type="button" className="btn btn-sm" disabled={checking || busy} onClick={() => void check()}>
+            <Icon name="refresh" />
+            {checking ? t.about.checking : t.about.check}
+          </button>
+        </div>
+      </div>
+
+      <div className="update-result">
+        <div role="status" className="update-result-line">
+          {!checking && <ResultText state={state} userChecked={userChecked} />}
+        </div>
+        {info !== null && !busy && !checking && (
+          <div className="update-result-action">
+            <button
+              type="button"
+              className="btn btn-sm btn-accent-outline"
+              disabled={sessionBlocked}
+              aria-describedby={sessionBlocked ? 'about-update-blocked' : undefined}
+              onClick={() => void updater.install()}
+            >
+              <Icon name="import" />
+              {t.about.install}
+            </button>
+            {sessionBlocked && (
+              <p id="about-update-blocked" className="hint">
+                {t.update.blockedBySession}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ResultText({ state, userChecked }: { state: UpdateState; userChecked: boolean }) {
+  const { t } = useI18n();
+  switch (state.kind) {
+    case 'none':
+      return userChecked ? (
+        <span className="update-result-ok">
+          <Icon name="check" />
+          {t.about.upToDate}
+        </span>
+      ) : null;
+    case 'available':
+      return <span className="update-result-new">{t.about.available(state.info.version)}</span>;
+    case 'downloading':
+      return <span>{t.update.downloading}</span>;
+    case 'installed':
+      return <span>{t.update.restarting}</span>;
+    case 'error':
+      return (
+        <>
+          {state.info && <span className="update-result-new">{t.about.available(state.info.version)}</span>}
+          <span className="update-result-error">{t.update.errors[state.error.kind]}</span>
+        </>
+      );
+    default:
+      return null;
+  }
+}

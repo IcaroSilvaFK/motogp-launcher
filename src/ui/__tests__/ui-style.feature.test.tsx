@@ -343,9 +343,9 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       launch();
       await user.click(nav().getByRole('button', { name: 'Settings' }));
     });
-    Then('I see a "Settings sections" navigation with "Game" and "Preferences"', () => {
+    Then('I see a "Settings sections" navigation with "Game", "Preferences" and "About"', () => {
       const sections = within(screen.getByRole('navigation', { name: 'Settings sections' }));
-      expect(sections.getAllByRole('link').map((link) => link.textContent)).toEqual(['Game', 'Preferences']);
+      expect(sections.getAllByRole('link').map((link) => link.textContent)).toEqual(['Game', 'Preferences', 'About']);
     });
     And('the "Game" section is marked as the current location', () => {
       const sections = within(screen.getByRole('navigation', { name: 'Settings sections' }));

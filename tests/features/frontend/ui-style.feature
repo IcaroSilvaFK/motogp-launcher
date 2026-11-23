@@ -75,7 +75,7 @@ Feature: Polished dark launcher interface
 
   Scenario: Settings has a section navigation
     Given the launcher open on the Settings screen
-    Then I see a "Settings sections" navigation with "Game" and "Preferences"
+    Then I see a "Settings sections" navigation with "Game", "Preferences" and "About"
     And the "Game" section is marked as the current location
     When I select the "Preferences" section
     Then the "Preferences" section is marked as the current location

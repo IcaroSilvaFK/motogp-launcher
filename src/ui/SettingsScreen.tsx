@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import type { MouseEvent } from 'react';
+import { AboutSection } from './AboutSection';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { LOCALES, useI18n } from './i18n';
 import type { Locale } from './i18n';
 import { useLauncher } from './LauncherContext';
 
-type SectionId = 'game' | 'preferences';
+type SectionId = 'game' | 'preferences' | 'about';
 
 const SECTIONS: readonly { id: SectionId; icon: IconName }[] = [
   { id: 'game', icon: 'game' },
   { id: 'preferences', icon: 'language' },
+  { id: 'about', icon: 'info' },
 ];
 
 export function SettingsScreen() {
@@ -18,7 +20,11 @@ export function SettingsScreen() {
   const { controller, state } = useLauncher();
   const { game, detected } = state;
   const [current, setCurrent] = useState<SectionId>('game');
-  const sectionTitle: Record<SectionId, string> = { game: t.settings.game, preferences: t.settings.preferences };
+  const sectionTitle: Record<SectionId, string> = {
+    game: t.settings.game,
+    preferences: t.settings.preferences,
+    about: t.about.title,
+  };
 
   const jump = (event: MouseEvent<HTMLAnchorElement>, id: SectionId) => {
     event.preventDefault();
@@ -146,6 +152,8 @@ export function SettingsScreen() {
               </div>
             </div>
           </section>
+
+          <AboutSection />
         </div>
       </div>
     </section>
