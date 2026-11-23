@@ -133,10 +133,11 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
         Ok(())
     }
 
-    /// Replaces the mods of a profile, preserving the given order.
+    /// "Set load order" use case: replaces the mods of a profile, keeping the
+    /// given order (index 0 loads first, the last wins) without duplicates.
     pub fn set_mods(&self, id: &str, mod_ids: Vec<String>) -> Result<Profile, ProfileServiceError> {
         self.update(id, |profile| {
-            profile.mod_ids = mod_ids;
+            profile.set_load_order(mod_ids);
             Ok(())
         })
     }
@@ -307,6 +308,17 @@ mod tests {
         assert_eq!(updated.mod_ids, ["b", "a", "c"]);
         assert_eq!(service.get(&created.id).unwrap().mod_ids, ["b", "a", "c"]);
         assert_eq!(stored(&service)[1].mod_ids, ["b", "a", "c"]);
+    }
+
+    #[test]
+    fn set_mods_dedupes_keeping_first_occurrence() {
+        let service = service();
+        let created = service.create("A").unwrap();
+        let updated = service
+            .set_mods(&created.id, mods(&["b", "a", "b"]))
+            .unwrap();
+        assert_eq!(updated.mod_ids, ["b", "a"]);
+        assert_eq!(stored(&service)[1].mod_ids, ["b", "a"]);
     }
 
     #[test]

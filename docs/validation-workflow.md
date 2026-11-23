@@ -433,3 +433,24 @@ Gherkin: `tests/features/frontend/storage.feature`, bound by `src/ui/__tests__/s
 | Unknown free space is shown as unavailable | vitest-cucumber "Unknown free space is shown as unavailable", gateway "free space is kept as a number" |
 | A failed measurement shows an inline error with retry | vitest-cucumber "A failed measurement shows an inline error with retry", "When Retry succeeds after a failure", "When a refresh fails after a successful measurement" (StorageSection), controller "no global error is set" |
 | The section is translated | vitest-cucumber "The section is translated" (pt-BR labels and `1,5 GB`) |
+
+### Load order and conflicts (#55)
+
+The load order is `Profile.mod_ids` (index 0 loads first, the last one wins). Gherkin (Rust side): `crates/domain/tests/features/load-order.feature`, `crates/application/tests/features/load-order.feature` and `crates/infrastructure/tests/features/profile-persistence.feature`. The frontend scenarios live in `tests/features/frontend/load-order.feature`. Limitation: only file-name conflicts are detected, not asset conflicts inside paks.
+
+| Scenario | Tests |
+|----------|-------|
+| Later mod in the load order wins a conflict | `later_mod_wins_and_path_uses_the_winner_spelling` (domain), domain cucumber "Later mod in the load order wins a conflict" |
+| Reordering changes the winner | `reordering_changes_the_winner`, `three_mods_keep_load_order` (domain), domain cucumber "Reordering changes the winner" |
+| Mods without shared files do not conflict | `disjoint_files_do_not_conflict`, `a_mod_shipping_the_name_twice_counts_once` (domain), domain cucumber |
+| Missing and duplicate mods are ignored | `missing_and_duplicate_ids_are_ignored` (domain), domain cucumber |
+| The load order has no duplicates | `set_load_order_dedupes_keeping_first_occurrence`, `normalize_load_order_keeps_unique_input_untouched` (domain), domain cucumber |
+| Saving the load order persists it normalized | `set_mods_dedupes_keeping_first_occurrence` (application), application cucumber "Saving the load order persists it normalized" |
+| Listing conflicts for a candidate order | `list_conflicts_reads_the_library_and_follows_the_candidate_order` (application), application cucumber, IPC `list_conflicts_takes_camel_case_mod_ids_and_returns_snake_case_dtos`, `list_conflicts_rejects_snake_case_arguments` |
+| Deploy follows the load order | `resolve_profile_mods_deploys_a_repeated_id_once` (application), application cucumber "Deploy follows the load order" |
+| A legacy profiles file keeps its implicit order | `legacy_file_keeps_its_order_and_unknown_ids` (infrastructure), infrastructure cucumber "A legacy profiles file keeps its implicit order" |
+| Duplicate IDs in a legacy file collapse to the first occurrence | `duplicate_mod_ids_collapse_to_the_first_occurrence_on_load` (infrastructure), infrastructure cucumber |
+| Reorder the load order with the keyboard | `tests/features/frontend/load-order.feature` bound by `src/ui/__tests__/load-order.feature.test.tsx` (Enter on "Move Beta up", focus kept on the moved mod, save sends `["beta", "alpha"]`) |
+| The conflicts panel previews the draft order | `load-order.feature.test.tsx` (panel lists the path and the mods in load order, the winner follows the unsaved draft, nothing is saved) |
+| No conflicts | `load-order.feature.test.tsx` (status reads "No conflicts"; with one mod left no preview request is made) |
+| Library rows show a conflict badge for the active profile | `load-order.feature.test.tsx` ("Overridden" / "Wins" badges with their tooltip and accessible sentence, no badge without conflicts) |

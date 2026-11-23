@@ -1,7 +1,7 @@
 use crate::{ArchiveReader, ContentHasher, LibraryError, LibraryFiles, ModRepository};
 use motogp_domain::{
     base_name, display_name, extension_of, group_pak_files, is_mod_file, is_valid_mod_id,
-    mod_id_from_hash, ModEntry, ModGroup,
+    mod_id_from_hash, FileConflict, ModEntry, ModGroup,
 };
 use std::path::Path;
 
@@ -27,6 +27,11 @@ where
             archive,
             hasher,
         }
+    }
+
+    /// File conflicts of a candidate load order against the library.
+    pub fn list_conflicts(&self, order: &[String]) -> Result<Vec<FileConflict>, LibraryError> {
+        crate::list_conflicts(&self.repository, order)
     }
 
     pub fn list(&self) -> Result<Vec<ModEntry>, LibraryError> {

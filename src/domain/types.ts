@@ -14,6 +14,13 @@ export interface GameInfo {
   app_id: number | null;
 }
 
+/** Files that several mods of a load order ship; `mod_ids` are in load order and the last one wins. */
+export interface FileConflict {
+  path: string;
+  mod_ids: string[];
+  winner: string;
+}
+
 export interface ModEntry {
   id: string;
   name: string;

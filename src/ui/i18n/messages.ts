@@ -50,6 +50,14 @@ export interface Messages {
     toggleLocked: string;
     toggleVanilla: string;
     toggleNoProfile: string;
+    /** Conflict badge of a row whose mod wins every file it shares in the active profile. */
+    conflictWins: string;
+    /** Conflict badge of a row whose mod loses at least one shared file in the active profile. */
+    conflictOverridden: string;
+    /** Tooltip and accessible text of the "wins" badge: files won and the mods it beats. */
+    conflictWinsDetail: (count: number, others: string[]) => string;
+    /** Tooltip and accessible text of the "overridden" badge: files lost and the mods that win them. */
+    conflictOverriddenDetail: (count: number, winners: string[]) => string;
   };
   profiles: {
     title: string;
@@ -74,6 +82,13 @@ export interface Messages {
     modCount: (count: number) => string;
     active: string;
     selectHint: string;
+    orderHint: string;
+    conflictsTitle: string;
+    /** Live summary of the draft's conflicts; 0 reads as "no conflicts". */
+    conflictsSummary: (count: number) => string;
+    conflictsHint: string;
+    conflictsEmpty: string;
+    conflictWinner: string;
   };
   settings: {
     title: string;

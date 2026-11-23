@@ -1,10 +1,93 @@
-import { useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import type { Profile } from '../domain';
+import type { FileConflict, Profile } from '../domain';
 import { isVanilla, moveItem, toggleMod } from '../domain';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
+
+type Direction = 'up' | 'down';
+
+/**
+ * Conflicts of the unsaved draft order. Each order change asks the back end again; a response
+ * that arrives after a newer request is dropped. Fewer than two mods cannot conflict, so nothing
+ * is asked.
+ */
+function ConflictsPanel({ order, nameOf }: { order: string[]; nameOf: (id: string) => string }) {
+  const { t } = useI18n();
+  const { controller } = useLauncher();
+  const [conflicts, setConflicts] = useState<FileConflict[]>([]);
+  // A string key so the effect reruns on a real order change, not on every render.
+  const orderKey = JSON.stringify(order);
+
+  // The previous result stays on screen while a new one loads, so the panel does not flicker.
+  const shown = order.length < 2 ? [] : conflicts;
+
+  useEffect(() => {
+    const ids = JSON.parse(orderKey) as string[];
+    if (ids.length < 2) return;
+    let current = true;
+    void controller.previewConflicts(ids).then((result) => {
+      if (current) setConflicts(result);
+    });
+    return () => {
+      current = false;
+    };
+  }, [controller, orderKey]);
+
+  return (
+    <section aria-labelledby="conflicts-title" className="conflicts">
+      <div className="conflicts-head">
+        <h4 id="conflicts-title" className="section-title">
+          {t.profiles.conflictsTitle}
+        </h4>
+        <p role="status" aria-live="polite" className={shown.length === 0 ? 'badge badge-off' : 'badge badge-warning'}>
+          {t.profiles.conflictsSummary(shown.length)}
+        </p>
+      </div>
+      {shown.length === 0 ? (
+        <div className="empty-state empty-state-inline">
+          <span className="empty-icon" aria-hidden="true">
+            <Icon name="check" />
+          </span>
+          <p className="hint">{t.profiles.conflictsEmpty}</p>
+        </div>
+      ) : (
+        <>
+          <p className="hint">{t.profiles.conflictsHint}</p>
+          <ul className="conflict-list">
+            {shown.map((conflict, index) => {
+              const pathId = `conflict-path-${index}`;
+              return (
+                <li key={conflict.path} className="conflict-item">
+                  <span id={pathId} className="conflict-path" title={conflict.path}>
+                    {conflict.path}
+                  </span>
+                  <ol className="conflict-mods" aria-labelledby={pathId}>
+                    {conflict.mod_ids.map((id) => (
+                      <li
+                        key={id}
+                        className={id === conflict.winner ? 'conflict-mod conflict-mod-winner' : 'conflict-mod'}
+                      >
+                        <span className="conflict-mod-name">{nameOf(id)}</span>
+                        {id === conflict.winner && (
+                          <>
+                            {' '}
+                            <span className="badge badge-info">{t.profiles.conflictWinner}</span>
+                          </>
+                        )}
+                      </li>
+                    ))}
+                  </ol>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
 
 function ProfileEditor({ profile }: { profile: Profile }) {
   const { t } = useI18n();
@@ -13,6 +96,29 @@ function ProfileEditor({ profile }: { profile: Profile }) {
   const [draft, setDraft] = useState<string[]>(profile.mod_ids);
   const modsById = new Map(state.mods.map((mod) => [mod.id, mod]));
   const ordered = draft.filter((id) => modsById.has(id));
+  const nameOf = (id: string) => modsById.get(id)?.name ?? id;
+
+  // Keyboard focus follows the moved mod: its button in the same direction, or the other one
+  // when the move reached an end of the list (that button is then disabled).
+  const moveButtons = useRef(new Map<string, HTMLButtonElement>());
+  const [moved, setMoved] = useState<{ id: string; direction: Direction } | null>(null);
+  useLayoutEffect(() => {
+    if (moved === null) return;
+    const same = moveButtons.current.get(`${moved.id}:${moved.direction}`);
+    const other = moveButtons.current.get(`${moved.id}:${moved.direction === 'up' ? 'down' : 'up'}`);
+    (same && !same.disabled ? same : other)?.focus();
+  }, [moved]);
+
+  const move = (id: string, index: number, direction: Direction) => {
+    setDraft(moveItem(ordered, index, direction === 'up' ? -1 : 1));
+    setMoved({ id, direction });
+  };
+
+  const bindMoveButton = (id: string, direction: Direction) => (element: HTMLButtonElement | null) => {
+    const key = `${id}:${direction}`;
+    if (element) moveButtons.current.set(key, element);
+    else moveButtons.current.delete(key);
+  };
 
   const rename = (event: FormEvent) => {
     event.preventDefault();
@@ -81,28 +187,39 @@ function ProfileEditor({ profile }: { profile: Profile }) {
 
             {ordered.length > 0 && (
               <div className="editor-column">
-                <h4 className="section-title">{t.profiles.orderTitle}</h4>
-                <ol className="order-list">
+                <h4 id="load-order-title" className="section-title">
+                  {t.profiles.orderTitle}
+                </h4>
+                <p className="hint">{t.profiles.orderHint}</p>
+                <ol className="order-list" aria-labelledby="load-order-title">
                   {ordered.map((id, index) => {
-                    const modName = modsById.get(id)?.name ?? id;
+                    const modName = nameOf(id);
                     return (
                       <li key={id}>
-                        <span className="order-name">{modName}</span>
+                        {/* The list already tells assistive tech the position; the number is visual. */}
+                        <span className="order-pos num" aria-hidden="true">
+                          {index + 1}
+                        </span>
+                        <span className="order-name" title={modName}>
+                          {modName}
+                        </span>
                         <button
+                          ref={bindMoveButton(id, 'up')}
                           type="button"
                           className="btn btn-icon btn-sm"
                           disabled={index === 0}
                           aria-label={t.profiles.moveUp(modName)}
-                          onClick={() => setDraft(moveItem(ordered, index, -1))}
+                          onClick={() => move(id, index, 'up')}
                         >
                           <Icon name="up" />
                         </button>
                         <button
+                          ref={bindMoveButton(id, 'down')}
                           type="button"
                           className="btn btn-icon btn-sm"
                           disabled={index === ordered.length - 1}
                           aria-label={t.profiles.moveDown(modName)}
-                          onClick={() => setDraft(moveItem(ordered, index, 1))}
+                          onClick={() => move(id, index, 'down')}
                         >
                           <Icon name="down" />
                         </button>
@@ -113,6 +230,8 @@ function ProfileEditor({ profile }: { profile: Profile }) {
               </div>
             )}
           </div>
+
+          <ConflictsPanel order={ordered} nameOf={nameOf} />
 
           <div className="card-footer">
             <button

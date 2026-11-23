@@ -1,5 +1,6 @@
 import type {
   Config,
+  FileConflict,
   DeploySession,
   GameInfo,
   Locale,
@@ -28,6 +29,8 @@ export interface LauncherGateway {
   deleteProfile(id: string): Promise<void>;
   setProfileMods(id: string, modIds: string[]): Promise<Profile>;
   setActiveProfile(id: string): Promise<void>;
+  /** Stateless: conflicts of a candidate load order (first loads first, last wins). */
+  listConflicts(modIds: string[]): Promise<FileConflict[]>;
   play(profileId: string): Promise<void>;
   recoveryStatus(): Promise<RecoveryStatus>;
   deploySession(): Promise<DeploySession>;

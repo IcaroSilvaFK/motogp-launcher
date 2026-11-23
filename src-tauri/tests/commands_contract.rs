@@ -104,6 +104,58 @@ fn commands_preserve_camel_case_arguments_and_snake_case_dtos() {
 }
 
 #[test]
+fn list_conflicts_takes_camel_case_mod_ids_and_returns_snake_case_dtos() {
+    let h = Harness::new();
+    h.recover().unwrap();
+    let root = h.create_game();
+    h.invoke("set_game_dir", json!({ "path": root.to_string_lossy() }))
+        .unwrap();
+    // Two different mods shipping the same file name (different contents).
+    let first = h.write_mod_source("Same_P.pak", b"first-pak-content");
+    let imported = h
+        .invoke("import_mods", json!({ "paths": [first.to_string_lossy()] }))
+        .unwrap();
+    let second = h.write_mod_source("same_p.pak", b"second-pak-content");
+    let imported_two = h
+        .invoke(
+            "import_mods",
+            json!({ "paths": [second.to_string_lossy()] }),
+        )
+        .unwrap();
+    let a = imported[0]["id"].as_str().unwrap().to_string();
+    let b = imported_two[0]["id"].as_str().unwrap().to_string();
+
+    let found = h
+        .invoke("list_conflicts", json!({ "modIds": [a, b] }))
+        .unwrap();
+
+    assert_eq!(found.as_array().unwrap().len(), 1);
+    assert_eq!(keys(&found[0]), ["mod_ids", "path", "winner"]);
+    assert_eq!(found[0]["mod_ids"], json!([a, b]));
+    assert_eq!(found[0]["winner"], json!(b));
+    let reversed = h
+        .invoke("list_conflicts", json!({ "modIds": [b, a] }))
+        .unwrap();
+    assert_eq!(reversed[0]["winner"], json!(a));
+    let none = h
+        .invoke("list_conflicts", json!({ "modIds": [a, "gone00000000"] }))
+        .unwrap();
+    assert_eq!(none, json!([]));
+}
+
+#[test]
+fn list_conflicts_rejects_snake_case_arguments() {
+    let h = Harness::new();
+    h.recover().unwrap();
+
+    let error = h
+        .invoke("list_conflicts", json!({ "mod_ids": [] }))
+        .unwrap_err();
+
+    assert!(error.to_string().contains("modIds"), "{error}");
+}
+
+#[test]
 fn snake_case_arguments_are_not_accepted_from_javascript() {
     let h = Harness::new();
     h.recover().unwrap();

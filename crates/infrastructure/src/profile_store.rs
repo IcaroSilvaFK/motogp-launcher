@@ -1,7 +1,7 @@
 //! `ProfileRepository` backed by `profiles.json` and the real `Clock`.
 use crate::store::{load_json, save_json};
 use motogp_application::{AppError, Clock, ProfileRepository};
-use motogp_domain::{normalize_name, Profile, ProfileError};
+use motogp_domain::{normalize_load_order, normalize_name, Profile, ProfileError};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -22,7 +22,8 @@ impl TryFrom<ProfileDto> for Profile {
         Ok(Profile {
             id: dto.id,
             name: normalize_name(&dto.name)?,
-            mod_ids: dto.mod_ids,
+            // Migration: legacy files keep their order; only duplicates collapse.
+            mod_ids: normalize_load_order(dto.mod_ids),
         })
     }
 }
@@ -132,6 +133,31 @@ mod tests {
         fs::write(&path, br#"[{"id":"p1","name":"Old"}]"#).unwrap();
         let store = JsonProfileStore::new(&path);
         assert_eq!(store.load(), Ok(vec![profile("p1", "Old", &[])]));
+    }
+
+    #[test]
+    fn legacy_file_keeps_its_order_and_unknown_ids() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("profiles.json");
+        let content = br#"[{"id":"p1","name":"Old","mod_ids":["z","y","x"]}]"#;
+        fs::write(&path, content).unwrap();
+        let store = JsonProfileStore::new(&path);
+        assert_eq!(
+            store.load(),
+            Ok(vec![profile("p1", "Old", &["z", "y", "x"])])
+        );
+        assert_eq!(fs::read(&path).unwrap(), content, "not rewritten on load");
+    }
+
+    #[test]
+    fn duplicate_mod_ids_collapse_to_the_first_occurrence_on_load() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("profiles.json");
+        let content = br#"[{"id":"p1","name":"Old","mod_ids":["a","b","a"]}]"#;
+        fs::write(&path, content).unwrap();
+        let store = JsonProfileStore::new(&path);
+        assert_eq!(store.load(), Ok(vec![profile("p1", "Old", &["a", "b"])]));
+        assert_eq!(fs::read(&path).unwrap(), content, "not rewritten on load");
     }
 
     #[test]

@@ -15,6 +15,8 @@ mod deploy;
 mod game_detection;
 #[path = "bdd/library.rs"]
 mod library;
+#[path = "bdd/load_order.rs"]
+mod load_order;
 #[path = "bdd/profiles.rs"]
 mod profiles;
 
@@ -41,6 +43,7 @@ type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 const FEATURES: &[(&str, Runner)] = &[
     ("game-detection", || Box::pin(game_detection::run())),
     ("profiles", || Box::pin(profiles::run())),
+    ("load-order", || Box::pin(load_order::run())),
     ("library", || Box::pin(library::run())),
     ("session-tracking", || Box::pin(session_tracking::run())),
     ("deploy", || Box::pin(deploy::run())),

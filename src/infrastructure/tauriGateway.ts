@@ -45,6 +45,7 @@ export function createTauriGateway(invoke: InvokeFn = tauriInvoke): LauncherGate
     deleteProfile: (id) => call('delete_profile', { id }),
     setProfileMods: (id, modIds) => call('set_profile_mods', { id, modIds }),
     setActiveProfile: (id) => call('set_active_profile', { id }),
+    listConflicts: (modIds) => call('list_conflicts', { modIds }),
     play: (profileId) => call('play', { profileId }),
     recoveryStatus: () => call('recovery_status'),
     deploySession: () => call('deploy_session'),

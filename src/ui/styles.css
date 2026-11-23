@@ -1022,7 +1022,7 @@ button {
 
 .mod-row {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto auto;
   align-items: center;
   column-gap: var(--space-3);
   min-height: 52px;
@@ -1114,6 +1114,30 @@ button {
 .badge-off {
   background: var(--surface-3);
   color: var(--text-muted);
+}
+
+/* Conflict state (#55): neutral blue for "wins", amber for "overridden" and the conflict count. */
+.badge-info {
+  background: var(--info-bg);
+  border-color: var(--info-border);
+  color: var(--info-fg);
+}
+
+.badge-warning {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-fg);
+}
+
+/* Holds the row's conflict badge; empty (zero width) when the mod has no conflict. */
+.mod-flags {
+  display: inline-flex;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
+.badge-conflict {
+  cursor: default;
 }
 
 .badge-store {
@@ -1772,17 +1796,113 @@ button {
   padding: 0 var(--space-2) 0 var(--space-3);
 }
 
-.order-list {
-  counter-reset: order;
-}
-
-.order-list > li::before {
-  counter-increment: order;
-  content: counter(order);
+/* Load order position: rendered in markup (aria-hidden; the <ol> already exposes it). */
+.order-pos {
+  flex: none;
   width: 20px;
   color: var(--text-muted);
   font-size: var(--fs-caption);
-  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Conflicts panel (profile editor, #55) ---------- */
+
+.conflicts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.conflicts-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.conflicts-head .badge {
+  margin: 0;
+}
+
+.empty-state-inline {
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  text-align: start;
+}
+
+.empty-state-inline .empty-icon {
+  width: 32px;
+  height: 32px;
+  margin: 0;
+}
+
+.empty-state-inline .empty-icon .icon {
+  width: 16px;
+  height: 16px;
+  stroke: var(--running);
+}
+
+.conflict-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+}
+
+.conflict-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+}
+
+.conflict-item + .conflict-item {
+  border-top: 1px solid var(--border);
+}
+
+.conflict-path {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-mono);
+  font-size: var(--fs-small);
+}
+
+/* Involved mods in load order, left to right, separated by a chevron. */
+.conflict-mods {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: var(--fs-small);
+}
+
+.conflict-mod {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.conflict-mod + .conflict-mod::before {
+  content: '›' / '';
+  margin-right: var(--space-1);
+  color: var(--text-muted);
+}
+
+.conflict-mod-winner {
+  color: var(--text);
+  font-weight: 600;
 }
 
 .order-name,
