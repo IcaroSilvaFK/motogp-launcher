@@ -82,6 +82,19 @@ fn commands_preserve_camel_case_arguments_and_snake_case_dtos() {
         "tracking was scheduled"
     );
 
+    // Stale-session recovery (issue #34): the session of this Play is current;
+    // the session is still active, so both recovery commands are refused.
+    let session = h.invoke("deploy_session", json!({})).unwrap();
+    assert_eq!(keys(&session), ["mods_dir", "state", "tracked"]);
+    assert_eq!(session["state"], "current");
+    assert_eq!(session["tracked"], 1);
+    let forget = h.invoke("forget_stale_session", json!({})).unwrap_err();
+    assert_eq!(forget["code"], "already_running");
+    let clean = h
+        .invoke("clean_stale_session", json!({ "confirmedDir": "x/~mods" }))
+        .unwrap_err();
+    assert_eq!(clean["code"], "already_running");
+
     // Removal commands keep the data consistent.
     h.invoke("delete_profile", json!({ "id": id })).unwrap();
     let config = h.invoke("get_config", json!({})).unwrap();
