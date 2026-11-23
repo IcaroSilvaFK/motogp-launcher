@@ -92,6 +92,24 @@ export const ptBR: Messages = {
     staleCleaned: (cleaned) =>
       `Pasta antiga limpa; ${cleaned} ${plural(cleaned, 'arquivo removido', 'arquivos removidos')}`,
   },
+  update: {
+    available: (version) => `Nova versão ${version} disponível`,
+    currentVersion: (version) => `Você está na versão ${version}.`,
+    button: 'Atualizar',
+    downloading: 'Baixando a atualização…',
+    progressLabel: 'Baixando atualização',
+    restarting: 'Atualização instalada. Reiniciando…',
+    blockedBySession:
+      'Uma sessão do jogo está iniciando ou em execução, ou há uma limpeza pendente. Encerre a sessão antes de atualizar.',
+    errors: {
+      network: 'Não foi possível acessar o servidor de atualização. Verifique a conexão e tente novamente.',
+      signature: 'A atualização falhou na verificação de assinatura e não foi instalada.',
+      install: 'Não foi possível instalar a atualização.',
+      session: 'Há uma sessão do jogo ativa ou limpeza pendente, então a atualização não foi instalada.',
+      busy: 'Já existe uma atualização em andamento.',
+      unknown: 'A atualização falhou por um motivo desconhecido.',
+    },
+  },
   errors: {
     read_failed: 'Não foi possível ler os dados do launcher.',
     write_failed: 'Não foi possível salvar os dados do launcher.',

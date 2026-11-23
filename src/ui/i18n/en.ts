@@ -91,6 +91,24 @@ export const en: Messages = {
     staleForgotten: 'Old session forgotten',
     staleCleaned: (cleaned) => `Old folder cleaned; ${cleaned} ${plural(cleaned, 'file', 'files')} removed`,
   },
+  update: {
+    available: (version) => `New version ${version} available`,
+    currentVersion: (version) => `You have version ${version}.`,
+    button: 'Update',
+    downloading: 'Downloading the update…',
+    progressLabel: 'Downloading update',
+    restarting: 'Update installed. Restarting…',
+    blockedBySession:
+      'A game session is starting or running, or cleanup is pending. Finish the session before updating.',
+    errors: {
+      network: 'Could not reach the update server. Check your connection and try again.',
+      signature: 'The update failed signature verification and was not installed.',
+      install: 'The update could not be installed.',
+      session: 'A game session is active or cleanup is pending, so the update was not installed.',
+      busy: 'An update is already in progress.',
+      unknown: 'The update failed for an unknown reason.',
+    },
+  },
   errors: {
     read_failed: 'Could not read the launcher data.',
     write_failed: 'Could not save the launcher data.',

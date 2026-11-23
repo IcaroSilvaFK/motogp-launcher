@@ -33,12 +33,20 @@ The installed launcher checks whether a newer version exists, downloads the pack
    ```
 5. **Capabilities** (`src-tauri/capabilities/default.json`): add `"updater:default"` and `"process:allow-restart"`.
 
+**Current key (done 2026-11-23):** the production pair was generated on the maintainer's PC at `~/.tauri/motogp-launcher.key` (password in `~/.tauri/motogp-launcher.key.password`); both GitHub secrets are set and the public key is in `tauri.conf.json`. Back up the key and the password outside this machine: if either is lost, installed apps can no longer verify new updates and users must reinstall manually.
+
 ## Clean Architecture on the front end
 
-- `application/ports/UpdateService.ts`: interface `check()`, `downloadAndInstall(onProgress)`, `restart()`.
-- `infrastructure/tauri/TauriUpdateService.ts`: adapter using `@tauri-apps/plugin-updater` and `plugin-process`.
-- `application/useCases/checkForUpdate.ts`: use case, tested with a fake of the port (TDD).
-- `ui/UpdateBanner.tsx`: presentation only (new version, notes, progress bar, button).
+- `src/application/ports/UpdateService.ts`: port with `check()`, `downloadAndInstall(onProgress)` and `restart()`.
+- `src/infrastructure/tauri/TauriUpdateService.ts`: adapter over `@tauri-apps/plugin-updater` and `@tauri-apps/plugin-process` (`createTauriUpdateService()`).
+- `src/application/useCases/checkForUpdate.ts`: use case `createUpdateController`, tested with `FakeUpdateService` (TDD).
+- `src/ui/UpdateBanner.tsx`: presentation only (new version, notes, progress, error, button).
+- `src/main.tsx`: composition root. It injects the Tauri service, wires `isSessionClean` from the launcher state (`selectSessionClean`) and triggers one non-blocking check on startup.
+
+**Session guard:** the update is shown even during a game session, but the button is disabled and `install()` itself refuses (`session` error) while a session is `starting`/`running` or recovery is `game-running`/`failed`, so `~mods` is never cleaned under a running game.
+
+**Feed:** the endpoint is `https://github.com/IcaroSilvaFK/motogp-launcher/releases/latest/download/latest.json`. The repository `IcaroSilvaFK/motogp-launcher` is public, so the app needs no token.
+
 
 ## Base BDD scenario
 
