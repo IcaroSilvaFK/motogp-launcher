@@ -119,7 +119,9 @@ fn test_targets_exist(_w: &mut ScaffoldWorld) {
     // targets exist and are non-interactive, avoiding `cargo test` recursion.
     assert_eq!(json("package.json")["scripts"]["test"], "vitest run");
     assert!(read("src-tauri/Cargo.toml").contains("harness = false"));
-    assert!(root().join("src/ui/__tests__/scaffold.test.tsx").is_file());
+    assert!(root()
+        .join("tooling/__tests__/scaffold.feature.test.tsx")
+        .is_file());
 }
 
 // ---------- Scenario 2: validate the Windows application configuration ----------

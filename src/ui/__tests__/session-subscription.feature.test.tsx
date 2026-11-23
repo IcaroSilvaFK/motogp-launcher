@@ -1,13 +1,14 @@
-// End-to-end scenario of tests/features/frontend/session-subscription.feature: the real
-// application controller and the real UI, with only the ports replaced by the in-memory fakes.
+// Binds tests/features/frontend/session-subscription.feature end to end: the real application
+// controller and the real UI, with only the ports replaced by the in-memory fakes.
+import { describeFeature } from '@amiceli/vitest-cucumber';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { expect } from 'vitest';
 import { createLauncherController } from '../../application';
+import type { LauncherController } from '../../application';
 import { FakeDropEvents, FakeGateway, FakePicker, FakeSessionEvents } from '../../application/__tests__/fakes';
 import type { GameInfo } from '../../domain';
 import { App } from '../App';
-
-afterEach(cleanup);
+import { loadFrontendFeature } from './features';
 
 const game: GameInfo = {
   name: 'MotoGP 25',
@@ -16,19 +17,36 @@ const game: GameInfo = {
   app_id: 1234,
 };
 
-describe('Given the session event subscription rejects', () => {
-  it('When the launcher starts Then an error notice is announced and Play stays disabled', async () => {
-    const controller = createLauncherController({
-      gateway: new FakeGateway({ game }),
-      picker: new FakePicker(),
-      session: new FakeSessionEvents({ rejectSession: new Error('listen failed') }),
-      drop: new FakeDropEvents(),
-    });
-    render(<App controller={controller} locale="en" />);
-    await waitFor(() => expect(controller.getState().status).toBe('ready'));
+const feature = await loadFrontendFeature('session-subscription');
 
-    expect(await screen.findByRole('alert')).toHaveTextContent('Session events are unavailable');
-    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
-    expect(screen.getByRole('status')).toHaveTextContent('Play is disabled');
+describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
+  // Steps are separate tests: the DOM must survive between them, so clean up per scenario.
+  AfterEachScenario(cleanup);
+
+  Scenario('The session event subscription fails', ({ Given, When, Then, And }) => {
+    let controller: LauncherController;
+
+    Given('the session event subscription rejects', () => {
+      controller = createLauncherController({
+        gateway: new FakeGateway({ game }),
+        picker: new FakePicker(),
+        session: new FakeSessionEvents({ rejectSession: new Error('listen failed') }),
+        drop: new FakeDropEvents(),
+      });
+    });
+
+    When('the launcher starts', async () => {
+      render(<App controller={controller} locale="en" />);
+      await waitFor(() => expect(controller.getState().status).toBe('ready'));
+    });
+
+    Then('an error notice is announced', async () => {
+      expect(await screen.findByRole('alert')).toHaveTextContent('Session events are unavailable');
+    });
+
+    And('Play stays disabled', () => {
+      expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
+      expect(screen.getByRole('status')).toHaveTextContent('Play is disabled');
+    });
   });
 });

@@ -1,15 +1,15 @@
-// End-to-end scenarios of tests/features/frontend/stale-session.feature: the real application
+// Binds tests/features/frontend/stale-session.feature end to end: the real application
 // controller and the real UI, with only the ports replaced by the in-memory fakes.
+import { describeFeature } from '@amiceli/vitest-cucumber';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, describe, expect, it } from 'vitest';
+import { expect } from 'vitest';
 import { createLauncherController } from '../../application';
 import type { FakeGatewayOptions } from '../../application/__tests__/fakes';
 import { FakeDropEvents, FakeGateway, FakePicker, FakeSessionEvents } from '../../application/__tests__/fakes';
 import type { GameInfo } from '../../domain';
 import { App } from '../App';
-
-afterEach(cleanup);
+import { loadFrontendFeature } from './features';
 
 const root = 'D:/Steam/MotoGP25';
 const game: GameInfo = {
@@ -42,112 +42,183 @@ async function launch(options: FakeGatewayOptions = {}) {
   return { gateway, picker, controller, user };
 }
 
+type World = Awaited<ReturnType<typeof launch>>;
+
 const playButton = () => screen.getByRole('button', { name: 'Play' });
 const noticeRegion = () => screen.queryByRole('region', { name: 'Old session pending' });
 const staleNoticeGone = () => waitFor(() => expect(noticeRegion()).not.toBeInTheDocument());
 
-describe('Given the manifest points to a previous game install', () => {
-  it('When the user chooses "Forget the old session" Then the notice disappears and Play is enabled again', async () => {
-    const world = await launch();
-    expect(playButton()).toBeDisabled();
+const feature = await loadFrontendFeature('stale-session');
 
-    await world.user.click(screen.getByRole('button', { name: 'Forget the old session' }));
+describeFeature(feature, ({ Background, Scenario, AfterEachScenario }) => {
+  // Steps are separate tests: the DOM must survive between them, so clean up per scenario.
+  AfterEachScenario(cleanup);
 
-    await staleNoticeGone();
-    expect(world.gateway.manifestState()).toBe('none');
-    expect(await screen.findByRole('status')).toHaveTextContent('Old session forgotten');
-    await waitFor(() => expect(playButton()).toBeEnabled());
+  // The app is launched lazily so a scenario can start from its own manifest (its own Given)
+  // instead of the Background default.
+  let world: World | undefined;
+  const getWorld = async () => (world ??= await launch());
+  const startWith = async (options: FakeGatewayOptions) => (world = await launch(options));
+
+  Background(({ Given }) => {
+    Given('the manifest points to a previous game install', () => {
+      world = undefined;
+    });
   });
 
-  it('When the user confirms cleaning the old folder Then only files proven to be ours are removed and the notice disappears', async () => {
-    const world = await launch();
+  Scenario('The user forgets the old session', ({ When, Then, And }) => {
+    When('the user chooses "Forget the old session"', async () => {
+      const current = await getWorld();
+      expect(playButton()).toBeDisabled();
+      await current.user.click(screen.getByRole('button', { name: 'Forget the old session' }));
+    });
 
-    await world.user.click(screen.getByRole('button', { name: 'Clean the old folder' }));
-    await world.user.click(screen.getByRole('button', { name: 'Confirm' }));
+    Then('the notice disappears', async () => {
+      const current = await getWorld();
+      await staleNoticeGone();
+      expect(current.gateway.manifestState()).toBe('none');
+      expect(await screen.findByRole('status')).toHaveTextContent('Old session forgotten');
+    });
 
-    await staleNoticeGone();
-    // The shown folder is the one confirmed to the backend, which removes only its own files.
-    expect(world.gateway.callsOf('cleanStaleSession').map((call) => call.args)).toEqual([[OLD]]);
-    expect(world.gateway.manifestState()).toBe('none');
-    expect(await screen.findByRole('status')).toHaveTextContent('Old folder cleaned; 3 files removed');
+    And('Play is enabled again', async () => {
+      await waitFor(() => expect(playButton()).toBeEnabled());
+    });
   });
 
-  it('Then a notice names the old folder and Play is disabled', async () => {
-    await launch();
+  Scenario('The user cleans the old folder', ({ When, Then, And }) => {
+    When('the user confirms cleaning the old folder', async () => {
+      const current = await getWorld();
+      await current.user.click(screen.getByRole('button', { name: 'Clean the old folder' }));
+      await current.user.click(screen.getByRole('button', { name: 'Confirm' }));
+    });
 
-    const notice = screen.getByRole('region', { name: 'Old session pending' });
-    expect(notice).toHaveTextContent(OLD);
-    expect(notice).toHaveTextContent('3 files');
-    expect(playButton()).toBeDisabled();
+    Then('only files proven to be ours are removed', async () => {
+      const current = await getWorld();
+      await staleNoticeGone();
+      // The shown folder is the one confirmed to the backend, which removes only its own files.
+      expect(current.gateway.callsOf('cleanStaleSession').map((call) => call.args)).toEqual([[OLD]]);
+      expect(current.gateway.manifestState()).toBe('none');
+      expect(await screen.findByRole('status')).toHaveTextContent('Old folder cleaned; 3 files removed');
+    });
+
+    And('the notice disappears', async () => {
+      await staleNoticeGone();
+    });
   });
 
-  it('When the user chooses "Clean the old folder" and cancels Then nothing is removed and the notice is still shown', async () => {
-    const world = await launch();
+  Scenario('Play is blocked while a stale session is pending', ({ Then, And }) => {
+    Then('a notice names the old folder', async () => {
+      await getWorld();
+      const notice = screen.getByRole('region', { name: 'Old session pending' });
+      expect(notice).toHaveTextContent(OLD);
+      expect(notice).toHaveTextContent('3 files');
+    });
 
-    await world.user.click(screen.getByRole('button', { name: 'Clean the old folder' }));
-    expect(screen.getByRole('region', { name: 'Old session pending' })).toHaveTextContent(OLD);
-    await world.user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    expect(world.gateway.callsOf('cleanStaleSession')).toHaveLength(0);
-    expect(world.gateway.callsOf('forgetStaleSession')).toHaveLength(0);
-    expect(world.gateway.manifestState()).toBe('stale');
-    expect(noticeRegion()).toBeInTheDocument();
-    expect(playButton()).toBeDisabled();
+    And('Play is disabled', () => {
+      expect(playButton()).toBeDisabled();
+    });
   });
 
-  it('When cleaning is confirmed with a different folder Then the error "deploy_unauthorized_directory" is shown and nothing is removed', async () => {
-    const world = await launch();
-    await world.user.click(screen.getByRole('button', { name: 'Clean the old folder' }));
-    // The manifest changed behind the notice, so the confirmed folder no longer matches.
-    if (world.gateway.manifest) world.gateway.manifest.mods_dir = 'F:/Elsewhere/~mods';
+  Scenario('Cancelling the confirmation keeps everything', ({ When, Then, And }) => {
+    When('the user chooses "Clean the old folder" and cancels', async () => {
+      const current = await getWorld();
+      await current.user.click(screen.getByRole('button', { name: 'Clean the old folder' }));
+      expect(screen.getByRole('region', { name: 'Old session pending' })).toHaveTextContent(OLD);
+      await current.user.click(screen.getByRole('button', { name: 'Cancel' }));
+    });
 
-    await world.user.click(screen.getByRole('button', { name: 'Confirm' }));
+    Then('nothing is removed', async () => {
+      const current = await getWorld();
+      expect(current.gateway.callsOf('cleanStaleSession')).toHaveLength(0);
+      expect(current.gateway.callsOf('forgetStaleSession')).toHaveLength(0);
+      expect(current.gateway.manifestState()).toBe('stale');
+    });
 
-    await screen.findByRole('alert');
-    expect(world.controller.getState().error?.code).toBe('deploy_unauthorized_directory');
-    expect(world.gateway.manifestState()).toBe('stale');
-    expect(noticeRegion()).toBeInTheDocument();
+    And('the notice is still shown', () => {
+      expect(noticeRegion()).toBeInTheDocument();
+      expect(playButton()).toBeDisabled();
+    });
   });
-});
 
-describe('Given a session deployed in the current game folder', () => {
-  it('When the user configures another game folder Then the stale notice appears', async () => {
-    const world = await launch({ manifest: { mods_dir: game.mods_dir, tracked: 2 } });
-    expect(noticeRegion()).not.toBeInTheDocument();
-    world.picker.queueDirectory('D:/Steam/Other');
+  Scenario('Cleaning is refused when the confirmed folder does not match', ({ When, Then, And }) => {
+    When('cleaning is confirmed with a different folder', async () => {
+      const current = await getWorld();
+      await current.user.click(screen.getByRole('button', { name: 'Clean the old folder' }));
+      // The manifest changed behind the notice, so the confirmed folder no longer matches.
+      if (current.gateway.manifest) current.gateway.manifest.mods_dir = 'F:/Elsewhere/~mods';
+      await current.user.click(screen.getByRole('button', { name: 'Confirm' }));
+    });
 
-    await world.user.click(screen.getByRole('button', { name: 'Settings' }));
-    await world.user.click(screen.getByRole('button', { name: 'Choose folder…' }));
+    Then('the error "deploy_unauthorized_directory" is shown', async () => {
+      const current = await getWorld();
+      await screen.findByRole('alert');
+      expect(current.controller.getState().error?.code).toBe('deploy_unauthorized_directory');
+    });
 
-    const notice = await screen.findByRole('region', { name: 'Old session pending' });
-    expect(notice).toHaveTextContent(game.mods_dir);
-    expect(notice).toHaveTextContent('2 files');
+    And('nothing is removed and the notice is still shown', async () => {
+      const current = await getWorld();
+      expect(current.gateway.manifestState()).toBe('stale');
+      expect(noticeRegion()).toBeInTheDocument();
+    });
   });
-});
 
-describe('Given the manifest points to a folder that no longer exists', () => {
-  it('Then no stale notice is shown and Play is enabled', async () => {
-    await launch({ manifest: { ...stale, vanished: true } });
+  Scenario('Switching the game folder makes the session stale', ({ Given, When, Then }) => {
+    Given('a session deployed in the current game folder', async () => {
+      const current = await startWith({ manifest: { mods_dir: game.mods_dir, tracked: 2 } });
+      expect(noticeRegion()).not.toBeInTheDocument();
+      current.picker.queueDirectory('D:/Steam/Other');
+    });
 
-    expect(noticeRegion()).not.toBeInTheDocument();
-    expect(playButton()).toBeEnabled();
+    When('the user configures another game folder', async () => {
+      const current = await getWorld();
+      await current.user.click(screen.getByRole('button', { name: 'Settings' }));
+      await current.user.click(screen.getByRole('button', { name: 'Choose folder…' }));
+    });
+
+    Then('the stale notice appears', async () => {
+      const notice = await screen.findByRole('region', { name: 'Old session pending' });
+      expect(notice).toHaveTextContent(game.mods_dir);
+      expect(notice).toHaveTextContent('2 files');
+    });
   });
-});
 
-describe('Given the startup recovery failed because of the stale manifest', () => {
-  it('Then the stale notice is shown instead of the generic recovery error, and after forgetting Play deploys normally', async () => {
-    const world = await launch({ recovery: { state: 'failed', error: 'stale manifest', cleaned_count: 0 } });
+  Scenario('A vanished old folder needs no recovery', ({ Given, Then, And }) => {
+    Given('the manifest points to a folder that no longer exists', async () => {
+      await startWith({ manifest: { ...stale, vanished: true } });
+    });
 
-    expect(noticeRegion()).toBeInTheDocument();
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
-    expect(playButton()).toBeDisabled();
+    Then('no stale notice is shown', () => {
+      expect(noticeRegion()).not.toBeInTheDocument();
+    });
 
-    await world.user.click(screen.getByRole('button', { name: 'Forget the old session' }));
-    await staleNoticeGone();
-    await waitFor(() => expect(playButton()).toBeEnabled());
-    await world.user.click(playButton());
+    And('Play is enabled', () => {
+      expect(playButton()).toBeEnabled();
+    });
+  });
 
-    await waitFor(() => expect(world.gateway.callsOf('play').map((call) => call.args)).toEqual([['vanilla']]));
-    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+  Scenario('A stale manifest at startup unblocks Play once resolved', ({ Given, When, Then }) => {
+    Given('the startup recovery failed because of the stale manifest', async () => {
+      await startWith({ recovery: { state: 'failed', error: 'stale manifest', cleaned_count: 0 } });
+    });
+
+    Then('the stale notice is shown instead of the generic recovery error', () => {
+      expect(noticeRegion()).toBeInTheDocument();
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(playButton()).toBeDisabled();
+    });
+
+    When('the user forgets the old session', async () => {
+      const current = await getWorld();
+      await current.user.click(screen.getByRole('button', { name: 'Forget the old session' }));
+      await staleNoticeGone();
+      await waitFor(() => expect(playButton()).toBeEnabled());
+    });
+
+    Then('Play deploys normally', async () => {
+      const current = await getWorld();
+      await current.user.click(playButton());
+      await waitFor(() => expect(current.gateway.callsOf('play').map((call) => call.args)).toEqual([['vanilla']]));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
   });
 });

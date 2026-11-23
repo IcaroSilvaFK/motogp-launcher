@@ -21,7 +21,7 @@ Feature: Install mod
 
 - Scenarios become `.feature` files in the repo:
   - Rust: `tests/features/*.feature`, run with the [`cucumber`](https://crates.io/crates/cucumber) crate.
-  - Frontend: scenarios become `describe("Given…") / it("When… Then…")` in Vitest + Testing Library.
+  - Frontend: `.feature` files live in `tests/features/frontend/` and are executed with [`@amiceli/vitest-cucumber`](https://github.com/amiceli/vitest-cucumber). Each file is bound by a step-definition spec (`src/ui/__tests__/<name>.feature.test.tsx`) that calls `loadFrontendFeature("<name>")` (`src/ui/__tests__/features.ts`, path resolved from the file location, so it works in worktrees and CI) and `describeFeature`, with one `Scenario` per Gherkin scenario and one step function per Given/When/Then/And (Testing Library for the UI). They run under `corepack pnpm test` (`vitest run`), with no extra CI step. The binding is strict: a scenario added or renamed in the `.feature` without matching step code, a step that is never called, or step code for a scenario that no longer exists makes the suite fail. Do not write a hand-written Vitest test that restates a bound scenario.
 - If a scenario cannot be tested, the issue is poorly defined. It goes back to the Coordinator.
 
 ## 2. TDD: Red → Green → Refactor (Dev, Sonnet)
@@ -77,7 +77,7 @@ src/
 | 2 | Lint | `cargo clippy --all-targets -- -D warnings` · `pnpm lint` |
 | 3 | Types | `pnpm tsc --noEmit` |
 | 4 | Unit tests (TDD) | `cargo test --workspace` · `pnpm test` |
-| 5 | BDD scenarios | `cargo test --test features` · Vitest scenarios |
+| 5 | BDD scenarios | `cargo test --test features` · `vitest run` binds `tests/features/frontend/*.feature` through `@amiceli/vitest-cucumber` |
 | 6 | Architecture | crate deps checked + `pnpm lint` (boundaries) |
 | 7 | Coverage | `cargo llvm-cov` · `pnpm test --coverage` (targets above) |
 | 8 | Acceptance criteria | every Gherkin scenario in the issue has a matching, passing test |
@@ -113,7 +113,7 @@ Run everything from the workspace root. `pnpm` is declared through `packageManag
 | 2 Lint | `cargo clippy --workspace --all-targets -- -D warnings` | `pnpm lint` (ESLint + `eslint-plugin-boundaries`) |
 | 3 Types | built into `cargo` | `pnpm tsc --noEmit` |
 | 4 Unit tests | `cargo test --workspace` | `pnpm test` (`vitest run`, non-interactive) |
-| 5 BDD | `cargo test --workspace --test features` (or `-p motogp-launcher --test features`) | Vitest scenarios (`src/ui/__tests__`, `tooling/__tests__`, Gherkin in `tests/features/frontend/`) |
+| 5 BDD | `cargo test --workspace --test features` (or `-p motogp-launcher --test features`) | `corepack pnpm test`: Gherkin in `tests/features/frontend/` bound by `src/ui/__tests__/*.feature.test.tsx` (and `tooling/__tests__/scaffold.feature.test.tsx`, which runs Node tooling) with `@amiceli/vitest-cucumber` (unbound or removed scenarios fail), plus the other Vitest tests in `src` and `tooling/__tests__` |
 | 6 Architecture | `cargo test -p motogp-launcher --test architecture` (reads `cargo metadata`) | `pnpm lint` (boundaries) |
 | 7 Coverage | `cargo llvm-cov --workspace --json --summary-only --output-path coverage-rust.json --ignore-filename-regex 'src-tauri[\\/]src[\\/](main\|bootstrap)\.rs'` then `node scripts/check-rust-coverage.mjs coverage-rust.json` | `pnpm test --coverage` |
 
@@ -133,8 +133,8 @@ Limits live in `tooling/coverage-thresholds.json` (`core` = 90, `overall` = 80) 
 | Scenario | Test |
 |----------|------|
 | Generate the scaffold preserving the project | `src-tauri/tests/features/scaffold.feature` (cucumber) + `workspace_members_are_registered` |
-| Open the application on Windows | cucumber scenario `Validate the Windows application configuration` checks `tauri.conf.json` (title, 1100x700, min 900x600, identifier); `renders_launcher_shell` checks rendering; the actual window opening is the manual smoke below |
-| Reject dependencies that violate the architecture | `rejects_ui_importing_infrastructure` (Vitest, real ESLint on `tests/fixtures/boundaries`), `rejects_outward_cargo_dependencies` (`src-tauri/tests/architecture.rs`, fixtures in `src-tauri/tests/fixtures`) |
+| Open the application on Windows | cucumber scenario `Validate the Windows application configuration` checks `tauri.conf.json` (title, 1100x700, min 900x600, identifier); the frontend scenario `Render the launcher shell` (`tooling/__tests__/scaffold.feature.test.tsx`) checks rendering; the actual window opening is the manual smoke below |
+| Reject dependencies that violate the architecture | scenario "Reject an import from ui to infrastructure" (bound in `tooling/__tests__/scaffold.feature.test.tsx`, real ESLint on `tests/fixtures/boundaries`), `rejects_outward_cargo_dependencies` (`src-tauri/tests/architecture.rs`, fixtures in `src-tauri/tests/fixtures`) |
 | Run all gates in CI | cucumber step + `tooling/__tests__/ci-workflow.test.ts` inspect `.github/workflows/validacao.yml`; the CI itself runs the gates |
 
 ### Scenario traceability (issue #2)
@@ -302,7 +302,7 @@ Recovery protocol (write-ahead journal in `deployed.json`): the destination is v
 
 ### Issue #9: scenario traceability
 
-Gherkin: `tests/features/frontend/interface.feature`. Each scenario is covered at three levels: the use case against fake ports (`src/application/__tests__/controller.test.tsx`), the screens against a fake controller (`src/ui/__tests__/launcher.test.tsx`) and end to end over the real controller with the in-memory fakes of `src/application/__tests__/fakes.ts` (`src/ui/__tests__/interface.feature.test.tsx`, one `describe`/`it` per scenario, named with the Gherkin wording). Only `src/main.tsx` wires the Tauri adapters (`src/infrastructure`) into the controller.
+Gherkin: `tests/features/frontend/interface.feature`. Each scenario is covered at three levels: the use case against fake ports (`src/application/__tests__/controller.test.tsx`), the screens against a fake controller (`src/ui/__tests__/launcher.test.tsx`) and end to end over the real controller with the in-memory fakes of `src/application/__tests__/fakes.ts` (`src/ui/__tests__/interface.feature.test.tsx`, bound to the Gherkin file with `@amiceli/vitest-cucumber`, one `Scenario` per scenario). Only `src/main.tsx` wires the Tauri adapters (`src/infrastructure`) into the controller.
 
 | Scenario | Tests |
 |----------|-------|
@@ -347,7 +347,7 @@ When the user switches the game install while a session is deployed, the manifes
 
 ### Issue #34: scenario traceability
 
-Gherkin: `tests/features/frontend/stale-session.feature` (UI, e2e over the in-memory fakes) and `crates/application/tests/features/stale-session-recovery.feature` (9 scenarios, steps in `tests/bdd/stale_session_recovery.rs`). Frontend tests: `src/ui/__tests__/stale-session.feature.test.tsx` (real App over the real controller), `src/ui/__tests__/staleSession.test.tsx` (screen tests over the fake controller), the `Given a stale deploy session` block of `src/application/__tests__/controller.test.tsx` and the gateway cases of `src/infrastructure/__tests__/tauriGateway.test.ts`. Rust: `crates/application/tests/stale_recovery.rs` and the IPC contract `src-tauri/tests/stale_session_contract.rs`.
+Gherkin: `tests/features/frontend/stale-session.feature` (UI, e2e over the in-memory fakes) and `crates/application/tests/features/stale-session-recovery.feature` (9 scenarios, steps in `tests/bdd/stale_session_recovery.rs`). Frontend tests: `src/ui/__tests__/stale-session.feature.test.tsx` (bound to the Gherkin file; real App over the real controller), `src/ui/__tests__/staleSession.test.tsx` (screen tests over the fake controller), the `Given a stale deploy session` block of `src/application/__tests__/controller.test.tsx` and the gateway cases of `src/infrastructure/__tests__/tauriGateway.test.ts`. Rust: `crates/application/tests/stale_recovery.rs` and the IPC contract `src-tauri/tests/stale_session_contract.rs`.
 
 Design note: the recovery rules live in `PlayService` (session lock, `GameRunning`, a `Blocked` recovery becomes `Ready`), and the Tauri commands are thin wrappers. IPC contract: `deploy_session` (read, `{ state, mods_dir, tracked }`), `forget_stale_session` and `clean_stale_session { confirmedDir }` (camelCase argument only; returns the number of files removed). The confirmation is a UI step: the controller sends the folder shown in the notice as `confirmedDir`, and the backend refuses anything that is not exactly the recorded folder.
 
@@ -368,7 +368,7 @@ Design note: the recovery rules live in `PlayService` (session lock, `GameRunnin
 
 ### Issue #10: scenario traceability
 
-Gherkin: `tests/features/frontend/auto-update.feature` (frontend) and `src-tauri/tests/features/updater.feature` (Rust cucumber runner `updater_support`, registered in `src-tauri/tests/features.rs`). Each frontend scenario is covered by the domain rule (`src/domain/__tests__/update.test.ts`), the use case against `FakeUpdateService` (`src/application/useCases/__tests__/checkForUpdate.test.ts`, `src/application/__tests__/selectSessionClean.test.ts`), the Tauri adapter with the SDK mocked at the boundary (`src/infrastructure/__tests__/tauriUpdateService.test.ts`), the banner (`src/ui/__tests__/UpdateBanner.test.tsx`) and end to end over the real launcher controller, the real update controller and the real UI (`src/ui/__tests__/autoUpdate.feature.test.tsx`, one `it` per scenario, named with the Gherkin title). Only `src/main.tsx` wires `createTauriUpdateService()` into the update controller and triggers the startup check.
+Gherkin: `tests/features/frontend/auto-update.feature` (frontend) and `src-tauri/tests/features/updater.feature` (Rust cucumber runner `updater_support`, registered in `src-tauri/tests/features.rs`). Each frontend scenario is covered by the domain rule (`src/domain/__tests__/update.test.ts`), the use case against `FakeUpdateService` (`src/application/useCases/__tests__/checkForUpdate.test.ts`, `src/application/__tests__/selectSessionClean.test.ts`), the Tauri adapter with the SDK mocked at the boundary (`src/infrastructure/__tests__/tauriUpdateService.test.ts`), the banner (`src/ui/__tests__/UpdateBanner.test.tsx`) and end to end over the real launcher controller, the real update controller and the real UI (`src/ui/__tests__/autoUpdate.feature.test.tsx`, bound to the Gherkin file with `@amiceli/vitest-cucumber`, one `Scenario` per scenario; the production-flow scenario only checks that the Rust feature still states the same rules). Only `src/main.tsx` wires `createTauriUpdateService()` into the update controller and triggers the startup check.
 
 | Scenario | Tests |
 |----------|-------|
@@ -380,6 +380,6 @@ Gherkin: `tests/features/frontend/auto-update.feature` (frontend) and `src-tauri
 | Handle an installation failure | `install_failure_does_not_restart` (application), `update_error_is_accessible` (ui), e2e "Scenario: Handle an installation failure" |
 | Avoid simultaneous installs | `concurrent_update_is_rejected` (application), e2e "Scenario: Avoid simultaneous installs" (double click and a direct second `install()` give one download) |
 | Protect a game session | `active_or_unclean_session_blocks_install` (application), `selectSessionClean` tests, `session_state_disables_update_action` (ui), e2e "Scenario: Protect a game session" (session event and recovery `game-running`; a direct `install()` is refused with `session`) |
-| Publish the feed only through the production flow | Rust cucumber only: "Publish the update feed only after validation on main" (`release_job_requires_successful_validation`), "Configure the updater with the production public key" (`updater_config_contains_public_key_and_endpoint`), "Grant the window only the updater permissions it needs" (`updater_capabilities_are_minimal`) (`src-tauri/tests/features/updater.feature`); no frontend test |
+| Publish the feed only through the production flow | Rust cucumber only: "Publish the update feed only after validation on main" (`release_job_requires_successful_validation`), "Configure the updater with the production public key" (`updater_config_contains_public_key_and_endpoint`), "Grant the window only the updater permissions it needs" (`updater_capabilities_are_minimal`) (`src-tauri/tests/features/updater.feature`); the bound frontend scenario only asserts that this Rust feature still states the same rules |
 
 The scenario "Configure the updater with the production public key" stays red on purpose until the real signing key pair exists and its public key replaces the placeholder in `plugins.updater.pubkey` (external setup, see [auto-update.md](auto-update.md)). The real two-version update (install, restart on the new version) is validated in issue #11.
