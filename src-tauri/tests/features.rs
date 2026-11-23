@@ -4,6 +4,7 @@
 mod interface_steps;
 mod ipc_support;
 mod support;
+mod updater_support;
 
 use cucumber::{given, then, when, World};
 use std::fs;
@@ -300,7 +301,8 @@ fn main() {
     )
     .execution_has_failed();
     let interface_ok = futures::executor::block_on(interface_steps::run());
-    if scaffold_failed || !interface_ok {
+    let updater_ok = futures::executor::block_on(updater_support::steps::run());
+    if scaffold_failed || !interface_ok || !updater_ok {
         std::process::exit(1);
     }
 }

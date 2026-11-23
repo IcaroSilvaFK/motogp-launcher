@@ -54,3 +54,44 @@ fn real_workspace_dependencies_point_inward() {
     let metadata = cargo_metadata(&workspace_root().join("Cargo.toml"));
     assert_eq!(dependency_violations(&metadata), Vec::<String>::new());
 }
+
+#[test]
+fn updater_plugins_are_only_in_the_interface_crate() {
+    let metadata = cargo_metadata(&workspace_root().join("Cargo.toml"));
+    let runtime_deps = |package: &str| -> Vec<String> {
+        let package = metadata["packages"]
+            .as_array()
+            .expect("metadata without packages")
+            .iter()
+            .find(|p| p["name"] == package)
+            .unwrap_or_else(|| panic!("package {package} missing"));
+        package["dependencies"]
+            .as_array()
+            .expect("dependencies")
+            .iter()
+            .filter(|d| d["kind"].is_null())
+            .map(|d| d["name"].as_str().unwrap_or_default().to_string())
+            .collect()
+    };
+    let plugins = ["tauri-plugin-updater", "tauri-plugin-process"];
+    for inner in [
+        "motogp-domain",
+        "motogp-application",
+        "motogp-infrastructure",
+    ] {
+        let deps = runtime_deps(inner);
+        for plugin in plugins {
+            assert!(
+                !deps.iter().any(|d| d == plugin),
+                "{inner} must not depend on {plugin}: the updater belongs to the interface layer"
+            );
+        }
+    }
+    let interface = runtime_deps("motogp-launcher");
+    for plugin in plugins {
+        assert!(
+            interface.iter().any(|d| d == plugin),
+            "motogp-launcher must depend on {plugin}"
+        );
+    }
+}

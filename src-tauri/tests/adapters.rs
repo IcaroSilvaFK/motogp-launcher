@@ -99,7 +99,10 @@ fn capabilities_are_minimal_and_open_only_steam_urls() {
     );
     for forbidden in ["shell", "process", "fs:", "http"] {
         assert!(
-            identifiers.iter().all(|i| !i.starts_with(forbidden)),
+            identifiers
+                .iter()
+                .filter(|i| **i != "process:allow-restart") // the updater restart (issue #10)
+                .all(|i| !i.starts_with(forbidden)),
             "{forbidden} permission is not allowed"
         );
     }
