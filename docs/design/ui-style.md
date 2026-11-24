@@ -2,6 +2,8 @@
 
 ## Decisions
 
+- **Material Design base, hand-built (2026-11-23, user decision):** the styling follows Material 3, covering the type scale, 8dp grid, dark surface tones and elevation, shape scale, state layers, button variants and motion. It is replicated manually in `styles.css`, with no MUI or other UI library. New and reworked tokens should name their Material role. The full rule lives in `.claude/agents/ui-designer.md`.
+
 - 2026-11-23 (issue #48): the user chose a dark launcher UI.
 - 2026-11-23, after the first version (a racing-style skin): "less playful, more elaborate/polished and easier to use". The direction became a **professional desktop tool**: neutral graphite surfaces, crisp 1px borders, dense readable rows, one restrained accent.
 - 2026-11-23, v3: the user pointed at a third-party PC mod launcher as the level of polish to reach. Its **patterns** were adopted (top icon+label tabs, a persistent bottom status bar with the game and Play, rail + content layouts, facet filters with counts, settings as a section nav plus cards of rows, small outlined secondary buttons). Its brand, colors, copy and every feature we do not have (online catalog, leaderboards, donations, social login, notifications, mod versions, conflicts) were **not** copied.
