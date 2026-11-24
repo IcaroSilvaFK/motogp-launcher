@@ -27,3 +27,9 @@ Feature: Expose the launcher use cases through Tauri commands
     Given a launcher instance holding the OS lock
     When a second instance tries to acquire it
     Then it is refused without touching the deployment state
+
+  Scenario: set_profile_mods is refused while a session is running
+    Given the game is running after Play
+    When the interface calls "set_profile_mods" for a profile
+    Then the command fails with code "profile_locked_by_session"
+    And the profile keeps its previous mods

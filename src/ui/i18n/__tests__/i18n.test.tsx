@@ -43,6 +43,13 @@ describe('i18n dictionaries', () => {
       expect(ptBR.errors[code]).not.toBe(ptBR.errors.unknown);
     }
   });
+
+  it('translates the backend profile lock in both locales', () => {
+    expect(en.errors.profile_locked_by_session).toBe('Profiles cannot be changed while the game is running.');
+    expect(ptBR.errors.profile_locked_by_session).toBe(
+      'Os perfis não podem ser alterados enquanto o jogo está em execução.',
+    );
+  });
 });
 
 describe('I18nProvider', () => {

@@ -138,6 +138,11 @@ mod tests {
         let profile =
             motogp_application::ProfileServiceError::Profile(motogp_domain::ProfileError::NotFound);
         assert_eq!(code(PlayError::Profile(profile)), "profile_not_found");
+        let locked = motogp_application::ProfileServiceError::SessionActive;
+        assert_eq!(
+            code(PlayError::Profile(locked)),
+            "profile_locked_by_session"
+        );
     }
 
     #[test]
@@ -204,5 +209,8 @@ mod tests {
             motogp_domain::ProfileError::NotFound,
         ));
         assert_eq!(CommandError::from(profiles).code, "profile_not_found");
+        let locked =
+            RemoveModError::Profiles(motogp_application::ProfileServiceError::SessionActive);
+        assert_eq!(CommandError::from(locked).code, "profile_locked_by_session");
     }
 }

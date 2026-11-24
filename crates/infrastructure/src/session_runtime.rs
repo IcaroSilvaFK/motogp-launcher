@@ -1,5 +1,5 @@
 //! Adapters for the session lock and background execution (plain std).
-use motogp_application::{BackgroundRunner, SessionLock, SpawnError};
+use motogp_application::{BackgroundRunner, SessionActivity, SessionLock, SpawnError};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 /// `SessionLock` backed by an atomic flag.
@@ -15,6 +15,12 @@ impl SessionLock for AtomicSessionLock {
 
     fn release(&self) {
         self.0.store(false, Ordering::Release);
+    }
+}
+
+impl SessionActivity for AtomicSessionLock {
+    fn is_active(&self) -> bool {
+        self.0.load(Ordering::Acquire)
     }
 }
 
@@ -35,7 +41,7 @@ impl BackgroundRunner for ThreadRunner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use motogp_application::{BackgroundRunner, SessionLock};
+    use motogp_application::{BackgroundRunner, SessionActivity, SessionLock};
     use std::sync::mpsc;
     use std::sync::Arc;
 
@@ -46,6 +52,16 @@ mod tests {
         assert!(!lock.try_acquire());
         lock.release();
         assert!(lock.try_acquire());
+    }
+
+    #[test]
+    fn activity_follows_the_lock() {
+        let lock = AtomicSessionLock::default();
+        assert!(!lock.is_active());
+        assert!(lock.try_acquire());
+        assert!(lock.is_active());
+        lock.release();
+        assert!(!lock.is_active());
     }
 
     #[test]

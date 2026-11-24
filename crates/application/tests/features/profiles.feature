@@ -47,3 +47,22 @@ Feature: Maintain ordered profiles
     Then the updated name is persisted
     When I look up an unknown ID
     Then I receive the error "profile not found"
+
+  Scenario: Profile edits are refused while a game session is active
+    Given a profile "Race" exists
+    And a game session is active
+    When I try to rename, delete, activate, create or change the mods of a profile
+    Then every attempt fails with "session active"
+    And the stored profiles and the active profile are unchanged
+
+  Scenario: Profiles can be read while a game session is active
+    Given a profile "Race" exists
+    And a game session is active
+    When I list the profiles
+    Then "Race" is listed
+
+  Scenario: Profile edits work again after the session ends
+    Given a profile "Race" exists
+    And a game session was active and has ended
+    When I change the mods of "Race" to "m1"
+    Then "Race" has the mods "m1"

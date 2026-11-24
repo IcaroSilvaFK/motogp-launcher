@@ -55,10 +55,11 @@ where
         JsonConfigStore::new(data.config_file()),
         GameService::new(steam, FsGameFiles),
     ));
-    let profiles = Arc::new(ProfileService::new(
-        JsonProfileStore::new(data.profiles_file()),
-        SystemClock,
-    ));
+    let session_lock = Arc::new(AtomicSessionLock::default());
+    let profiles = Arc::new(
+        ProfileService::new(JsonProfileStore::new(data.profiles_file()), SystemClock)
+            .with_session(session_lock.clone()),
+    );
     let planner = ProfileModPlanner::new(
         profiles.clone(),
         JsonModRepository::new(data.library_file()),
@@ -74,7 +75,7 @@ where
         Arc::new(planner),
         Arc::new(deployer),
         Arc::new(runtime),
-        Arc::new(AtomicSessionLock::default()),
+        session_lock,
         runner,
         publisher,
     );

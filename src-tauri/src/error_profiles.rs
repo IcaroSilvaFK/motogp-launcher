@@ -16,6 +16,10 @@ impl From<&ProfileServiceError> for CommandError {
     fn from(error: &ProfileServiceError) -> Self {
         match error {
             ProfileServiceError::Storage(app) => CommandError::from(app),
+            ProfileServiceError::SessionActive => CommandError {
+                code: "profile_locked_by_session".to_string(),
+                message: error.to_string(),
+            },
             ProfileServiceError::Profile(rule) => CommandError {
                 code: rule_code(rule).to_string(),
                 message: rule.to_string(),
@@ -50,6 +54,16 @@ mod tests {
         let vanilla = rule(ProfileError::VanillaProtected);
         assert_eq!(vanilla.code, "vanilla_protected");
         assert!(vanilla.message.contains("Vanilla"));
+    }
+
+    #[test]
+    fn session_lock_maps_to_a_stable_code_and_message() {
+        let locked = CommandError::from(ProfileServiceError::SessionActive);
+        assert_eq!(locked.code, "profile_locked_by_session");
+        assert_eq!(
+            locked.message,
+            "profiles cannot be changed while a game session is active"
+        );
     }
 
     #[test]

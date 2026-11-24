@@ -5,10 +5,13 @@ use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
 use motogp_application::{
     AppError, Clock, ConfigRepository, ProfileRepository, ProfileService, ProfileServiceError,
+    SessionActivity,
 };
 use motogp_domain::{Config, Profile, ProfileError};
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 #[derive(Debug, Default)]
 struct Storage {
@@ -56,6 +59,16 @@ impl Clock for FixedClock {
     }
 }
 
+/// Session flag the scenarios switch on and off.
+#[derive(Debug, Default)]
+struct ToggleSession(AtomicBool);
+
+impl SessionActivity for ToggleSession {
+    fn is_active(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
 #[derive(Debug, Default, World)]
 struct ProfilesWorld {
     repo: SharedRepository,
@@ -64,11 +77,12 @@ struct ProfilesWorld {
     target: Option<String>,
     errors: Vec<ProfileServiceError>,
     snapshot: Option<Vec<Profile>>,
+    session: Arc<ToggleSession>,
 }
 
 impl ProfilesWorld {
     fn service(&self) -> ProfileService<SharedRepository, FixedClock> {
-        ProfileService::new(self.repo.clone(), FixedClock)
+        ProfileService::new(self.repo.clone(), FixedClock).with_session(self.session.clone())
     }
 
     fn persisted(&self) -> Vec<Profile> {
@@ -301,6 +315,90 @@ fn lookup_unknown(w: &mut ProfilesWorld) {
         .err()
         .into_iter()
         .collect();
+}
+
+// ---------- Scenarios: profile edits while a game session is active (#58) ----------
+
+/// Config port that records saves, so a refused edit can prove it wrote nothing.
+#[derive(Debug, Default)]
+struct CountingConfig {
+    saves: Cell<usize>,
+}
+
+impl ConfigRepository for CountingConfig {
+    fn load(&self) -> Result<Config, AppError> {
+        Ok(Config::default())
+    }
+
+    fn save(&self, _config: &Config) -> Result<(), AppError> {
+        self.saves.set(self.saves.get() + 1);
+        Ok(())
+    }
+}
+
+#[given(expr = "a profile {string} exists")]
+fn named_profile_exists(w: &mut ProfilesWorld, name: String) {
+    w.create_target(&name);
+    w.snapshot = Some(w.persisted());
+}
+
+#[given("a game session is active")]
+fn session_active(w: &mut ProfilesWorld) {
+    w.session.0.store(true, Ordering::SeqCst);
+}
+
+#[given("a game session was active and has ended")]
+fn session_ended(w: &mut ProfilesWorld) {
+    w.session.0.store(true, Ordering::SeqCst);
+    w.session.0.store(false, Ordering::SeqCst);
+}
+
+#[when("I try to rename, delete, activate, create or change the mods of a profile")]
+fn try_every_mutation(w: &mut ProfilesWorld) {
+    let service = w.service();
+    let id = w.target();
+    let config = CountingConfig::default();
+    let outcomes = [
+        service.rename(&id, "Other").map(|_| ()),
+        service.delete(&id, &config),
+        service.set_active(&id, &config),
+        service.create("Another").map(|_| ()),
+        service.set_mods(&id, vec!["m1".to_string()]).map(|_| ()),
+    ];
+    assert_eq!(config.saves.get(), 0, "no active profile change");
+    w.errors = outcomes.into_iter().filter_map(Result::err).collect();
+    assert_eq!(w.errors.len(), 5, "all five attempts must fail");
+}
+
+#[then(expr = "every attempt fails with {string}")]
+fn every_attempt_fails(w: &mut ProfilesWorld, kind: String) {
+    assert_eq!(kind, "session active");
+    assert!(w
+        .errors
+        .iter()
+        .all(|error| *error == ProfileServiceError::SessionActive));
+}
+
+#[then("the stored profiles and the active profile are unchanged")]
+fn stored_unchanged(w: &mut ProfilesWorld) {
+    // The active profile lives in the config, which the counter proved untouched.
+    assert_eq!(Some(w.persisted()), w.snapshot);
+}
+
+#[then(expr = "{string} is listed")]
+fn profile_is_listed(w: &mut ProfilesWorld, name: String) {
+    let listed = w.listed.clone().expect("not listed").unwrap();
+    assert!(listed.iter().any(|p| p.name == name));
+}
+
+#[when(expr = "I change the mods of {string} to {string}")]
+fn change_mods(w: &mut ProfilesWorld, _name: String, mod_id: String) {
+    w.service().set_mods(&w.target(), vec![mod_id]).unwrap();
+}
+
+#[then(expr = "{string} has the mods {string}")]
+fn has_mods(w: &mut ProfilesWorld, _name: String, mod_id: String) {
+    assert_eq!(w.service().get(&w.target()).unwrap().mod_ids, [mod_id]);
 }
 
 /// Runs only `profiles.feature`; returns `true` when every step passed.
