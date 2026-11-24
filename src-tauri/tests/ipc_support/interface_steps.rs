@@ -19,6 +19,8 @@ struct InterfaceWorld {
     held: Option<motogp_application::InstanceGuard>,
     lock_dir: Option<tempfile::TempDir>,
     second: Option<bool>,
+    locked: Value,
+    locked_profile: String,
 }
 
 impl std::fmt::Debug for InterfaceWorld {
@@ -99,7 +101,9 @@ fn errors_presented(w: &mut InterfaceWorld) {
         .h()
         .invoke("delete_profile", json!({ "id": "vanilla" }))
         .unwrap_err();
-    assert_eq!(error["code"], "vanilla_protected");
+    // A session is running here, so the profile lock rule fires before the
+    // vanilla protection rule (`vanilla_protected` is covered in error_profiles.rs).
+    assert_eq!(error["code"], "profile_locked_by_session");
 }
 
 #[given("a previous deployment left in ~mods by a crash")]
@@ -234,6 +238,50 @@ fn second_instance_refused(w: &mut InterfaceWorld) {
             .exists(),
         "the refused instance wrote nothing"
     );
+}
+
+#[given("the game is running after Play")]
+fn game_running_after_play(w: &mut InterfaceWorld) {
+    let h = Harness::new();
+    h.recover().expect("recovery");
+    let root = h.create_game();
+    h.invoke("set_game_dir", json!({ "path": root.to_string_lossy() }))
+        .unwrap();
+    let created = h
+        .invoke("create_profile", json!({ "name": "Race" }))
+        .unwrap();
+    let id = created["id"].as_str().unwrap().to_string();
+    h.invoke("set_profile_mods", json!({ "id": id, "modIds": ["m1"] }))
+        .unwrap();
+    h.invoke("play", json!({ "profileId": id })).unwrap();
+    w.locked_profile = id;
+    w.harness = Some(h);
+}
+
+#[when(expr = "the interface calls {string} for a profile")]
+fn interface_calls_for_profile(w: &mut InterfaceWorld, command: String) {
+    let id = w.locked_profile.clone();
+    w.locked = w
+        .h()
+        .invoke(&command, json!({ "id": id, "modIds": ["m2"] }))
+        .unwrap_err();
+}
+
+#[then(expr = "the command fails with code {string}")]
+fn command_fails_with_code(w: &mut InterfaceWorld, code: String) {
+    assert_eq!(w.locked["code"], json!(code));
+}
+
+#[then("the profile keeps its previous mods")]
+fn profile_keeps_mods(w: &mut InterfaceWorld) {
+    let listed = w.h().invoke("list_profiles", json!({})).unwrap();
+    let race = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == json!(w.locked_profile))
+        .unwrap();
+    assert_eq!(race["mod_ids"], json!(["m1"]));
 }
 
 /// Runs only `tauri-interface.feature`; returns `true` when every step passed.

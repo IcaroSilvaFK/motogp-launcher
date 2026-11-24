@@ -1,12 +1,15 @@
-use crate::{AppError, Clock, ConfigRepository, ProfileRepository};
+use crate::{AppError, Clock, ConfigRepository, ProfileRepository, SessionActivity};
 use motogp_domain::{normalize_name, Config, Profile, ProfileError, VANILLA_ID};
 use std::fmt;
+use std::sync::Arc;
 
 /// Failure of a profile use case: a business rule or the storage.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ProfileServiceError {
     Profile(ProfileError),
     Storage(AppError),
+    /// A game session is starting, running or being cleaned up.
+    SessionActive,
 }
 
 impl From<ProfileError> for ProfileServiceError {
@@ -26,6 +29,9 @@ impl fmt::Display for ProfileServiceError {
         match self {
             ProfileServiceError::Profile(error) => error.fmt(f),
             ProfileServiceError::Storage(error) => error.fmt(f),
+            ProfileServiceError::SessionActive => {
+                f.write_str("profiles cannot be changed while a game session is active")
+            }
         }
     }
 }
@@ -36,11 +42,30 @@ impl std::error::Error for ProfileServiceError {}
 pub struct ProfileService<R: ProfileRepository, C: Clock> {
     repository: R,
     clock: C,
+    session: Option<Arc<dyn SessionActivity>>,
 }
 
 impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
     pub fn new(repository: R, clock: C) -> Self {
-        Self { repository, clock }
+        Self {
+            repository,
+            clock,
+            session: None,
+        }
+    }
+
+    /// Refuses profile mutations while `session` reports an active game session.
+    pub fn with_session(mut self, session: Arc<dyn SessionActivity>) -> Self {
+        self.session = Some(session);
+        self
+    }
+
+    /// Checked before any read or write of storage by a guarded mutation.
+    fn ensure_idle(&self) -> Result<(), ProfileServiceError> {
+        match &self.session {
+            Some(session) if session.is_active() => Err(ProfileServiceError::SessionActive),
+            _ => Ok(()),
+        }
     }
 
     /// Loads the collection; an empty one is seeded with Vanilla and persisted.
@@ -69,6 +94,7 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
 
     /// Creates a profile with a fresh `p<unix_millis>` ID and no mods.
     pub fn create(&self, name: &str) -> Result<Profile, ProfileServiceError> {
+        self.ensure_idle()?;
         let name = normalize_name(name)?;
         let mut profiles = self.load_seeded()?;
         let profile = Profile::new(self.next_id(&profiles), &name)?;
@@ -78,6 +104,7 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
     }
 
     pub fn rename(&self, id: &str, name: &str) -> Result<Profile, ProfileServiceError> {
+        self.ensure_idle()?;
         let name = normalize_name(name)?;
         self.update(id, |profile| profile.rename(&name))
     }
@@ -90,6 +117,7 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
         id: &str,
         config: &impl ConfigRepository,
     ) -> Result<(), ProfileServiceError> {
+        self.ensure_idle()?;
         if id == VANILLA_ID {
             return Err(ProfileError::VanillaProtected.into());
         }
@@ -124,6 +152,7 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
         id: &str,
         config: &impl ConfigRepository,
     ) -> Result<(), ProfileServiceError> {
+        self.ensure_idle()?;
         self.get(id)?;
         let current = config.load()?;
         config.save(&Config {
@@ -136,6 +165,7 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
     /// "Set load order" use case: replaces the mods of a profile, keeping the
     /// given order (index 0 loads first, the last wins) without duplicates.
     pub fn set_mods(&self, id: &str, mod_ids: Vec<String>) -> Result<Profile, ProfileServiceError> {
+        self.ensure_idle()?;
         self.update(id, |profile| {
             profile.set_load_order(mod_ids);
             Ok(())
@@ -471,6 +501,52 @@ mod tests {
             Err(ProfileServiceError::Storage(write_failure()))
         );
         assert_eq!(stored(&service).len(), 2, "profile kept when config fails");
+    }
+
+    struct FakeSession(std::sync::atomic::AtomicBool);
+
+    impl SessionActivity for FakeSession {
+        fn is_active(&self) -> bool {
+            self.0.load(std::sync::atomic::Ordering::SeqCst)
+        }
+    }
+
+    #[test]
+    fn mutations_are_refused_before_touching_storage_while_a_session_is_active() {
+        use std::sync::atomic::Ordering::SeqCst;
+        let session = Arc::new(FakeSession(Default::default()));
+        let service = service().with_session(session.clone());
+        let created = service.create("A").unwrap();
+        let config = config_with_active(Some(&created.id));
+        let (saves, before) = (service.repository.saves.get(), stored(&service));
+        session.0.store(true, SeqCst);
+        // A storage failure would surface if storage were read before the check.
+        *service.repository.load_error.borrow_mut() = Some(write_failure());
+        let locked = ProfileServiceError::SessionActive;
+        assert_eq!(service.create("B"), Err(locked.clone()));
+        assert_eq!(service.rename(&created.id, "B"), Err(locked.clone()));
+        assert_eq!(
+            service.set_mods(&created.id, mods(&["a"])),
+            Err(locked.clone())
+        );
+        assert_eq!(service.delete(&created.id, &config), Err(locked.clone()));
+        assert_eq!(service.set_active(&created.id, &config), Err(locked));
+        *service.repository.load_error.borrow_mut() = None;
+        assert_eq!(service.repository.saves.get(), saves);
+        assert_eq!(config.saves.get(), 0);
+        assert_eq!(stored(&service), before);
+        // Reads keep working, and edits work again once the session ends.
+        assert_eq!(service.list().unwrap().len(), 2);
+        session.0.store(false, SeqCst);
+        assert!(service.rename(&created.id, "B").is_ok());
+    }
+
+    #[test]
+    fn session_active_display_explains_the_lock() {
+        assert_eq!(
+            ProfileServiceError::SessionActive.to_string(),
+            "profiles cannot be changed while a game session is active"
+        );
     }
 
     #[test]

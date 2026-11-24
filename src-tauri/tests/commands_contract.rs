@@ -95,10 +95,13 @@ fn commands_preserve_camel_case_arguments_and_snake_case_dtos() {
         .unwrap_err();
     assert_eq!(clean["code"], "already_running");
 
-    // Removal commands keep the data consistent.
-    h.invoke("delete_profile", json!({ "id": id })).unwrap();
+    // Profile mutations are refused while the session is active (issue #58).
+    let locked = h.invoke("delete_profile", json!({ "id": id })).unwrap_err();
+    assert_eq!(locked["code"], "profile_locked_by_session");
     let config = h.invoke("get_config", json!({})).unwrap();
-    assert_eq!(config["active_profile"], "vanilla");
+    assert_eq!(config["active_profile"], json!(id));
+
+    // Removing a mod from the library keeps the data consistent.
     h.invoke("remove_mod", json!({ "id": mod_id })).unwrap();
     assert_eq!(h.invoke("list_mods", json!({})).unwrap(), json!([]));
 }

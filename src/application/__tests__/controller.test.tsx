@@ -566,5 +566,14 @@ describe('Given a stale deploy session', () => {
       await controller.toggleModInActiveProfile('b');
       expect(controller.getState().error?.code).toBe('write_failed');
     });
+
+    it('When the backend refuses because a session is active Then the error is exposed and mods are unchanged', async () => {
+      const { controller, gateway, id } = await withActive(['a']);
+      expect(controller.getState().session.kind).toBe('idle');
+      gateway.failNext('setProfileMods', { code: 'profile_locked_by_session', message: 'locked' });
+      await controller.toggleModInActiveProfile('b');
+      expect(controller.getState().error?.code).toBe('profile_locked_by_session');
+      expect(modsOf(controller, id)).toEqual(['a']);
+    });
   });
 });

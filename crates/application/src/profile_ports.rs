@@ -14,3 +14,9 @@ pub trait ProfileRepository {
 pub trait Clock {
     fn now_millis(&self) -> u64;
 }
+
+/// Port: read-only view of the game session flag. Profile use cases may only
+/// ask whether a session is active; they can never acquire or release it.
+pub trait SessionActivity: Send + Sync {
+    fn is_active(&self) -> bool;
+}

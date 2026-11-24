@@ -211,6 +211,7 @@ export const en: Messages = {
     empty_profile_name: 'The profile name cannot be empty.',
     profile_not_found: 'Profile not found.',
     vanilla_protected: 'The Vanilla profile cannot be changed or deleted.',
+    profile_locked_by_session: 'Profiles cannot be changed while the game is running.',
     already_running: 'A session is already running.',
     game_not_configured: 'No game is configured. Choose the game folder in Settings.',
     missing_app_id: 'Cannot play: game App ID not found. Open the game from Steam once.',

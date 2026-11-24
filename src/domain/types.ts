@@ -91,6 +91,7 @@ export const BACKEND_ERROR_CODES = [
   'empty_profile_name',
   'profile_not_found',
   'vanilla_protected',
+  'profile_locked_by_session',
   'already_running',
   'game_not_configured',
   'missing_app_id',

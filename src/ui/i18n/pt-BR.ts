@@ -213,6 +213,7 @@ export const ptBR: Messages = {
     empty_profile_name: 'O nome do perfil não pode ficar vazio.',
     profile_not_found: 'Perfil não encontrado.',
     vanilla_protected: 'O perfil Vanilla não pode ser alterado nem excluído.',
+    profile_locked_by_session: 'Os perfis não podem ser alterados enquanto o jogo está em execução.',
     already_running: 'Já existe uma sessão em execução.',
     game_not_configured: 'Nenhum jogo configurado. Escolha a pasta do jogo em Configurações.',
     missing_app_id: 'O App ID do jogo não foi encontrado. Abra o jogo pela Steam uma vez.',
