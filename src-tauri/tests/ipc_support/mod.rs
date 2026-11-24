@@ -6,7 +6,7 @@ use motogp_application::{
     AppError, BackgroundRunner, FolderOpener, ProcessInspector, SessionEvent, SessionPublisher,
     UrlOpener,
 };
-use motogp_infrastructure::{DataDir, SteamLibraries};
+use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries};
 use motogp_launcher_lib::{compose, configure, run_recovery, AppState};
 use serde_json::{json, Value};
 use std::fs;
@@ -122,6 +122,7 @@ impl Harness {
         let state = compose(
             &data,
             SteamLibraries::new(None),
+            SteamArtwork::new(Some(tmp.path().join("steam"))),
             opener,
             Arc::new(folder_opener),
             NoProcesses,

@@ -224,6 +224,22 @@ pub async fn open_data_folder(state: State<'_, AppState>) -> CommandResult<()> {
     read_blocking(state, |state| Ok(state.storage.open_data_folder()?)).await
 }
 
+/// The Steam artwork of the configured game as a `data:` URL, or `None` when
+/// there is no game, no App ID or nothing cached. Takes no argument: the App
+/// ID always comes from the saved configuration, never from the frontend.
+#[tauri::command]
+pub async fn get_game_artwork(state: State<'_, AppState>) -> CommandResult<Option<String>> {
+    read_blocking(state, |state| {
+        let app_id = state.settings.get_game()?.and_then(|game| game.app_id);
+        Ok(state
+            .artwork
+            .artwork(app_id)?
+            .as_ref()
+            .map(crate::dto::artwork_data_url))
+    })
+    .await
+}
+
 /// Registers every command on the builder; shared by the real app and the
 /// contract tests.
 pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
@@ -248,6 +264,7 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         forget_stale_session,
         clean_stale_session,
         get_storage_usage,
-        open_data_folder
+        open_data_folder,
+        get_game_artwork
     ])
 }

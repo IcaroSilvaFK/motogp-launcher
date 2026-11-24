@@ -228,10 +228,31 @@ impl From<StorageUsage> for StorageUsageDto {
     }
 }
 
+/// Game artwork as a `data:<mime>;base64,<bytes>` URL, so the WebView can
+/// show it without a file or network permission (CSP `img-src 'self' data:`).
+pub fn artwork_data_url(artwork: &motogp_application::Artwork) -> String {
+    use base64::engine::general_purpose::STANDARD;
+    use base64::Engine as _;
+    format!(
+        "data:{};base64,{}",
+        artwork.mime.as_str(),
+        STANDARD.encode(&artwork.bytes)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn artwork_data_url_embeds_the_mime_and_base64_bytes() {
+        let art = motogp_application::Artwork {
+            bytes: vec![1, 2, 3],
+            mime: motogp_application::ImageMime::Png,
+        };
+        assert_eq!(artwork_data_url(&art), "data:image/png;base64,AQID");
+    }
 
     fn dto(session: DeploySession) -> serde_json::Value {
         serde_json::to_value(DeploySessionDto::from(session)).unwrap()

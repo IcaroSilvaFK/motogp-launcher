@@ -11,6 +11,7 @@ const initialState: LauncherState = {
   status: 'loading',
   config: { game_dir: null, active_profile: null },
   game: null,
+  artwork: null,
   mods: [],
   profiles: [],
   conflicts: [],
@@ -68,9 +69,13 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
           // The deploy session only matters against a configured game; skip the backend otherwise.
           if (game === null) {
             patch.staleSession = null;
+            patch.artwork = null;
             return;
           }
+          // Artwork is cosmetic: a failed lookup never surfaces as an error.
+          const artwork = gateway.getGameArtwork().catch(() => null);
           const deploy = await gateway.deploySession();
+          patch.artwork = await artwork;
           patch.staleSession =
             deploy.state === 'stale' && deploy.mods_dir !== null
               ? { modsDir: deploy.mods_dir, tracked: deploy.tracked }

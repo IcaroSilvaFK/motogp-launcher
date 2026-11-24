@@ -20,6 +20,7 @@ export const initialState: LauncherState = {
   status: 'ready',
   config: { game_dir: null, active_profile: null },
   game: null,
+  artwork: null,
   mods: [],
   profiles: [{ id: 'vanilla', name: 'Vanilla', mod_ids: [] }],
   detected: null,

@@ -62,6 +62,8 @@ export interface FakeGatewayOptions {
   log?: string[];
   /** What `getStorageUsage` reports; defaults to an empty data folder. */
   storage?: StorageUsage;
+  /** What `getGameArtwork` reports while a game is configured (a `data:` URL); defaults to none. */
+  artwork?: string | null;
 }
 
 const EMPTY_STORAGE: StorageUsage = {
@@ -88,6 +90,8 @@ export class FakeGateway implements LauncherGateway {
   /** The persisted deploy manifest; `null` when there is none. */
   manifest: FakeManifest | null;
   storage: StorageUsage;
+  /** The artwork the backend would return for the configured game. */
+  artwork: string | null;
 
   private readonly failures = new Map<string, CommandError>();
   private readonly options: FakeGatewayOptions;
@@ -105,6 +109,7 @@ export class FakeGateway implements LauncherGateway {
     this.manifest = options.manifest ? { ...options.manifest } : null;
     this.recovery = options.recovery ?? { state: 'not-run', error: null, cleaned_count: 0 };
     this.storage = options.storage ?? EMPTY_STORAGE;
+    this.artwork = options.artwork ?? null;
   }
 
   /** Makes the next call of `method` reject once with `error`. */
@@ -277,6 +282,10 @@ export class FakeGateway implements LauncherGateway {
       ...this.storage,
       categories: this.storage.categories.map((entry) => ({ ...entry })),
     }));
+  }
+
+  getGameArtwork(): Promise<string | null> {
+    return this.run('getGameArtwork', [], () => (this.game ? this.artwork : null));
   }
 
   openDataFolder(): Promise<void> {

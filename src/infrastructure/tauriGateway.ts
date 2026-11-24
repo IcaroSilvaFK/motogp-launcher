@@ -52,6 +52,7 @@ export function createTauriGateway(invoke: InvokeFn = tauriInvoke): LauncherGate
     forgetStaleSession: () => call('forget_stale_session'),
     cleanStaleSession: (confirmedDir) => call('clean_stale_session', { confirmedDir }),
     getStorageUsage: async () => toStorageUsage(await call<StorageUsageDto>('get_storage_usage')),
+    getGameArtwork: () => call<string | null>('get_game_artwork'),
     openDataFolder: () => call('open_data_folder'),
   };
 }

@@ -32,6 +32,8 @@ export interface LauncherState {
   status: 'loading' | 'ready';
   config: Config;
   game: GameInfo | null;
+  /** Steam artwork of the configured game as a `data:` URL; `null` without a game or cached image. */
+  artwork: string | null;
   mods: ModEntry[];
   profiles: Profile[];
   /** Conflicts of the active profile load order; empty without an active profile or mods. */
