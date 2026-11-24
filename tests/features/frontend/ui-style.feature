@@ -130,3 +130,23 @@ Feature: Polished dark launcher interface
     Given the stylesheet
     Then no rule uses clip-path
     And the radius tokens are between 4px and 8px
+
+  # Material 3 type scale, hand-built (issue #69): body-large 16px for content text, nothing
+  # below label-small 12px, captions (body-small) at 13px.
+  Scenario: The type scale is readable
+    Given the stylesheet
+    Then the body-large text token is at least 16px and the page text uses it
+    And every type token is at least 12px
+    And the caption token is at least 13px
+    And no rule sets a font size outside the type tokens
+    And buttons use the label-large token
+
+  Scenario: The title bar close hover is readable
+    Given the stylesheet
+    Then the close button glyph on its hover background has a contrast of at least 4.5
+
+  Scenario: The title bar buttons use Material state layers and motion
+    Given the stylesheet
+    Then the state layer opacities are 8% for hover and 10% for focus and pressed
+    And the title bar buttons draw their hover, focus and pressed states with those opacities
+    And the motion tokens use the Material standard easing

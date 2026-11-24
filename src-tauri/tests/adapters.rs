@@ -92,6 +92,24 @@ fn capabilities_are_minimal_and_open_only_steam_urls() {
         .map(|p| p.as_str().or_else(|| p["identifier"].as_str()).unwrap())
         .collect();
 
+    let mut sorted = identifiers.clone();
+    sorted.sort_unstable();
+    assert_eq!(
+        sorted,
+        [
+            "core:default",
+            // The custom title bar (issue #69).
+            "core:window:allow-close",
+            "core:window:allow-internal-toggle-maximize",
+            "core:window:allow-minimize",
+            "core:window:allow-start-dragging",
+            "core:window:allow-toggle-maximize",
+            "dialog:allow-open",
+            "opener:allow-open-url",
+            "process:allow-restart",
+            "updater:default",
+        ]
+    );
     assert!(identifiers.contains(&"dialog:allow-open"));
     assert!(
         !identifiers.contains(&"opener:default"),

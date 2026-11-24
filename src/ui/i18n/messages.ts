@@ -128,6 +128,13 @@ export interface Messages {
     measureFailed: string;
     retry: string;
   };
+  titleBar: {
+    controls: string;
+    minimize: string;
+    maximize: string;
+    restore: string;
+    close: string;
+  };
   statusBar: {
     steam: string;
     noGame: string;
