@@ -86,3 +86,16 @@ describe('Given the Tauri gateway', () => {
     });
   });
 });
+
+describe('Given the game artwork command', () => {
+  it('When get_game_artwork resolves a data URL Then it is returned as is', async () => {
+    const invoke = vi.fn().mockResolvedValue('data:image/png;base64,AQID');
+    await expect(createTauriGateway(invoke).getGameArtwork()).resolves.toBe('data:image/png;base64,AQID');
+    expect(invoke.mock.calls[0]).toEqual(['get_game_artwork']);
+  });
+
+  it('When there is no artwork Then it resolves null', async () => {
+    const invoke = vi.fn().mockResolvedValue(null);
+    await expect(createTauriGateway(invoke).getGameArtwork()).resolves.toBeNull();
+  });
+});

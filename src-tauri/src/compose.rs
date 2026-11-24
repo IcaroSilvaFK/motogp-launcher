@@ -2,14 +2,14 @@
 //! varies between production and tests (Steam, opener, process table,
 //! background execution, events) is injected.
 use motogp_application::{
-    BackgroundRunner, DeployService, FolderOpener, GameService, GameSettings, PlayService,
-    ProcessInspector, ProfileModPlanner, ProfileService, SessionPublisher, SessionService,
-    StorageService, UrlOpener,
+    ArtworkService, BackgroundRunner, DeployService, FolderOpener, GameService, GameSettings,
+    PlayService, ProcessInspector, ProfileModPlanner, ProfileService, SessionPublisher,
+    SessionService, StorageService, UrlOpener,
 };
 use motogp_infrastructure::{
     mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsGameFiles, FsStorageScanner,
     JsonConfigStore, JsonDeployedRepository, JsonModRepository, JsonProfileStore, ModLibrary,
-    MonotonicClock, SteamLibraries, SystemClock,
+    MonotonicClock, SteamArtwork, SteamLibraries, SystemClock,
 };
 use std::sync::{Arc, Mutex};
 
@@ -29,14 +29,18 @@ pub struct AppState {
     pub play: PlayService,
     /// Read-only: measuring never takes `write_lock`.
     pub storage: Arc<Storage>,
+    /// Read-only: reads Steam's local artwork cache.
+    pub artwork: Arc<ArtworkService<SteamArtwork>>,
     /// Serializes every mutation of the shared JSON stores, so concurrent
     /// commands cannot lose each other's updates.
     pub write_lock: Arc<Mutex<()>>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn compose<O, P>(
     data: &DataDir,
     steam: SteamLibraries,
+    artwork: SteamArtwork,
     opener: O,
     folder_opener: Arc<dyn FolderOpener + Send + Sync>,
     inspector: P,
@@ -81,6 +85,7 @@ where
         write_lock: Arc::default(),
         config: JsonConfigStore::new(data.config_file()),
         play,
+        artwork: Arc::new(ArtworkService::new(artwork)),
         storage: Arc::new(StorageService::new(
             data.root().to_path_buf(),
             FsStorageScanner,

@@ -3,6 +3,8 @@
 //! Depends only on `motogp-domain`. Ports and use cases arrive in the issues
 //! that need them.
 
+mod artwork_ports;
+mod artwork_service;
 mod config_service;
 mod deploy_error;
 mod deploy_ports;
@@ -30,6 +32,8 @@ mod session_service;
 mod storage_ports;
 mod storage_service;
 
+pub use artwork_ports::{Artwork, GameArtworkSource, ImageMime};
+pub use artwork_service::ArtworkService;
 pub use config_service::ConfigService;
 pub use deploy_error::DeployError;
 pub use deploy_ports::{DeployFiles, DeployedRepository, DirCheck};

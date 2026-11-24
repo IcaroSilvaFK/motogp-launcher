@@ -1,9 +1,29 @@
+import { useState } from 'react';
 import { selectCanPlay } from '../application';
 import { useAppInfo } from './AppInfoContext';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 import { SessionStatus } from './SessionStatus';
+
+/**
+ * Decorative game tile: the Steam artwork when there is one that loads, the generic game icon
+ * otherwise. The failed URL is remembered (not a boolean), so a new artwork gets a fresh try.
+ */
+function GameTile({ artwork }: { artwork: string | null }) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const showArtwork = artwork !== null && artwork !== failed;
+
+  return (
+    <span className={showArtwork ? 'game-tile has-artwork' : 'game-tile'} aria-hidden="true">
+      {showArtwork ? (
+        <img className="game-tile-image" src={artwork} alt="" draggable={false} onError={() => setFailed(artwork)} />
+      ) : (
+        <Icon name="game" />
+      )}
+    </span>
+  );
+}
 
 /**
  * Persistent bottom bar: the configured game on the left, the session status in the middle and the
@@ -19,9 +39,7 @@ export function StatusBar({ onSetUpGame }: { onSetUpGame: () => void }) {
   return (
     <footer className="statusbar">
       <div className="statusbar-game">
-        <span className="game-tile" aria-hidden="true">
-          <Icon name="game" />
-        </span>
+        <GameTile artwork={game === null ? null : state.artwork} />
         {game === null ? (
           <div className="statusbar-game-text">
             <span className="statusbar-game-name muted">{t.statusBar.noGame}</span>

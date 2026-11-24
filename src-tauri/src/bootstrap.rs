@@ -6,7 +6,7 @@ use crate::adapters::{TauriEvents, TauriFolderOpener, TauriOpener};
 use crate::{compose, configure, run_recovery};
 use motogp_application::{InstanceGuard, InstanceLock};
 use motogp_infrastructure::{
-    DataDir, FileInstanceLock, SteamLibraries, SysinfoProcesses, ThreadRunner,
+    DataDir, FileInstanceLock, SteamArtwork, SteamLibraries, SysinfoProcesses, ThreadRunner,
 };
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -19,6 +19,16 @@ fn steam_libraries() -> SteamLibraries {
 #[cfg(not(windows))]
 fn steam_libraries() -> SteamLibraries {
     SteamLibraries::new(None)
+}
+
+#[cfg(windows)]
+fn steam_artwork() -> SteamArtwork {
+    SteamArtwork::new(motogp_infrastructure::read_steam_path())
+}
+
+#[cfg(not(windows))]
+fn steam_artwork() -> SteamArtwork {
+    SteamArtwork::new(None)
 }
 
 /// Keeps the single-instance lock alive in the managed state.
@@ -52,6 +62,7 @@ pub fn run() {
         let state = compose(
             &data,
             steam_libraries(),
+            steam_artwork(),
             TauriOpener::new(handle.clone()),
             Arc::new(TauriFolderOpener::new(handle.clone())),
             SysinfoProcesses::default(),

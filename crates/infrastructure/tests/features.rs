@@ -9,6 +9,8 @@ use std::pin::Pin;
 
 #[path = "bdd/steam.rs"]
 mod steam;
+#[path = "bdd/steam_artwork.rs"]
+mod steam_artwork;
 
 #[path = "bdd/file_deploy.rs"]
 mod file_deploy;
@@ -35,6 +37,7 @@ const FEATURES: &[(&str, Runner)] = &[
     }),
     ("processes", || Box::pin(processes::run())),
     ("steam", || Box::pin(steam::run())),
+    ("steam-artwork", || Box::pin(steam_artwork::run())),
     ("file_import", || Box::pin(file_import::run())),
     ("file_deploy", || Box::pin(file_deploy::run())),
     ("stale-manifest", || Box::pin(stale_manifest::run())),

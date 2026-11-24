@@ -39,6 +39,8 @@ export interface LauncherGateway {
   cleanStaleSession(confirmedDir: string): Promise<number>;
   /** Measures the launcher data folder (read-only; never waits for a running mutation). */
   getStorageUsage(): Promise<StorageUsage>;
+  /** The Steam artwork of the configured game as a `data:` URL; `null` when there is none. */
+  getGameArtwork(): Promise<string | null>;
   /** Opens the launcher data folder in the system file manager; the backend decides the path. */
   openDataFolder(): Promise<void>;
 }
