@@ -226,6 +226,24 @@ fn previous_intact(w: &mut PersistenceWorld) {
     assert_eq!(w.store().load(), Ok(w.config.clone().unwrap()));
 }
 
+// ---------- Scenario: An existing config with a mixed-separator game_dir is fixed on load ----------
+
+#[given(expr = "a config.json whose game_dir is {string}")]
+fn config_with_raw_game_dir(w: &mut PersistenceWorld, game_dir: String) {
+    let dir = w.base().join("legacy");
+    w.use_config_in(dir);
+    let path = w.path();
+    fs::create_dir_all(path.parent().unwrap()).unwrap();
+    let json = serde_json::json!({ "game_dir": game_dir });
+    fs::write(path, json.to_string()).unwrap();
+}
+
+#[then(expr = "game_dir is {string}")]
+fn game_dir_is(w: &mut PersistenceWorld, expected: String) {
+    let config = w.loaded.clone().expect("not loaded").expect("load failed");
+    assert_eq!(config.game_dir, Some(PathBuf::from(expected)));
+}
+
 /// Runs only `persistence.feature`; returns `true` when every step passed.
 pub async fn run() -> bool {
     let writer = PersistenceWorld::cucumber()

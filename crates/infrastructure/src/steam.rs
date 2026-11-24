@@ -1,4 +1,5 @@
 //! Steam file formats (VDF/ACF) and the Steam library locator adapter.
+use crate::win_path::normalize_windows_path;
 use motogp_application::{AppError, SteamLocator};
 use motogp_domain::SteamManifest;
 use std::path::{Path, PathBuf};
@@ -146,10 +147,14 @@ impl SteamLocator for SteamLibraries {
                 })
             }
         };
-        let mut libraries: Vec<PathBuf> = vec![steam_path.clone()];
+        let mut libraries: Vec<PathBuf> = vec![normalize_windows_path(steam_path)];
         for library in listed {
-            if !libraries.iter().any(|l| same_path(l, &library)) {
-                libraries.push(library);
+            let library = normalize_windows_path(&library);
+            match libraries.iter().position(|l| same_path(l, &library)) {
+                // The VDF carries the real folder spelling; the registry's is lower-cased.
+                Some(0) => libraries[0] = library,
+                Some(_) => {}
+                None => libraries.push(library),
             }
         }
         Ok(libraries)
@@ -297,6 +302,33 @@ mod tests {
         assert_eq!(
             libs,
             vec![tmp.path().to_path_buf(), PathBuf::from(r"D:\Lib")]
+        );
+    }
+
+    // Finding the VDF through a lower-cased path needs a case-insensitive filesystem.
+    #[cfg(windows)]
+    #[test]
+    fn steam_libraries_prefer_the_vdf_spelling_of_the_install_path() {
+        let tmp = tempfile::tempdir().unwrap();
+        let root = tmp.path().join("SteamRoot");
+        let steamapps = root.join("steamapps");
+        std::fs::create_dir_all(&steamapps).unwrap();
+        let real = root.to_string_lossy().into_owned();
+        let vdf = format!(
+            "\"libraryfolders\" {{ \"0\" {{ \"path\" \"{}\" }} }}",
+            real.replace('\\', "\\\\")
+        );
+        std::fs::write(steamapps.join("libraryfolders.vdf"), vdf).unwrap();
+        // The registry stores a lower-cased, forward-slash spelling.
+        let registry_style = PathBuf::from(real.replace('\\', "/").to_lowercase());
+        let libs = SteamLibraries::new(Some(registry_style))
+            .library_folders()
+            .unwrap();
+        assert_eq!(libs.len(), 1);
+        // Compared as strings: a case-insensitive path comparison would hide the bug.
+        assert_eq!(
+            libs[0].to_string_lossy(),
+            normalize_windows_path(Path::new(&real)).to_string_lossy()
         );
     }
 

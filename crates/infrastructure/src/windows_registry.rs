@@ -3,7 +3,7 @@
 //! `HKLM\SOFTWARE\WOW6432Node\Valve\Steam` `InstallPath`). The precedence logic
 //! is unit-tested through an injectable reader; the real registry access is
 //! verified by a manual smoke only (see docs/validation-workflow.md).
-use crate::SteamLibraries;
+use crate::{normalize_windows_path, SteamLibraries};
 use std::path::PathBuf;
 
 /// Reads a string value from a registry location; `None` when absent/unreadable.
@@ -27,7 +27,7 @@ pub fn steam_path_from(reader: &impl RegistryReader) -> Option<PathBuf> {
     let non_empty = |raw: Option<String>| {
         raw.map(|s| s.trim().to_owned())
             .filter(|s| !s.is_empty())
-            .map(PathBuf::from)
+            .map(|s| normalize_windows_path(&PathBuf::from(s)))
     };
     non_empty(reader.read(Hive::CurrentUser, HKCU_KEY, HKCU_VALUE))
         .or_else(|| non_empty(reader.read(Hive::LocalMachine, HKLM_KEY, HKLM_VALUE)))
@@ -95,7 +95,21 @@ mod tests {
                 HKLM_VALUE,
                 r"C:\Machine\Steam",
             );
-        assert_eq!(steam_path_from(&reg), Some(PathBuf::from("C:/User/Steam")));
+        assert_eq!(steam_path_from(&reg), Some(PathBuf::from(r"C:\User\Steam")));
+    }
+
+    #[test]
+    fn registry_value_is_normalized() {
+        let reg = FakeRegistry::default().with(
+            Hive::CurrentUser,
+            HKCU_KEY,
+            HKCU_VALUE,
+            "c:/program files (x86)/steam",
+        );
+        assert_eq!(
+            steam_path_from(&reg),
+            Some(PathBuf::from(r"C:\program files (x86)\steam"))
+        );
     }
 
     #[test]
