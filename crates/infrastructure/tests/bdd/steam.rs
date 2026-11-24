@@ -2,10 +2,10 @@
 //! A temporary Steam tree is used; the real registry is never touched.
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
-use motogp_application::{GameError, GameService};
+use motogp_application::{GameError, GameService, SteamLocator};
 use motogp_domain::{GameInfo, SteamManifest};
 use motogp_infrastructure::{
-    parse_app_manifest, parse_library_folders, FsGameFiles, SteamLibraries,
+    normalize_windows_path, parse_app_manifest, parse_library_folders, FsGameFiles, SteamLibraries,
 };
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -18,6 +18,9 @@ struct SteamWorld {
     vdf: String,
     expected_paths: Vec<PathBuf>,
     libraries: Vec<PathBuf>,
+    path_input: Option<PathBuf>,
+    normalized: Option<PathBuf>,
+    registry_steam_path: Option<PathBuf>,
     acf: String,
     manifest: Option<SteamManifest>,
     root: Option<PathBuf>,
@@ -85,7 +88,13 @@ fn libraryfolders(w: &mut SteamWorld, first: String, second: String) {
 
 #[when("I read the libraries")]
 fn read_libraries(w: &mut SteamWorld) {
-    w.libraries = parse_library_folders(&w.vdf);
+    // With a registry path the full locator runs (reads the VDF from disk); otherwise only the parser.
+    w.libraries = match w.registry_steam_path.clone() {
+        Some(steam) => SteamLibraries::new(Some(steam))
+            .library_folders()
+            .expect("libraries"),
+        None => parse_library_folders(&w.vdf),
+    };
 }
 
 #[then("I receive both Windows paths with unescaped backslashes")]
@@ -263,6 +272,81 @@ fn manual_available(w: &mut SteamWorld) {
     fs::create_dir_all(root.join("P").join("Content").join("Paks")).unwrap();
     let root = root.to_path_buf();
     assert!(w.service().inspect_root(&root).is_ok());
+}
+
+// ---------- Path normalization (issue #61) ----------
+
+#[given(expr = "the registry SteamPath is {string}")]
+#[given(expr = "the path {string}")]
+fn path_input(w: &mut SteamWorld, raw: String) {
+    w.path_input = Some(PathBuf::from(raw));
+}
+
+#[when("I normalize it")]
+fn normalize_it(w: &mut SteamWorld) {
+    let input = w.path_input.clone().expect("path not set");
+    w.normalized = Some(normalize_windows_path(&input));
+}
+
+#[then(expr = "I receive {string}")]
+fn receive_normalized(w: &mut SteamWorld, expected: String) {
+    assert_eq!(w.normalized, Some(PathBuf::from(expected)));
+}
+
+/// Real mixed-case Steam folder inside the temp dir; the registry spelling differs from it.
+fn mixed_case_steam_root(w: &mut SteamWorld) -> PathBuf {
+    let root = w.base().join("SteamRoot");
+    fs::create_dir_all(root.join("steamapps")).unwrap();
+    root
+}
+
+#[given("the registry SteamPath is a lower-cased forward-slash spelling of the Steam folder")]
+fn registry_lowercase_forward_slashes(w: &mut SteamWorld) {
+    let root = mixed_case_steam_root(w);
+    w.registry_steam_path = Some(PathBuf::from(
+        root.to_string_lossy().replace('\\', "/").to_lowercase(),
+    ));
+}
+
+#[given(expr = "a libraryfolders.vdf that lists the real spelling plus {string}")]
+fn vdf_lists_real_spelling(w: &mut SteamWorld, second: String) {
+    let real = mixed_case_steam_root(w);
+    let second = unescaped(&second);
+    w.vdf = format!(
+        "\"libraryfolders\"\n{{\n\t\"0\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t}}\n\t\"1\"\n\t{{\n\t\t\"path\"\t\t\"{}\"\n\t}}\n}}",
+        vdf_escaped(&real.to_string_lossy()),
+        vdf_escaped(&second)
+    );
+    fs::write(real.join("steamapps").join("libraryfolders.vdf"), &w.vdf).unwrap();
+}
+
+#[then(expr = "the first library has the VDF spelling and the second is {string}")]
+fn libraries_use_vdf_spelling(w: &mut SteamWorld, second: String) {
+    // Finding the VDF through a lower-cased path needs a case-insensitive filesystem.
+    #[cfg(windows)]
+    {
+        let real = normalize_windows_path(&mixed_case_steam_root(w));
+        // Compared as strings: a case-insensitive path comparison would hide the bug.
+        assert_eq!(
+            w.libraries[0].to_string_lossy(),
+            real.to_string_lossy(),
+            "first library must keep the VDF spelling"
+        );
+        assert_eq!(w.libraries[1], PathBuf::from(second));
+    }
+    #[cfg(not(windows))]
+    let _ = (w, second);
+}
+
+#[then("no path contains a forward slash")]
+fn no_forward_slash(w: &mut SteamWorld) {
+    // Unix temp trees legitimately use `/`; the check only applies to Windows paths.
+    if cfg!(windows) {
+        assert!(w
+            .libraries
+            .iter()
+            .all(|p| !p.to_string_lossy().contains('/')));
+    }
 }
 
 /// Runs only `steam.feature`; returns `true` when every step passed.

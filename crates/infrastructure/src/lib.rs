@@ -19,6 +19,7 @@ mod steam;
 mod storage_scanner;
 mod store;
 mod system_clock;
+mod win_path;
 #[cfg(windows)]
 mod windows_registry;
 mod zip_archive;
@@ -39,6 +40,7 @@ pub use steam::{parse_app_manifest, parse_library_folders, SteamLibraries};
 pub use storage_scanner::FsStorageScanner;
 pub use store::{load_json, save_json, JsonConfigStore};
 pub use system_clock::MonotonicClock;
+pub use win_path::normalize_windows_path;
 #[cfg(windows)]
 pub use windows_registry::read_steam_path;
 pub use zip_archive::{ZipArchiveReader, ZipLimits};

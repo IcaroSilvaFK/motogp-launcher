@@ -1,5 +1,6 @@
 //! JSON persistence adapter: generic `load_json`/`save_json` plus the
 //! `ConfigRepository` implementation backed by `config.json`.
+use crate::win_path::normalize_windows_path;
 use motogp_application::{AppError, ConfigRepository};
 use motogp_domain::Config;
 use serde::de::DeserializeOwned;
@@ -20,7 +21,7 @@ struct ConfigDto {
 impl From<ConfigDto> for Config {
     fn from(dto: ConfigDto) -> Self {
         Config {
-            game_dir: dto.game_dir,
+            game_dir: dto.game_dir.map(|p| normalize_windows_path(&p)),
             active_profile: dto.active_profile,
         }
     }

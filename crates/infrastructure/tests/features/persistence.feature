@@ -33,3 +33,8 @@ Feature: Persist local data safely
     When an I/O failure prevents the atomic replacement
     Then the operation returns an error
     And the previous file remains intact and readable
+
+  Scenario: An existing config with a mixed-separator game_dir is fixed on load
+    Given a config.json whose game_dir is "c:/program files (x86)/steam\steamapps\common\MotoGP™26"
+    When I load the configuration
+    Then game_dir is "C:\program files (x86)\steam\steamapps\common\MotoGP™26"

@@ -47,3 +47,21 @@ Feature: Find the correct MotoGP installation on Steam
     When I detect the games
     Then I receive an empty list
     And manual inspection is still available
+
+  Scenario: Normalize the Steam path read from the registry
+    Given the registry SteamPath is "c:/program files (x86)/steam"
+    When I normalize it
+    Then I receive "C:\program files (x86)\steam"
+
+  Scenario: Prefer the library spelling from libraryfolders.vdf
+    Given the registry SteamPath is a lower-cased forward-slash spelling of the Steam folder
+    And a libraryfolders.vdf that lists the real spelling plus "D:\\SteamLibrary"
+    When I read the libraries
+    Then the first library has the VDF spelling and the second is "D:\SteamLibrary"
+    And no path contains a forward slash
+
+  Scenario: Accented and trademark characters survive normalization
+    # "Usuário Padrão" is a real-world accented Windows folder name; kept on purpose.
+    Given the path "c:/Users/Usuário Padrão/Steam\steamapps\common\MotoGP™26"
+    When I normalize it
+    Then I receive "C:\Users\Usuário Padrão\Steam\steamapps\common\MotoGP™26"
