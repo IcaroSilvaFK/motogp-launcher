@@ -124,6 +124,7 @@ export const BACKEND_ERROR_CODES = [
   // Online catalog (#72).
   'catalog_unavailable',
   'catalog_unsupported_schema',
+  'catalog_not_published',
   // Opening a catalog page (#73).
   'catalog_entry_not_found',
   'catalog_page_not_allowed',
@@ -180,12 +181,17 @@ export interface CatalogEntry {
   download: CatalogDownload | null;
 }
 
+/** Where a catalog came from: fetched now, the disk cache, or the snapshot shipped with the launcher (#91). */
+export type CatalogOrigin = 'remote' | 'cache' | 'bundled';
+
 export interface Catalog {
   entries: CatalogEntry[];
   /** Unix milliseconds of the last successful fetch. */
   fetchedAt: number;
   /** `true` when the source was unreachable and this is an older cached copy. */
   stale: boolean;
+  /** Where the entries came from. */
+  source: CatalogOrigin;
   /** Catalog entries the launcher dropped as invalid or duplicate. */
   skipped: number;
 }

@@ -4,7 +4,9 @@
 mod ipc_support;
 
 use ipc_support::{FakeCatalogSource, Harness};
+use motogp_application::{CatalogSourceError, RawCatalog, RawEntry};
 use motogp_domain::CatalogEntryDraft;
+use motogp_launcher_lib::production_downloader;
 use serde_json::{json, Value};
 use std::sync::Arc;
 
@@ -38,6 +40,7 @@ fn get_catalog_returns_camel_case_dtos() {
     assert_eq!(catalog["entries"][0]["download"], Value::Null);
     assert!(catalog["fetchedAt"].as_u64().unwrap() > 0);
     assert_eq!(catalog["stale"], false);
+    assert_eq!(catalog["source"], "remote");
     assert_eq!(catalog["skipped"], 0);
 }
 
@@ -48,6 +51,37 @@ fn unavailable_catalog_maps_to_a_stable_code() {
     let error = h.invoke("refresh_catalog", json!({})).unwrap_err();
 
     assert_eq!(error["code"], "catalog_unavailable");
+    assert!(!error["message"].as_str().unwrap().is_empty());
+}
+
+#[test]
+fn an_offline_launcher_without_a_cache_serves_the_bundled_catalog() {
+    let h = Harness::with_bundled(
+        Arc::new(FakeCatalogSource::failing()),
+        production_downloader(),
+        Some(RawCatalog {
+            schema_version: 1,
+            entries: vec![RawEntry::Draft(draft())],
+        }),
+    );
+
+    let catalog = h.invoke("get_catalog", json!({})).unwrap();
+
+    assert_eq!(catalog["source"], "bundled");
+    assert_eq!(catalog["stale"], true);
+    assert_eq!(catalog["entries"][0]["id"], "rebalanced-ai");
+    assert!(!h.data_dir().join("catalog-cache.json").exists());
+}
+
+#[test]
+fn a_catalog_that_is_not_published_has_its_own_stable_code() {
+    let h = Harness::with_catalog_source(Arc::new(FakeCatalogSource::failing_with(
+        CatalogSourceError::NotPublished,
+    )));
+
+    let error = h.invoke("get_catalog", json!({})).unwrap_err();
+
+    assert_eq!(error["code"], "catalog_not_published");
     assert!(!error["message"].as_str().unwrap().is_empty());
 }
 

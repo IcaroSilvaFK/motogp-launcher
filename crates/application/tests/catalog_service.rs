@@ -4,8 +4,8 @@ mod fakes;
 
 use fakes::*;
 use motogp_application::{
-    validate_catalog, validate_catalog_strict, CatalogCacheError, CatalogError, CatalogService,
-    CatalogSourceError, RawCatalog, RawEntry, SourceFetch, DEFAULT_CATALOG_TTL,
+    validate_catalog, validate_catalog_strict, CatalogCacheError, CatalogError, CatalogOrigin,
+    CatalogService, CatalogSourceError, RawCatalog, RawEntry, SourceFetch, DEFAULT_CATALOG_TTL,
 };
 use std::sync::Arc;
 use std::thread;
@@ -604,4 +604,185 @@ fn open_page_errors_have_readable_messages() {
     let text: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
     assert!(text[0].contains("not found") && text[1].contains("bad host"));
     assert!(text[2].contains("no browser"));
+}
+
+fn bundled_service(
+    source: &FakeSource,
+    cache: &FakeCache,
+    clock: &FakeClock,
+    bundled: RawCatalog,
+) -> TestService {
+    service(source, cache, clock).with_bundled(bundled)
+}
+
+#[test]
+fn bundled_catalog_is_served_when_nothing_is_cached_and_the_source_is_offline() {
+    let source = FakeSource::failing(offline());
+    let cache = FakeCache::default();
+
+    let snap = bundled_service(&source, &cache, &FakeClock::at(NOW_MS), bundled(&["dhb"]))
+        .get()
+        .unwrap();
+
+    assert_eq!(ids(&snap.entries), ["dhb"]);
+    assert_eq!(snap.origin, CatalogOrigin::Bundled);
+    assert!(snap.stale);
+    assert_eq!(snap.fetched_at_ms, 0);
+    assert_eq!(cache.saves(), 0);
+    assert!(cache.stored().is_none());
+}
+
+#[test]
+fn bundled_catalog_reports_the_entries_it_skipped() {
+    let mut bad = draft("bad");
+    bad.page_url = "file://C:/Windows".into();
+    let catalog = RawCatalog {
+        schema_version: 1,
+        entries: vec![raw("ok"), RawEntry::Draft(bad)],
+    };
+    let source = FakeSource::failing(offline());
+
+    let snap = bundled_service(
+        &source,
+        &FakeCache::default(),
+        &FakeClock::at(NOW_MS),
+        catalog,
+    )
+    .get()
+    .unwrap();
+
+    assert_eq!(ids(&snap.entries), ["ok"]);
+    assert_eq!((snap.skipped, snap.warnings.len()), (1, 1));
+}
+
+#[test]
+fn bundled_catalog_with_a_newer_schema_is_ignored() {
+    let source = FakeSource::failing(offline());
+    let newer = RawCatalog {
+        schema_version: 2,
+        entries: vec![raw("dhb")],
+    };
+
+    let error = bundled_service(
+        &source,
+        &FakeCache::default(),
+        &FakeClock::at(NOW_MS),
+        newer,
+    )
+    .get()
+    .unwrap_err();
+
+    assert!(matches!(error, CatalogError::Unavailable { .. }));
+}
+
+#[test]
+fn stale_cache_wins_over_the_bundled_catalog() {
+    let source = FakeSource::failing(offline());
+    let cache = FakeCache::holding(cached(NOW_MS - 7 * HOUR_MS, &["cached"]));
+
+    let snap = bundled_service(&source, &cache, &FakeClock::at(NOW_MS), bundled(&["dhb"]))
+        .get()
+        .unwrap();
+
+    assert_eq!(ids(&snap.entries), ["cached"]);
+    assert_eq!(snap.origin, CatalogOrigin::Cache);
+    assert!(snap.stale);
+}
+
+#[test]
+fn remote_catalog_wins_over_the_bundled_one_and_has_the_remote_origin() {
+    let source = FakeSource::serving(vec![raw("remote")]);
+
+    let snap = bundled_service(
+        &source,
+        &FakeCache::default(),
+        &FakeClock::at(NOW_MS),
+        bundled(&["dhb"]),
+    )
+    .get()
+    .unwrap();
+
+    assert_eq!(ids(&snap.entries), ["remote"]);
+    assert_eq!(snap.origin, CatalogOrigin::Remote);
+    assert!(!snap.stale);
+}
+
+#[test]
+fn not_modified_is_a_remote_origin_and_a_fresh_cache_is_a_cache_origin() {
+    let source = FakeSource::answering(vec![Ok(SourceFetch::NotModified)]);
+    let cache = FakeCache::holding(cached(NOW_MS - 7 * HOUR_MS, &["old"]));
+    let svc = service(&source, &cache, &FakeClock::at(NOW_MS));
+
+    assert_eq!(svc.get().unwrap().origin, CatalogOrigin::Remote);
+    assert_eq!(svc.get().unwrap().origin, CatalogOrigin::Cache);
+}
+
+#[test]
+fn not_published_without_any_fallback_is_its_own_error() {
+    let source = FakeSource::failing(CatalogSourceError::NotPublished);
+
+    let error = service(&source, &FakeCache::default(), &FakeClock::at(NOW_MS))
+        .get()
+        .unwrap_err();
+
+    assert_eq!(error, CatalogError::NotPublished);
+}
+
+#[test]
+fn not_published_falls_back_to_the_stale_cache() {
+    let source = FakeSource::failing(CatalogSourceError::NotPublished);
+    let cache = FakeCache::holding(cached(NOW_MS - 7 * HOUR_MS, &["old"]));
+
+    let snap = service(&source, &cache, &FakeClock::at(NOW_MS))
+        .get()
+        .unwrap();
+
+    assert_eq!(snap.origin, CatalogOrigin::Cache);
+}
+
+#[test]
+fn not_published_is_retried_only_after_the_backoff() {
+    let source = FakeSource::failing(CatalogSourceError::NotPublished);
+    let clock = FakeClock::at(NOW_MS);
+    let svc = bundled_service(&source, &FakeCache::default(), &clock, bundled(&["dhb"]));
+
+    assert_eq!(svc.get().unwrap().origin, CatalogOrigin::Bundled);
+    clock.advance(10_000);
+    assert_eq!(svc.get().unwrap().origin, CatalogOrigin::Bundled);
+    assert_eq!(source.calls(), 1);
+    clock.advance(30_000);
+    assert_eq!(svc.get().unwrap().origin, CatalogOrigin::Bundled);
+    assert_eq!(source.calls(), 2);
+}
+
+#[test]
+fn open_page_finds_an_entry_of_the_bundled_catalog() {
+    let source = FakeSource::failing(offline());
+    let opener = FakeWebOpener::default();
+    let mut entry = draft("dhb");
+    entry.page_url = "https://github.com/user/repo".into();
+    let catalog = RawCatalog {
+        schema_version: 1,
+        entries: vec![RawEntry::Draft(entry)],
+    };
+    let svc = bundled_service(
+        &source,
+        &FakeCache::default(),
+        &FakeClock::at(NOW_MS),
+        catalog,
+    );
+
+    svc.open_page("dhb", &opener).unwrap();
+
+    assert_eq!(opener.opened(), ["https://github.com/user/repo"]);
+}
+
+#[test]
+fn not_published_has_readable_messages() {
+    assert!(CatalogSourceError::NotPublished
+        .to_string()
+        .contains("not published"));
+    assert!(CatalogError::NotPublished
+        .to_string()
+        .contains("not published"));
 }

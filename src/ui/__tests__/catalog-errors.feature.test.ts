@@ -34,4 +34,12 @@ describeFeature(feature, ({ Scenario }) => {
       },
     );
   });
+
+  Scenario('The not published error code is known and translated', ({ Then }) => {
+    Then('"catalog_not_published" is an error code with en and pt-BR messages', () => {
+      expect(ERROR_CODES).toContain('catalog_not_published');
+      expect(en.errors.catalog_not_published).toBeTruthy();
+      expect(ptBR.errors.catalog_not_published).toBeTruthy();
+    });
+  });
 });

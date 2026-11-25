@@ -3,6 +3,8 @@ use std::fmt;
 /// Why the online catalog source could not deliver a catalog.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CatalogSourceError {
+    /// The catalog file does not exist on the server (HTTP 404): not published yet.
+    NotPublished,
     /// The server could not be reached (DNS, connection, timeout, TLS).
     Network(String),
     /// The server answered with an unexpected HTTP status.
@@ -19,6 +21,7 @@ impl fmt::Display for CatalogSourceError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CatalogSourceError::Network(detail) => write!(f, "network error: {detail}"),
+            CatalogSourceError::NotPublished => write!(f, "catalog not published"),
             CatalogSourceError::Http { status } => write!(f, "unexpected HTTP status {status}"),
             CatalogSourceError::RateLimited {
                 retry_after_secs: Some(secs),
@@ -53,6 +56,8 @@ impl std::error::Error for CatalogCacheError {}
 pub enum CatalogError {
     /// No catalog can be shown: nothing cached and the source failed.
     Unavailable { reason: String },
+    /// No catalog can be shown: nothing cached, nothing bundled and the file is not published yet.
+    NotPublished,
     /// The catalog file uses a newer schema than this launcher understands.
     UnsupportedSchema { version: u32 },
     /// No catalog entry has this id.
@@ -67,6 +72,7 @@ impl fmt::Display for CatalogError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CatalogError::Unavailable { reason } => write!(f, "catalog unavailable: {reason}"),
+            CatalogError::NotPublished => write!(f, "catalog not published"),
             CatalogError::UnsupportedSchema { version } => {
                 write!(f, "unsupported catalog schema version {version}")
             }

@@ -81,6 +81,8 @@ export const ptBR: Messages = {
     refreshing: 'Atualizando…',
     loading: 'Carregando o catálogo…',
     stale: (date) => `Mostrando o catálogo salvo em ${date}. Não foi possível atualizá-lo agora.`,
+    bundled:
+      'Mostrando o catálogo que acompanha esta versão do launcher. Ele será atualizado quando o catálogo online estiver disponível.',
     categories: 'Categorias',
     all: 'Todas',
     search: 'Buscar no catálogo',
@@ -316,6 +318,7 @@ export const ptBR: Messages = {
     catalog_unavailable: 'Não foi possível carregar o catálogo de mods. Verifique sua conexão e tente novamente.',
     catalog_unsupported_schema:
       'O catálogo de mods exige uma versão mais nova do launcher. Atualize o launcher para navegar nele.',
+    catalog_not_published: 'Nenhum catálogo de mods foi publicado ainda. Tente novamente mais tarde.',
     catalog_entry_not_found: 'Este mod não está mais no catálogo. Atualize o catálogo e tente novamente.',
     catalog_page_not_allowed: 'A página deste mod não pode ser aberta porque o endereço não é confiável.',
     open_page_failed: 'Não foi possível abrir a página no navegador.',

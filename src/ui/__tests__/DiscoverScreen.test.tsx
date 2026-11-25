@@ -26,7 +26,13 @@ const entry: CatalogEntry = {
   download: { url: 'https://github.com/x/y.zip', size: 10, sha256: 'a'.repeat(64) },
 };
 
-const catalogOf = (entries: CatalogEntry[]): Catalog => ({ entries, fetchedAt: 0, stale: false, skipped: 0 });
+const catalogOf = (entries: CatalogEntry[]): Catalog => ({
+  entries,
+  fetchedAt: 0,
+  stale: false,
+  source: 'remote',
+  skipped: 0,
+});
 
 function setup(
   options: { locale?: Locale; download?: CatalogEntry['download']; refresh?: () => Promise<Catalog> } = {},
@@ -96,7 +102,8 @@ describe('DiscoverScreen', () => {
     await user.click(screen.getByRole('button', { name: 'Refresh catalog' }));
     expect(screen.getByRole('button', { name: 'Refreshing…' })).toBeDisabled();
     await act(async () => fail({ code: 'catalog_unavailable', message: 'timeout' }));
-    expect(screen.getByRole('alert')).toHaveTextContent('timeout');
+    expect(screen.getByRole('alert')).toHaveTextContent('The mod catalog could not be loaded.');
+    expect(screen.getByRole('alert')).not.toHaveTextContent('timeout');
     expect(screen.getByRole('button', { name: 'Rebalanced AI' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();

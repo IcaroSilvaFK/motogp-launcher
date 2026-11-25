@@ -6,8 +6,8 @@ use crate::adapters::{TauriEvents, TauriFolderOpener, TauriOpener, TauriWebOpene
 use crate::{compose, configure, run_recovery, UnavailableCatalogSource};
 use motogp_application::{CatalogSource, InstanceGuard, InstanceLock};
 use motogp_infrastructure::{
-    DataDir, FileInstanceLock, HttpCatalogConfig, HttpCatalogSource, SteamArtwork, SteamLibraries,
-    SysinfoProcesses, ThreadRunner,
+    bundled_catalog, DataDir, FileInstanceLock, HttpCatalogConfig, HttpCatalogSource, SteamArtwork,
+    SteamLibraries, SysinfoProcesses, ThreadRunner,
 };
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -83,6 +83,9 @@ pub fn run() {
             Arc::new(TauriEvents::new(handle)),
             Arc::new(ThreadRunner),
             catalog_source(),
+            bundled_catalog()
+                .map_err(|error| eprintln!("bundled catalog unavailable: {error}"))
+                .ok(),
         );
         // Recovery finishes before the state exists, so no command can run
         // `play` earlier. A failure is already on the error channel and blocks

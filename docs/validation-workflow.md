@@ -555,3 +555,21 @@ The Discover tab. Gherkin: `tests/features/frontend/discover.feature`, bound str
 | Error with retry | `discover.feature.test.tsx`; controller "enters the error state when the first load fails, and retry refreshes" |
 | Already in library badge | `discover.feature.test.tsx`; selectors `inLibrary`, `normalizeTitle` |
 | Open page failure is shown | `discover.feature.test.tsx` (inline alert in the sheet, Dismiss); controller "opens a page by id and reports a failure as a page error" |
+
+### Issue #91: scenario traceability
+
+Bundled catalog fallback and "not published" handling. Gherkin: `crates/application/tests/features/catalog.feature` (steps in `tests/bdd/catalog.rs`, fakes in `tests/support/catalog_fakes.rs`), `crates/infrastructure/tests/features/catalog-source.feature` (steps in `tests/bdd/catalog_source.rs`), `tests/features/frontend/discover.feature` and `catalog-errors.feature` (bound by `src/ui/__tests__/discover.feature.test.tsx` and `catalog-errors.feature.test.ts`).
+
+| Scenario | Tests |
+|----------|-------|
+| Serve the bundled catalog when nothing is cached and the source is offline / not published | `bundled_catalog_is_served_when_nothing_is_cached_and_the_source_is_offline`, `bundled_catalog_reports_the_entries_it_skipped`, `open_page_finds_an_entry_of_the_bundled_catalog` (application) + cucumber; IPC `an_offline_launcher_without_a_cache_serves_the_bundled_catalog` |
+| A stale cache / a remote catalog wins over the bundled one | `stale_cache_wins_over_the_bundled_catalog`, `remote_catalog_wins_over_the_bundled_one_and_has_the_remote_origin`, `not_modified_is_a_remote_origin_and_a_fresh_cache_is_a_cache_origin` + cucumber |
+| Report "not published" without any fallback; retry only after the backoff | `not_published_without_any_fallback_is_its_own_error`, `not_published_falls_back_to_the_stale_cache`, `not_published_is_retried_only_after_the_backoff`, `bundled_catalog_with_a_newer_schema_is_ignored` + cucumber |
+| A missing catalog file is "not published" | `a_404_is_not_published` (infrastructure `catalog_http.rs`) + cucumber |
+| The bundled catalog is the repository catalog | `the_bundled_catalog_is_the_repository_file_and_passes_the_strict_validation` (infrastructure `bundled_catalog.rs`) + cucumber |
+| The catalog DTO says where it came from; "not published" has its own code | `catalog_dto_is_camel_case_with_null_optionals`, `catalog_source_names_every_origin_in_lowercase`, `not_published_has_its_own_stable_code` (`src-tauri`), IPC `a_catalog_that_is_not_published_has_its_own_stable_code` |
+| Say that the catalog shipped with this version is shown | `discover.feature.test.tsx` (info notice, no "saved on" notice); the stale notice now needs `source: "cache"` |
+| The error state shows only the translated message / "Not published" is translated | `discover.feature.test.tsx` (pt-BR text, no English message on screen); controller tests "logs the English backend message of a failure ..." (`console.warn`); `catalog-errors.feature.test.ts` |
+| A refresh failure keeps the catalog on screen | `discover.feature.test.tsx`; `DiscoverScreen.test.tsx` |
+
+Note: the bundled snapshot is the repository `catalog/catalog.json` embedded with `include_str!` (it is never written to the cache); the content of that file is not part of this issue.

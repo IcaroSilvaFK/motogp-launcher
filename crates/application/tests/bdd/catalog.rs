@@ -4,7 +4,8 @@ use crate::catalog_fakes::*;
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
 use motogp_application::{
-    CatalogError, CatalogSnapshot, CatalogSourceError, RawEntry, SourceFetch,
+    CatalogError, CatalogOrigin, CatalogSnapshot, CatalogSourceError, RawCatalog, RawEntry,
+    SourceFetch,
 };
 use std::sync::Arc;
 use std::thread;
@@ -15,6 +16,7 @@ struct CatalogWorld {
     source: Option<FakeSource>,
     cache: FakeCache,
     clock: Option<FakeClock>,
+    bundled: Option<RawCatalog>,
     result: Option<Result<CatalogSnapshot, CatalogError>>,
     pair: Option<(CatalogSnapshot, CatalogSnapshot)>,
     /// Kept between steps: the backoff lives inside the service.
@@ -39,8 +41,9 @@ impl CatalogWorld {
     fn service(&mut self) -> Arc<TestService> {
         let clock = self.clock();
         let (source, cache) = (self.source(), self.cache.clone());
+        let bundled = self.bundled.clone();
         self.svc
-            .get_or_insert_with(|| Arc::new(service(&source, &cache, &clock)))
+            .get_or_insert_with(|| Arc::new(service_with(&source, &cache, &clock, bundled)))
             .clone()
     }
     fn snapshot(&self) -> &CatalogSnapshot {
@@ -249,6 +252,100 @@ fn fresh(w: &mut CatalogWorld) {
     assert_eq!(snap.entries[0].id, "old");
     assert_eq!(snap.fetched_at_ms, NOW_MS);
     assert_eq!(w.cache.stored().unwrap().fetched_at_ms, NOW_MS);
+}
+
+#[given("no cached catalog")]
+fn no_cached(w: &mut CatalogWorld) {
+    w.cache = FakeCache::default();
+}
+
+#[given(expr = "a bundled catalog with the entry {string}")]
+fn bundled_with(w: &mut CatalogWorld, id: String) {
+    w.bundled = Some(bundled(&[&id]));
+}
+
+#[given("no bundled catalog")]
+fn no_bundled(w: &mut CatalogWorld) {
+    w.bundled = None;
+}
+
+#[given("the catalog source is offline")]
+fn source_offline(w: &mut CatalogWorld) {
+    w.source = Some(FakeSource::failing(CatalogSourceError::Network(
+        "down".into(),
+    )));
+}
+
+#[given(expr = "the catalog source answers {string}")]
+fn source_answers(w: &mut CatalogWorld, what: String) {
+    assert_eq!(what, "not published");
+    w.source = Some(FakeSource::failing(CatalogSourceError::NotPublished));
+}
+
+#[given(expr = "a stale cached catalog with the entry {string}")]
+fn stale_cached_with(w: &mut CatalogWorld, id: String) {
+    w.cache = FakeCache::holding(cached(NOW_MS - 7 * HOUR_MS, &[&id]));
+}
+
+#[given(expr = "the catalog source returns the entry {string}")]
+fn source_returns(w: &mut CatalogWorld, id: String) {
+    w.source = Some(FakeSource::serving(vec![raw(&id)]));
+}
+
+#[when("the catalog is requested twice within 30 seconds")]
+fn requested_twice(w: &mut CatalogWorld) {
+    let _ = w.service().get();
+    w.clock().advance(10_000);
+    w.result = Some(w.service().get());
+}
+
+#[then(expr = "the catalog shows the entry {string}")]
+fn shows_entry(w: &mut CatalogWorld, id: String) {
+    let ids: Vec<_> = w.snapshot().entries.iter().map(|e| e.id.as_str()).collect();
+    assert_eq!(ids, [id.as_str()]);
+}
+
+fn origin_of(name: &str) -> CatalogOrigin {
+    match name {
+        "remote" => CatalogOrigin::Remote,
+        "cache" => CatalogOrigin::Cache,
+        "bundled" => CatalogOrigin::Bundled,
+        other => panic!("unknown origin {other}"),
+    }
+}
+
+#[then(expr = "the catalog origin is {string}")]
+fn origin_is(w: &mut CatalogWorld, name: String) {
+    assert_eq!(w.snapshot().origin, origin_of(&name));
+}
+
+#[then(expr = "the catalog origin is {string} and it is stale")]
+fn origin_is_stale(w: &mut CatalogWorld, name: String) {
+    assert_eq!(w.snapshot().origin, origin_of(&name));
+    assert!(w.snapshot().stale);
+}
+
+#[then(expr = "the catalog origin is {string} and it is not stale")]
+fn origin_is_fresh(w: &mut CatalogWorld, name: String) {
+    assert_eq!(w.snapshot().origin, origin_of(&name));
+    assert!(!w.snapshot().stale);
+}
+
+#[then("nothing is written to the catalog cache")]
+fn nothing_cached(w: &mut CatalogWorld) {
+    assert_eq!(w.cache.saves(), 0);
+    assert!(w.cache.stored().is_none());
+}
+
+#[then(expr = "the request fails as {string}")]
+fn fails_as(w: &mut CatalogWorld, what: String) {
+    assert_eq!(what, "not published");
+    assert_eq!(w.error(), &CatalogError::NotPublished);
+}
+
+#[then("the catalog source was asked once")]
+fn asked_once(w: &mut CatalogWorld) {
+    assert_eq!(w.source().calls(), 1);
 }
 
 /// Runs only `catalog.feature`; returns `true` when every step passed.

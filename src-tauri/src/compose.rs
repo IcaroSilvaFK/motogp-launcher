@@ -5,8 +5,8 @@ use crate::catalog_install_support::production_downloader;
 use motogp_application::{
     ArtworkService, BackgroundRunner, CancelFlag, CatalogInstaller, CatalogService, CatalogSource,
     DeployService, FolderOpener, GameService, GameSettings, ModDownloader, PlayService,
-    ProcessInspector, ProfileModPlanner, ProfileService, SessionPublisher, SessionService,
-    StorageService, UrlOpener, WebPageOpener,
+    ProcessInspector, ProfileModPlanner, ProfileService, RawCatalog, SessionPublisher,
+    SessionService, StorageService, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{
     mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsDownloadStaging, FsGameFiles,
@@ -51,6 +51,14 @@ pub struct AppState {
     pub install_cancels: Arc<Mutex<HashMap<String, CancelFlag>>>,
 }
 
+/// Serves the bundled snapshot when nothing is cached and the source fails.
+fn with_bundled(service: Catalog, bundled: Option<RawCatalog>) -> Catalog {
+    match bundled {
+        Some(bundled) => service.with_bundled(bundled),
+        None => service,
+    }
+}
+
 // The composition root receives every injected port, so it is wide on purpose.
 #[allow(clippy::too_many_arguments)]
 pub fn compose<O, P>(
@@ -64,6 +72,7 @@ pub fn compose<O, P>(
     publisher: Arc<dyn SessionPublisher>,
     runner: Arc<dyn BackgroundRunner>,
     catalog_source: Arc<dyn CatalogSource>,
+    bundled_catalog: Option<RawCatalog>,
 ) -> AppState
 where
     O: UrlOpener + Send + Sync + 'static,
@@ -80,6 +89,7 @@ where
         publisher,
         runner,
         catalog_source,
+        bundled_catalog,
         production_downloader(),
     )
 }
@@ -98,6 +108,7 @@ pub fn compose_with_downloader<O, P>(
     publisher: Arc<dyn SessionPublisher>,
     runner: Arc<dyn BackgroundRunner>,
     catalog_source: Arc<dyn CatalogSource>,
+    bundled_catalog: Option<RawCatalog>,
     downloader: Arc<dyn ModDownloader>,
 ) -> AppState
 where
@@ -151,10 +162,13 @@ where
             Sha256Hasher,
         )),
         install_cancels: Arc::default(),
-        catalog: Arc::new(CatalogService::new(
-            catalog_source,
-            JsonCatalogCache::new(data.catalog_cache_file()),
-            SystemClock,
+        catalog: Arc::new(with_bundled(
+            CatalogService::new(
+                catalog_source,
+                JsonCatalogCache::new(data.catalog_cache_file()),
+                SystemClock,
+            ),
+            bundled_catalog,
         )),
         web_opener,
     }

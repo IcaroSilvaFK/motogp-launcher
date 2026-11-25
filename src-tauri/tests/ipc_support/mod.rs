@@ -64,16 +64,29 @@ impl WebPageOpener for FakeWebOpener {
 /// fails as unreachable.
 pub struct FakeCatalogSource {
     entries: Option<Vec<motogp_domain::CatalogEntryDraft>>,
+    error: CatalogSourceError,
 }
 
 impl FakeCatalogSource {
     pub fn failing() -> Self {
-        Self { entries: None }
+        Self {
+            entries: None,
+            error: CatalogSourceError::Network("offline".to_string()),
+        }
+    }
+
+    /// Fails with the given error instead of an offline network.
+    pub fn failing_with(error: CatalogSourceError) -> Self {
+        Self {
+            entries: None,
+            error,
+        }
     }
 
     pub fn serving(entries: Vec<motogp_domain::CatalogEntryDraft>) -> Self {
         Self {
             entries: Some(entries),
+            error: CatalogSourceError::Network("offline".to_string()),
         }
     }
 }
@@ -88,7 +101,7 @@ impl CatalogSource for FakeCatalogSource {
                 },
                 etag: None,
             }),
-            None => Err(CatalogSourceError::Network("offline".to_string())),
+            None => Err(self.error.clone()),
         }
     }
 }
@@ -175,6 +188,15 @@ impl Harness {
         catalog_source: Arc<dyn CatalogSource>,
         downloader: Arc<dyn ModDownloader>,
     ) -> Harness {
+        Harness::with_bundled(catalog_source, downloader, None)
+    }
+
+    /// Like [`Harness::with_services`], with a catalog snapshot bundled in the build (#91).
+    pub fn with_bundled(
+        catalog_source: Arc<dyn CatalogSource>,
+        downloader: Arc<dyn ModDownloader>,
+        bundled_catalog: Option<RawCatalog>,
+    ) -> Harness {
         let tmp = TempDir::new().unwrap();
         let data = DataDir::new(tmp.path().join("data"));
         fs::create_dir_all(data.root()).unwrap();
@@ -197,6 +219,7 @@ impl Harness {
             recorder.clone(),
             runner.clone(),
             catalog_source,
+            bundled_catalog,
             downloader,
         );
         let app = configure(tauri::test::mock_builder())

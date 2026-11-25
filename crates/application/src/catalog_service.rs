@@ -26,6 +26,17 @@ pub struct CatalogWarning {
     pub reason: String,
 }
 
+/// Where a snapshot came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CatalogOrigin {
+    /// Fetched or revalidated from the online source by this call.
+    Remote,
+    /// Read from the disk cache (fresh, or an older copy when the source failed).
+    Cache,
+    /// The snapshot shipped with this build, used when nothing else is available.
+    Bundled,
+}
+
 /// What the catalog screens show.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CatalogSnapshot {
@@ -34,6 +45,8 @@ pub struct CatalogSnapshot {
     pub fetched_at_ms: u64,
     /// `true` when the source could not be reached and this is an older copy.
     pub stale: bool,
+    /// Where the entries came from.
+    pub origin: CatalogOrigin,
     /// Entries dropped as invalid or duplicate.
     pub skipped: usize,
     /// Reasons of the skipped entries. Only filled right after a fetch; a
@@ -47,6 +60,7 @@ impl CatalogSnapshot {
             entries: cached.entries,
             fetched_at_ms: cached.fetched_at_ms,
             stale,
+            origin: CatalogOrigin::Cache,
             skipped: cached.skipped,
             warnings: Vec::new(),
         }
@@ -125,6 +139,9 @@ pub struct CatalogService<S, C, K> {
     cache: C,
     clock: K,
     ttl_ms: u64,
+    /// Snapshot shipped with the build; the last resort when nothing is cached
+    /// and the source fails. Never written to the cache.
+    bundled: Option<RawCatalog>,
     /// Serializes refreshes (single-flight).
     flight: Mutex<Flight>,
     /// Bumped after every completed refresh; lets waiters reuse its result.
@@ -143,9 +160,17 @@ impl<S: CatalogSource, C: CatalogCache, K: Clock> CatalogService<S, C, K> {
             cache,
             clock,
             ttl_ms: u64::try_from(ttl.as_millis()).unwrap_or(u64::MAX),
+            bundled: None,
             flight: Mutex::new(Flight::default()),
             generation: AtomicU64::new(0),
         }
+    }
+
+    /// Serves `bundled` when there is no cache and the source fails.
+    #[must_use]
+    pub fn with_bundled(mut self, bundled: RawCatalog) -> Self {
+        self.bundled = Some(bundled);
+        self
     }
 
     /// The catalog: the cache while it is fresh, otherwise a refresh. Falls
@@ -237,7 +262,7 @@ impl<S: CatalogSource, C: CatalogCache, K: Clock> CatalogService<S, C, K> {
                 .unwrap_or(CatalogError::Unavailable {
                     reason: "waiting before retrying the catalog source".to_string(),
                 });
-            return Self::fall_back(cached, error);
+            return self.fall_back(cached, error);
         }
         let etag = cached.as_ref().and_then(|c| c.etag.clone());
         match self.source.fetch(etag.as_deref()) {
@@ -246,7 +271,9 @@ impl<S: CatalogSource, C: CatalogCache, K: Clock> CatalogService<S, C, K> {
                     cached.fetched_at_ms = now;
                     self.store(&cached);
                     self.succeeded(flight);
-                    Ok(CatalogSnapshot::from_cache(cached, false))
+                    let mut snapshot = CatalogSnapshot::from_cache(cached, false);
+                    snapshot.origin = CatalogOrigin::Remote;
+                    Ok(snapshot)
                 }
                 None => {
                     let error =
@@ -265,12 +292,13 @@ impl<S: CatalogSource, C: CatalogCache, K: Clock> CatalogService<S, C, K> {
                     self.store(&cached);
                     self.succeeded(flight);
                     let mut snapshot = CatalogSnapshot::from_cache(cached, false);
+                    snapshot.origin = CatalogOrigin::Remote;
                     snapshot.warnings = warnings;
                     Ok(snapshot)
                 }
                 Err(error) => {
                     self.record_failure(flight, now, None, error.clone());
-                    Self::fall_back(cached, error)
+                    self.fall_back(cached, error)
                 }
             },
             Err(error) => self.failed(flight, now, &error, cached),
@@ -301,11 +329,14 @@ impl<S: CatalogSource, C: CatalogCache, K: Clock> CatalogService<S, C, K> {
             } => Some(*secs),
             _ => None,
         };
-        let unavailable = CatalogError::Unavailable {
-            reason: error.to_string(),
+        let failure = match error {
+            CatalogSourceError::NotPublished => CatalogError::NotPublished,
+            other => CatalogError::Unavailable {
+                reason: other.to_string(),
+            },
         };
-        self.record_failure(flight, now, retry_after, unavailable.clone());
-        Self::fall_back(cached, unavailable)
+        self.record_failure(flight, now, retry_after, failure.clone());
+        self.fall_back(cached, failure)
     }
 
     /// Counts the failure and schedules the next allowed attempt: the server's
@@ -327,13 +358,29 @@ impl<S: CatalogSource, C: CatalogCache, K: Clock> CatalogService<S, C, K> {
         flight.last_error = Some(error);
     }
 
+    /// The stale cache, else the bundled snapshot, else `error`.
     fn fall_back(
+        &self,
         cached: Option<CachedCatalog>,
         error: CatalogError,
     ) -> Result<CatalogSnapshot, CatalogError> {
         match cached {
             Some(cached) => Ok(CatalogSnapshot::from_cache(cached, true)),
-            None => Err(error),
+            None => self.bundled_snapshot().ok_or(error),
         }
+    }
+
+    /// The bundled catalog as a stale snapshot; `None` when there is none or
+    /// it uses a schema this launcher does not understand.
+    fn bundled_snapshot(&self) -> Option<CatalogSnapshot> {
+        let (entries, warnings) = validate_catalog(self.bundled.clone()?).ok()?;
+        Some(CatalogSnapshot {
+            entries,
+            fetched_at_ms: 0,
+            stale: true,
+            origin: CatalogOrigin::Bundled,
+            skipped: warnings.len(),
+            warnings,
+        })
     }
 }

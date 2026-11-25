@@ -3,6 +3,7 @@
 //! Fs/JSON, ZIP/SHA-256 and Steam/process code goes here when needed, never
 //! in the core (`domain`/`application`).
 
+mod bundled_catalog;
 mod catalog_cache;
 mod catalog_http;
 mod data_dir;
@@ -29,6 +30,7 @@ mod win_path;
 mod windows_registry;
 mod zip_archive;
 
+pub use bundled_catalog::bundled_catalog;
 pub use catalog_cache::JsonCatalogCache;
 pub use catalog_http::{parse_catalog, HttpCatalogConfig, HttpCatalogSource, DEFAULT_CATALOG_URL};
 pub use data_dir::DataDir;

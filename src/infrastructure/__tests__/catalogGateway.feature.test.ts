@@ -25,6 +25,7 @@ const catalog: Catalog = {
   ],
   fetchedAt: 1_700_000_000_000,
   stale: false,
+  source: 'remote',
   skipped: 0,
 };
 

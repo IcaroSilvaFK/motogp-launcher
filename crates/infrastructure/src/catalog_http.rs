@@ -87,6 +87,9 @@ impl CatalogSource for HttpCatalogSource {
                 retry_after_secs: retry_after_secs(response.headers()),
             });
         }
+        if status == StatusCode::NOT_FOUND {
+            return Err(CatalogSourceError::NotPublished);
+        }
         if !status.is_success() {
             return Err(CatalogSourceError::Http {
                 status: status.as_u16(),
@@ -365,6 +368,15 @@ mod tests {
             Err(CatalogSourceError::RateLimited {
                 retry_after_secs: None
             })
+        );
+    }
+
+    #[test]
+    fn a_404_is_not_published() {
+        let (url, _) = serve(vec![status("404 Not Found", "")]);
+        assert_eq!(
+            source(url, 4096).fetch(None),
+            Err(CatalogSourceError::NotPublished)
         );
     }
 
