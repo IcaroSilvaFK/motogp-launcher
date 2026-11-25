@@ -35,6 +35,13 @@ Feature: Polished dark launcher interface
     When I select Profiles in the navigation
     Then the Profiles item is marked as the current page
 
+  # The custom title bar (issue #69) already shows the mark and the app name (user feedback, #71).
+  Scenario: The sidebar does not repeat the brand shown in the title bar
+    Given the launcher open on the Library
+    Then the sidebar shows no brand mark
+    And the main navigation is the first thing in the sidebar and keeps its name
+    And the document has a single visually hidden h1 with the app name
+
   Scenario: The sidebar toggle works from the keyboard
     Given the launcher open on the Library with the sidebar expanded
     When I focus the sidebar toggle and press Enter
@@ -125,6 +132,15 @@ Feature: Polished dark launcher interface
   Scenario: Motion respects the reduced-motion preference
     Given the stylesheet
     Then it declares a prefers-reduced-motion rule that disables animations and transitions
+
+  # User feedback on #71: with the sidebar, the content uses the whole window, with breathing room.
+  Scenario: The content uses the full width next to the sidebar
+    Given the stylesheet
+    Then the page container, the loading state and the messages column set no max-width
+    And there is no content max-width token
+    And the content and the messages use the page gutter of 24px
+    And a narrow-window media query reduces the page gutter to 16px
+    And text-heavy blocks keep a readable measure
 
   Scenario: The stylesheet stays restrained
     Given the stylesheet

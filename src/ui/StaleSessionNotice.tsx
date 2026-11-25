@@ -2,23 +2,41 @@ import { useState } from 'react';
 import { BannerIcon } from './BannerIcon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
+import { usePresence } from './usePresence';
+import type { PresenceState } from './usePresence';
 
 /** Offers to forget or clean the files a previous game folder still holds. */
 export function StaleSessionNotice() {
   const { state } = useLauncher();
-  // The panel unmounts with the session, so an open confirmation never outlives it.
-  return state.staleSession === null ? null : <StaleSessionPanel staleSession={state.staleSession} />;
+  // The panel unmounts with the session (after its exit animation), so an open confirmation
+  // never outlives it.
+  const presence = usePresence(state.staleSession);
+  return presence.item === null ? null : <StaleSessionPanel staleSession={presence.item} motion={presence.state} />;
 }
 
-function StaleSessionPanel({ staleSession }: { staleSession: { modsDir: string; tracked: number } }) {
+function StaleSessionPanel({
+  staleSession,
+  motion,
+}: {
+  staleSession: { modsDir: string; tracked: number };
+  motion: PresenceState;
+}) {
   const { t } = useI18n();
   const { controller, state } = useLauncher();
   const { busy } = state;
   const [confirming, setConfirming] = useState(false);
   const text = t.staleSession;
+  const exiting = motion === 'exiting';
 
   return (
-    <section role="region" aria-label={text.regionLabel} className="notice notice-warning stale-session">
+    <section
+      role="region"
+      aria-label={text.regionLabel}
+      className="notice notice-warning stale-session"
+      data-state={motion}
+      inert={exiting}
+      aria-hidden={exiting || undefined}
+    >
       <BannerIcon variant="warning" />
       <div>
         {confirming ? (

@@ -84,9 +84,9 @@ export function Icon({ name, className = 'icon' }: { name: IconName; className?:
   );
 }
 
-/** The launcher mark (sidebar brand and title bar), on the same 20x20 grid as the icons. */
+/** The launcher mark (shown in the title bar), on the same 20x20 grid as the icons. */
 export function BrandMark({
-  className = 'brand-mark',
+  className = 'titlebar-mark',
   ...rest
 }: {
   className?: string;

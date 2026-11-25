@@ -16,7 +16,7 @@
   --text: #e7e9ec;
   --text-muted: #9aa2ad;
 
-  /* Accent (warm racing red, used sparingly): Play, current nav item/section bar, brand mark */
+  /* Accent (warm racing red, used sparingly): Play, current nav item/section bar, title bar mark */
   --accent: #d23a1e;
   --accent-hover: #b52f17;
   --on-accent: #ffffff;
@@ -70,7 +70,10 @@
   --sidebar-item-height: 40px;
   --statusbar-height: 64px;
   --rail-width: 208px;
-  --content-max: 1180px;
+  /* Side and top padding of the content column; 16px near the minimum window (media query below). */
+  --page-gutter: var(--space-5);
+  /* Readable line length for help text, subtitles, empty states and banner text. */
+  --measure: 72ch;
   --control-height: 36px;
   --control-height-sm: 32px;
   --play-height: 44px;
@@ -102,19 +105,48 @@
   --state-focus-opacity: 0.1;
   --state-pressed-opacity: 0.1;
 
-  /* Motion (Material 3 easing and durations) */
+  /* Motion (Material 3 easing and durations). Every transition and animation below uses these;
+     raw times and curves live only here (issue #71). EXIT/ENTER/STAGGER_CAP in src/ui/motion.ts
+     mirror the values JavaScript has to wait on. */
   --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
   --motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --motion-easing-emphasized-accelerate: cubic-bezier(0.3, 0, 0.8, 0.15);
+  --motion-duration-none: 0s;
   --motion-duration-short2: 100ms;
   --motion-duration-short3: 150ms;
+  --motion-duration-short4: 200ms;
+  --motion-duration-medium1: 250ms;
   --motion-duration-medium2: 300ms;
+  --motion-duration-extra-long2: 800ms;
+  --motion-distance-enter: 8px;
+  --motion-stagger-step: 30ms;
+  --motion-press-scale: 0.98;
+  --motion-thumb-press-scale: 1.2;
   --transition: var(--motion-duration-short3) var(--motion-easing-standard);
+  --transition-press: transform var(--motion-duration-short2) var(--motion-easing-standard);
+  --transition-focus: outline-offset var(--motion-duration-short2) var(--motion-easing-standard);
+  --motion-enter: var(--motion-duration-medium1) var(--motion-easing-emphasized-decelerate);
+  --motion-exit: var(--motion-duration-short4) var(--motion-easing-emphasized-accelerate);
   --pulse: 1.2s ease-in-out infinite alternate;
+  --shimmer: 1.4s var(--motion-easing-standard) infinite;
+  --spin: var(--motion-duration-extra-long2) linear infinite;
+
+  /* Loading feedback: the skeleton shine and the Play spinner */
+  --skeleton-shine: rgba(255, 255, 255, 0.06);
+  --spinner-size: 14px;
+  --spinner-stroke: 2px;
 
   font-family: var(--font-body);
   font-size: var(--type-body-large);
   color: var(--text);
   background: var(--bg);
+}
+
+/* Near the 900px minimum window width the page gutter tightens to 16dp. */
+@media (max-width: 960px) {
+  :root {
+    --page-gutter: var(--space-4);
+  }
 }
 
 *,
@@ -130,9 +162,12 @@ body {
   line-height: 1.45;
 }
 
+/* The ring eases out from the edge (outline-offset only); the outline itself is always drawn at
+   once. Components with their own transition list add var(--transition-focus) to it. */
 :focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
+  transition: var(--transition-focus);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -197,7 +232,6 @@ code {
 .icon,
 .nav-icon,
 .search-icon,
-.brand-mark,
 .titlebar-mark {
   flex: none;
   width: 16px;
@@ -292,7 +326,8 @@ code {
   cursor: default;
   transition:
     color var(--transition),
-    background var(--transition);
+    background var(--transition),
+    var(--transition-focus);
 }
 
 /* State layer: a currentColor overlay at --state-layer, set to 8% on hover and 10% on focus. */
@@ -316,7 +351,7 @@ code {
   pointer-events: none;
   transition:
     opacity var(--motion-duration-medium2) var(--motion-easing-standard),
-    background-size 0s var(--motion-duration-medium2);
+    background-size var(--motion-duration-none) var(--motion-duration-medium2);
 }
 
 .titlebar-glyph {
@@ -378,35 +413,19 @@ code {
   overflow: hidden auto;
   background: var(--surface-1);
   border-right: 1px solid var(--border);
-  transition: width var(--transition);
+  /* The one layout property that animates (documented exception): the content column follows. */
+  transition: width var(--motion-duration-medium1) var(--motion-easing-standard);
 }
 
 .sidebar[data-collapsed='true'] {
   width: var(--sidebar-width-collapsed);
 }
 
-.brand {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 0;
-  height: var(--sidebar-item-height);
-  padding: 0 calc(var(--sidebar-inset) - 1px);
-}
-
-.brand-mark {
-  width: 20px;
-  height: 20px;
-  stroke: var(--accent-text);
-}
-
-.brand h1 {
-  overflow: hidden;
-  font-size: var(--type-body-large);
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Expanding: the labels fade in as the rail widens, so text never pops in at full strength.
+   Collapsing hides them at once (they are clipped by the shrinking rail anyway). */
+.sidebar[data-collapsed='false'] .nav-label {
+  animation: fade-in var(--motion-duration-medium1) var(--motion-easing-standard) var(--motion-duration-short2)
+    backwards;
 }
 
 .side-nav {
@@ -435,7 +454,9 @@ code {
   cursor: pointer;
   transition:
     color var(--transition),
-    background var(--transition);
+    background var(--transition),
+    var(--transition-press),
+    var(--transition-focus);
 }
 
 .nav-item .nav-icon,
@@ -480,32 +501,98 @@ code {
   background: var(--accent);
 }
 
+/* Pressed: one surface step up and a slight press-in (after :hover and current, so it wins). */
+.nav-item:active,
+.sidebar-toggle:active {
+  background: var(--surface-3);
+  transform: scale(var(--motion-press-scale));
+}
+
 /* Pinned to the bottom of the sidebar, quieter than the navigation. */
 .sidebar-toggle {
   margin-top: auto;
   font-size: var(--type-body-medium);
 }
 
+/* The content fills the width next to the sidebar (no centred column, #71); the page gutter
+   keeps the breathing room and aligns the messages with the page. */
 .app-messages {
   width: 100%;
-  max-width: calc(var(--content-max) + 2 * var(--space-5));
-  margin: 0 auto;
-  padding: 0 var(--space-5);
+  padding: 0 var(--page-gutter);
 }
 
 main {
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
-  padding: var(--space-5) var(--space-5) var(--space-5);
+  padding: var(--page-gutter);
 }
 
 .page {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-width: var(--content-max);
-  margin: 0 auto;
+}
+
+/* Text-heavy blocks keep a readable line length while their containers stretch. */
+.hint,
+.page-subtitle,
+.empty-state p,
+.banner p {
+  max-width: var(--measure);
+}
+
+/* ---------- Motion: screen, list and message entrances (issue #71) ---------- */
+
+/* A new screen rises in; there is no exit, so navigating never waits. */
+.screen[data-state='entering'] {
+  animation: enter-up var(--motion-enter) backwards;
+}
+
+/* First render of a list or a settings page: items rise in one after another. The index comes
+   from markup, already capped (src/ui/motion.ts), and re-renders keep the nodes, so it never
+   replays. Fill mode backwards: no transform is left on the element once it has entered. */
+.stagger-item {
+  animation: enter-up var(--motion-enter) backwards;
+  animation-delay: calc(var(--stagger-index, 0) * var(--motion-stagger-step));
+}
+
+/* Notices and banners sit on top of the content: they drop in and lift out. */
+.notice[data-state='entering'],
+.banner[data-state='entering'] {
+  animation: enter-down var(--motion-enter) backwards;
+}
+
+.notice[data-state='exiting'],
+.banner[data-state='exiting'] {
+  animation: exit-up var(--motion-exit) forwards;
+}
+
+@keyframes enter-up {
+  from {
+    opacity: 0;
+    transform: translateY(var(--motion-distance-enter));
+  }
+}
+
+@keyframes enter-down {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--motion-distance-enter)));
+  }
+}
+
+@keyframes exit-up {
+  to {
+    opacity: 0;
+    transform: translateY(calc(-1 * var(--motion-distance-enter)));
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 .page-head {
@@ -708,6 +795,7 @@ main {
   font-size: var(--type-body-small);
   font-weight: 500;
   cursor: pointer;
+  transition: var(--transition-press), var(--transition-focus);
 }
 
 .btn-link:hover {
@@ -751,7 +839,9 @@ input:not([type='checkbox']) {
   color: var(--text);
   font: inherit;
   min-width: 0;
-  transition: border-color var(--transition);
+  transition:
+    border-color var(--transition),
+    var(--transition-focus);
 }
 
 .form-field .input {
@@ -807,12 +897,20 @@ button {
   cursor: pointer;
   transition:
     background var(--transition),
-    border-color var(--transition);
+    border-color var(--transition),
+    var(--transition-press),
+    var(--transition-focus);
 }
 
 .btn:hover:not(:disabled) {
   background: var(--surface-3);
   border-color: var(--text-muted);
+}
+
+/* Press feedback for every button variant: a slight press-in while held. */
+.btn:active:not(:disabled),
+.btn-link:active {
+  transform: scale(var(--motion-press-scale));
 }
 
 .btn-sm {
@@ -892,6 +990,31 @@ button {
   fill: currentColor;
 }
 
+/* Busy while the game starts: Play stays disabled (StatusBar) but reads as working, not dead.
+   Keyed off the session status already in the bar, so StatusBar.tsx needs no new markup. Under
+   reduced motion the ring is static and the "Starting" status text carries the meaning. */
+.statusbar:has(.session-status-starting) .play:disabled {
+  opacity: 0.75;
+  cursor: progress;
+}
+
+.statusbar:has(.session-status-starting) .play:disabled::after {
+  content: '';
+  flex: none;
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  border: var(--spinner-stroke) solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin var(--spin);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
 /* ---------- Session status ---------- */
 
 .session-status {
@@ -931,12 +1054,15 @@ button {
   background: var(--accent-text);
 }
 
+/* Only the starting and running dots pulse; idle, unavailable and the "Ready" dot stay still. */
 @keyframes pulse {
   from {
     opacity: 0.45;
+    transform: scale(0.8);
   }
   to {
     opacity: 1;
+    transform: scale(1);
   }
 }
 
@@ -1135,12 +1261,19 @@ button {
   cursor: pointer;
   transition:
     background var(--transition),
-    color var(--transition);
+    color var(--transition),
+    var(--transition-press),
+    var(--transition-focus);
 }
 
 .facet:hover {
   background: var(--surface-2);
   color: var(--text);
+}
+
+.facet:active {
+  background: var(--surface-3);
+  transform: scale(var(--motion-press-scale));
 }
 
 .facet[aria-pressed='true'] {
@@ -1379,6 +1512,15 @@ button {
   background: var(--bg);
 }
 
+/* Pressed: the thumb grows a little (Material switch), on top of its slide. */
+.switch:active:not([aria-disabled='true']) .switch-thumb {
+  transform: scale(var(--motion-thumb-press-scale));
+}
+
+.switch[aria-checked='true']:active:not([aria-disabled='true']) .switch-thumb {
+  transform: translateX(12px) scale(var(--motion-thumb-press-scale));
+}
+
 .switch:hover:not([aria-disabled='true'])::before {
   border-color: var(--text-muted);
 }
@@ -1461,8 +1603,6 @@ button {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  max-width: var(--content-max);
-  margin: 0 auto;
 }
 
 .skeleton-list {
@@ -1483,11 +1623,28 @@ button {
   border-top: 1px solid var(--border);
 }
 
+/* A soft shine sweeps across each placeholder (transform only, clipped by the placeholder). */
 .skeleton {
+  position: relative;
   display: block;
+  overflow: hidden;
   border-radius: var(--radius-sm);
   background: var(--surface-3);
-  animation: pulse var(--pulse);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--skeleton-shine), transparent);
+  transform: translateX(-100%);
+  animation: shimmer var(--shimmer);
+}
+
+@keyframes shimmer {
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .skeleton-tile {
@@ -1533,11 +1690,18 @@ button {
   font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: background var(--transition);
+  transition:
+    background var(--transition),
+    var(--transition-press),
+    var(--transition-focus);
 }
 
 .profile-select:hover {
   background: var(--surface-2);
+}
+
+.profile-select:active {
+  transform: scale(var(--motion-press-scale));
 }
 
 .profile-select[aria-pressed='true'] {
@@ -1606,7 +1770,13 @@ button {
   text-decoration: none;
   transition:
     background var(--transition),
-    color var(--transition);
+    color var(--transition),
+    var(--transition-press),
+    var(--transition-focus);
+}
+
+.section-link:active {
+  transform: scale(var(--motion-press-scale));
 }
 
 .section-link:hover {

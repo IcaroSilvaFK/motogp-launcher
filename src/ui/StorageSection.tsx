@@ -4,6 +4,7 @@ import { storageBreakdown, toCommandError } from '../domain';
 import { Icon } from './Icon';
 import { formatShare, formatSize, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
+import { stagger } from './motion';
 
 /**
  * Settings > Storage: where the launcher keeps its data and how much it uses. Self-contained on
@@ -63,7 +64,12 @@ export function StorageSection() {
     usage === null ? null : usage.freeBytes === null ? t.storage.unavailable : formatSize(usage.freeBytes, locale);
 
   return (
-    <section id="settings-storage" aria-labelledby="settings-storage-title" className="settings-section">
+    <section
+      id="settings-storage"
+      aria-labelledby="settings-storage-title"
+      className="settings-section stagger-item"
+      style={stagger(2)}
+    >
       <h3 id="settings-storage-title" className="group-title">
         {t.storage.title}
       </h3>
@@ -141,13 +147,13 @@ export function StorageSection() {
                       {skeleton}
                     </li>
                   ))
-                : storageBreakdown(usage).map(({ category, bytes, share }) => {
+                : storageBreakdown(usage).map(({ category, bytes, share }, index) => {
                     const name = t.storage.categories[category];
                     const size = formatSize(bytes, locale);
                     const percent = formatShare(share, locale);
                     const value = Math.round(share * 1000) / 10;
                     return (
-                      <li key={category} className="storage-category">
+                      <li key={category} className="storage-category stagger-item" style={stagger(index)}>
                         <div className="storage-category-text">
                           <span className="storage-category-name">{name}</span>
                           <span className="hint">{t.storage.categoryHints[category]}</span>

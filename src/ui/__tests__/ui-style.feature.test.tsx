@@ -49,6 +49,12 @@ function toPx(value: string): number {
   return Number(match[1]) * (match[2] === 'rem' ? 16 : 1);
 }
 
+/** Body of the top-level rule whose selector list is exactly `selector` (empty when absent). */
+function cssRule(selector: string): string {
+  const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|\\n)${escaped}\\s*\\{([^}]*)\\}`).exec(css)?.[2] ?? '';
+}
+
 const token = (name: string): string => {
   const value = rootTokens(css).get(name);
   expect(value, `token ${name}`).toMatch(/^#[0-9a-fA-F]{6}$/);
@@ -162,8 +168,8 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
           .getAllByRole('button')
           .map((item) => item.textContent),
       ).toEqual(['Library', 'Profiles', 'Settings']);
-      // The single page h1 (the app name) lives in the sidebar brand.
-      expect(within(aside).getByRole('heading', { level: 1, name: 'MotoGP Launcher' })).toBeInTheDocument();
+      // The single page h1 (the app name) lives in the sidebar, visually hidden: the title bar shows it.
+      expect(within(aside).getByRole('heading', { level: 1, name: 'MotoGP Launcher' })).toHaveClass('visually-hidden');
       expect(screen.getAllByRole('heading', { level: 1 })).toHaveLength(1);
     });
     And('there is no top tab bar', () => {
@@ -221,6 +227,27 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       expect(nav().getByRole('button', { name: 'Profiles' })).toHaveAttribute('aria-current', 'page');
       expect(screen.getByRole('heading', { level: 2, name: 'Profiles' })).toBeInTheDocument();
       expectCollapsed(true);
+    });
+  });
+
+  Scenario('The sidebar does not repeat the brand shown in the title bar', ({ Given, Then, And }) => {
+    Given('the launcher open on the Library', () => {
+      launch();
+      expect(nav().getByRole('button', { name: 'Library' })).toHaveAttribute('aria-current', 'page');
+    });
+    Then('the sidebar shows no brand mark', () => {
+      expect(sidebar().querySelector('.brand, .brand-mark, svg.brand-mark')).toBeNull();
+      expect(within(sidebar()).queryByText('MotoGP Launcher', { ignore: '.visually-hidden' })).toBeNull();
+    });
+    And('the main navigation is the first thing in the sidebar and keeps its name', () => {
+      const visible = [...sidebar().children].filter((child) => !child.classList.contains('visually-hidden'));
+      expect(visible[0]).toBe(screen.getByRole('navigation', { name: 'Main navigation' }));
+    });
+    And('the document has a single visually hidden h1 with the app name', () => {
+      const [h1, ...others] = screen.getAllByRole('heading', { level: 1 });
+      expect(others).toHaveLength(0);
+      expect(h1).toHaveAccessibleName('MotoGP Launcher');
+      expect(h1).toHaveClass('visually-hidden');
     });
   });
 
@@ -552,6 +579,52 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       const block = /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{([\s\S]*?\})\s*\}/.exec(css)?.[1] ?? '';
       expect(block).toMatch(/animation:\s*none/);
       expect(block).toMatch(/transition:\s*none/);
+    });
+  });
+
+  Scenario('The content uses the full width next to the sidebar', ({ Given, Then, And }) => {
+    Given('the stylesheet', () => {
+      expect(css.length).toBeGreaterThan(0);
+    });
+    Then('the page container, the loading state and the messages column set no max-width', () => {
+      for (const selector of ['main', '.page', '.loading-state', '.app-messages']) {
+        const body = cssRule(selector);
+        expect(body, selector).not.toBe('');
+        expect(body, selector).not.toMatch(/max-width/);
+        expect(body, selector).not.toMatch(/margin:\s*0 auto/);
+      }
+    });
+    And('there is no content max-width token', () => {
+      expect(css).not.toMatch(/--content-max/);
+    });
+    And('the content and the messages use the page gutter of 24px', () => {
+      const tokens = rootTokens(css);
+      expect(tokens.get('--page-gutter')).toBe('var(--space-5)');
+      expect(tokens.get('--space-5')).toBe('24px');
+      expect(cssRule('main')).toMatch(/(^|\n)\s*padding:\s*var\(--page-gutter\);/);
+      expect(cssRule('.app-messages')).toMatch(/padding:\s*0 var\(--page-gutter\);/);
+    });
+    And('a narrow-window media query reduces the page gutter to 16px', () => {
+      const media = /@media\s*\(max-width:\s*(\d+)px\)\s*\{\s*:root\s*\{([^}]*)\}\s*\}/.exec(css);
+      expect(media).not.toBeNull();
+      // Covers the 900px minimum window width.
+      expect(Number(media?.[1])).toBeGreaterThanOrEqual(900);
+      expect(media?.[2]).toMatch(/--page-gutter:\s*var\(--space-4\);/);
+      expect(rootTokens(css).get('--space-4')).toBe('16px');
+    });
+    And('text-heavy blocks keep a readable measure', () => {
+      const measure = /^(\d+)ch$/.exec(rootTokens(css).get('--measure') ?? '');
+      expect(measure).not.toBeNull();
+      expect(Number(measure?.[1])).toBeGreaterThanOrEqual(60);
+      expect(Number(measure?.[1])).toBeLessThanOrEqual(80);
+      const uncommented = css.replace(/\/\*[\s\S]*?\*\//g, '');
+      const rule = [...uncommented.matchAll(/(^|\n)([^{}@]+)\{([^}]*)\}/g)].find(([, , , body = '']) =>
+        /max-width:\s*var\(--measure\)/.test(body),
+      );
+      const selectors = (rule?.[2] ?? '').split(',').map((s) => s.trim());
+      for (const block of ['.hint', '.page-subtitle', '.empty-state p', '.banner p']) {
+        expect(selectors, block).toContain(block);
+      }
     });
   });
 

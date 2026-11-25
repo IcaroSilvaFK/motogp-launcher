@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { BrandMark, Icon } from './Icon';
+import { Icon } from './Icon';
 import { useI18n } from './i18n';
 
 export type ScreenId = 'library' | 'profiles' | 'settings';
@@ -7,9 +7,11 @@ export type ScreenId = 'library' | 'profiles' | 'settings';
 const SCREENS: readonly ScreenId[] = ['library', 'profiles', 'settings'];
 
 /**
- * Left sidebar: brand, the main navigation (icon + label, `aria-current="page"` on the current
- * screen) and a collapse toggle pinned at the bottom. Collapsed, only the icons show: the labels
- * and the h1 stay in the DOM visually hidden, and each item gets its label as a tooltip.
+ * Left sidebar: the main navigation (icon + label, `aria-current="page"` on the current screen)
+ * and a collapse toggle pinned at the bottom. The custom title bar already shows the mark and the
+ * app name, so the sidebar has no brand row (#71); the document's single h1 (the app name) stays
+ * here, visually hidden. Collapsed, only the icons show: the labels stay in the DOM visually
+ * hidden, and each item gets its label as a tooltip.
  */
 export function Sidebar({
   current,
@@ -29,10 +31,7 @@ export function Sidebar({
 
   return (
     <aside className="sidebar" data-collapsed={String(collapsed)}>
-      <div className="brand">
-        <BrandMark />
-        <h1 className={hidden}>{t.appName}</h1>
-      </div>
+      <h1 className="visually-hidden">{t.appName}</h1>
       <nav id={navId} aria-label={t.nav.label} className="side-nav">
         {SCREENS.map((screen) => (
           <button
