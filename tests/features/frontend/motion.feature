@@ -51,4 +51,4 @@ Feature: Motion and micro-interactions
     Given the launcher stylesheet
     Then the stopping and cleaning-up progress button shows a spinner and a progress cursor
     And the progress button gives no hover or press feedback
-    And Stop stays a plain action while the game is starting
+    And Stop shows the same spinner through a busy modifier while the game is starting

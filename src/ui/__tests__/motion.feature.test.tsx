@@ -278,7 +278,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       expect(rulesOnly.length).toBeGreaterThan(0);
     });
     Then('the stopping and cleaning-up progress button shows a spinner and a progress cursor', () => {
-      const spinner = rule('.play-progress::after');
+      const spinner = rule('.play-progress::after,\n.play-busy::after');
       expect(spinner).toMatch(/content:\s*''/);
       expect(spinner).toMatch(/border-radius:\s*50%/);
       expect(spinner).toMatch(/animation:\s*spin\b/);
@@ -291,11 +291,15 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       expect(rule('.play-progress,\n.play-progress:hover:not(:disabled)')).toMatch(/background:\s*transparent/);
       expect(rule('.play-progress:active:not(:disabled)')).toMatch(/transform:\s*none/);
     });
-    And('Stop stays a plain action while the game is starting', () => {
-      // Under #75 Play is not rendered while starting (Stop takes its slot), so no rule may key a busy
-      // look off the starting status: Stop must read as clickable, the pulsing dot and the text say "starting".
+    And('Stop shows the same spinner through a busy modifier while the game is starting', () => {
+      // #89: while starting, Stop (still enabled) carries `play-busy` from the markup, which shares the
+      // progress spinner rule. Nothing keys off the starting status text, and Stop itself never spins
+      // without the modifier (no spinner while running).
+      expect(rule('.play-progress::after,\n.play-busy::after')).toMatch(/animation:\s*spin\b/);
       expect(rulesOnly).not.toMatch(/session-status-starting\)?[^{,]*\.play/);
       expect(rulesOnly).not.toMatch(/\.btn-danger\.play[^{]*::after/);
+      // The busy Stop keeps its danger look and press feedback: only `.play-progress` switches them off.
+      expect(rulesOnly).not.toMatch(/\.play-busy[^{]*\{[^}]*(background|transform):/);
     });
   });
 });

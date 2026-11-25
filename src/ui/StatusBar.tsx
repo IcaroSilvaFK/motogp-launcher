@@ -89,15 +89,16 @@ function SessionAction() {
   const showConfirm = confirming && canStop;
 
   const actionRef = useRef<HTMLButtonElement>(null);
-  const confirmRef = useRef<HTMLButtonElement>(null);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   const wasConfirming = useRef(false);
   const titleId = useId();
   const detailId = useId();
 
-  // Focus goes to the confirm action on open and back to the main action when the question closes
-  // (cancelled, confirmed or outlived), so it is never dropped on the page.
+  // Focus goes to Cancel on open (#89: Enter or Space right after opening never stops the game) and
+  // back to the main action when the question closes (cancelled, confirmed or outlived), so it is
+  // never dropped on the page.
   useEffect(() => {
-    if (showConfirm) confirmRef.current?.focus();
+    if (showConfirm) cancelRef.current?.focus();
     else if (wasConfirming.current) actionRef.current?.focus();
     wasConfirming.current = showConfirm;
   }, [showConfirm]);
@@ -122,7 +123,6 @@ function SessionAction() {
         </p>
         {/* Cancel sits where Stop was, so a double click on Stop never confirms by accident. */}
         <button
-          ref={confirmRef}
           type="button"
           className="btn btn-danger"
           onClick={() => {
@@ -132,7 +132,7 @@ function SessionAction() {
         >
           {t.stop.confirm}
         </button>
-        <button type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>
+        <button ref={cancelRef} type="button" className="btn btn-ghost" onClick={() => setConfirming(false)}>
           {t.stop.cancel}
         </button>
       </div>
@@ -142,10 +142,18 @@ function SessionAction() {
   const profile = <ActiveProfileField />;
 
   if (canStop) {
+    // While starting, Stop stays a real action but shows the busy spinner (#89); none once running.
+    const starting = session.kind === 'starting';
     return (
       <>
         {profile}
-        <button ref={actionRef} type="button" className="btn btn-danger play" onClick={() => setConfirming(true)}>
+        <button
+          ref={actionRef}
+          type="button"
+          className={starting ? 'btn btn-danger play play-busy' : 'btn btn-danger play'}
+          aria-busy={starting ? 'true' : undefined}
+          onClick={() => setConfirming(true)}
+        >
           <Icon name="stop" className="icon" />
           {t.stop.button}
         </button>

@@ -71,11 +71,13 @@ export function formatShare(share: number, locale: Locale): string {
 }
 
 /**
- * Formats Unix ms as a local wall-clock time, hours and minutes with two digits each. The clock is
- * always 24-hour ("14:05"), as racing timetables are; the locale still picks the separator.
+ * Formats Unix ms as a local wall-clock time (hours and minutes) in the locale's own clock (#89):
+ * 12-hour in English ("2:05 PM"), 24-hour in Brazilian Portuguese ("14:05"). Every caller goes
+ * through here, so the whole UI follows the same clock. Some ICU versions separate the day period
+ * with a narrow no-break space (U+202F).
  */
 export function formatClockTime(ms: number, locale: Locale): string {
-  return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms);
+  return new Intl.DateTimeFormat(locale, { timeStyle: 'short' }).format(ms);
 }
 
 /** Formats a calendar day (`YYYY-MM-DD`, no time zone) as a medium date, e.g. "Nov 10, 2026". */

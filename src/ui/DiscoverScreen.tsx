@@ -1,8 +1,17 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import type { KeyboardEvent, ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { categoryCounts, inLibrary, pageHost, selectEntries, sortEntries, useCatalogState } from '../application';
-import type { CatalogController, CatalogSort } from '../application';
+import {
+  categoryCounts,
+  inLibrary,
+  loadDiscoverView,
+  pageHost,
+  saveDiscoverView,
+  selectEntries,
+  sortEntries,
+  useCatalogState,
+} from '../application';
+import type { CatalogController, CatalogSort, DiscoverView, DiscoverViewStore } from '../application';
 import type { CatalogEntry, CommandError } from '../domain';
 import { BannerIcon } from './BannerIcon';
 import { Icon } from './Icon';
@@ -12,7 +21,7 @@ import { CatalogInstallButton } from './InstallButton';
 import { useLauncher } from './LauncherContext';
 import { stagger } from './motion';
 
-type View = 'grid' | 'list';
+type View = DiscoverView;
 
 const SKELETON_CARDS = [0, 1, 2, 3, 4, 5];
 
@@ -219,14 +228,29 @@ function LoadingCatalog() {
  * Discover tab (#73): browse the curated online catalog. Loads on the first visit; the page of an
  * entry opens by id only (the backend owns the URL and its allow-list). Entries with a download show the install control (#74).
  */
-export function DiscoverScreen({ catalog, onGoToLibrary }: { catalog: CatalogController; onGoToLibrary: () => void }) {
+export function DiscoverScreen({
+  catalog,
+  onGoToLibrary,
+  viewStore,
+}: {
+  catalog: CatalogController;
+  onGoToLibrary: () => void;
+  /** Remembers the grid/list choice across restarts (#89). */
+  viewStore?: DiscoverViewStore;
+}) {
   const { t, locale } = useI18n();
   const { state: launcher } = useLauncher();
   const state = useCatalogState(catalog);
   const [category, setCategory] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<CatalogSort>('updated');
-  const [view, setView] = useState<View>('grid');
+  // Read once on mount; without a store the choice lives in memory and starts in the grid.
+  const [view, setView] = useState<View>(() => (viewStore ? loadDiscoverView(viewStore) : 'grid'));
+  // The save stays out of the state updater, which StrictMode may run twice.
+  const changeView = (next: View) => {
+    setView(next);
+    if (viewStore) saveDiscoverView(viewStore, next);
+  };
   const [openId, setOpenId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -377,7 +401,7 @@ export function DiscoverScreen({ catalog, onGoToLibrary }: { catalog: CatalogCon
             <option value="name">{t.discover.sortName}</option>
           </select>
         </label>
-        <ViewToggle view={view} onChange={setView} />
+        <ViewToggle view={view} onChange={changeView} />
         <p className="hint catalog-count" aria-live="polite">
           {t.discover.resultCount(visible.length)}
         </p>

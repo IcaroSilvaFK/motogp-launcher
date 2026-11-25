@@ -7,6 +7,8 @@ export type {
   SessionPhase,
 } from './controller';
 export type {
+  DiscoverView,
+  DiscoverViewStore,
   DropEvents,
   FilePicker,
   LauncherGateway,
@@ -17,6 +19,7 @@ export type {
 } from './ports';
 export { loadLocale, saveLocale } from './localePreference';
 export { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarPreference';
+export { loadDiscoverView, saveDiscoverView } from './discoverViewPreference';
 export { createLauncherController } from './createLauncherController';
 export { selectCanPlay } from './selectCanPlay';
 export { selectCanStop } from './selectCanStop';

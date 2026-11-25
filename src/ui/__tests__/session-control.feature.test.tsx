@@ -18,7 +18,7 @@ const game: GameInfo = {
   mods_dir: `${root}/MotoGP25/Content/Paks/~mods`,
   app_id: 1234,
 };
-// Built from local time, so it reads 14:05 in whatever time zone the test runs.
+// Built from local time, so it reads 14:05 (2:05 PM in en) in whatever time zone the test runs.
 const SINCE_14_05 = new Date(2026, 10, 24, 14, 5).getTime();
 
 async function launch(options: FakeGatewayOptions = {}, before?: (gateway: FakeGateway) => void) {
@@ -65,8 +65,8 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       await runningSession();
     });
 
-    Then('the status bar shows "Running since 14:05"', () => {
-      expect(sessionStatus()).toHaveTextContent('Running since 14:05');
+    Then('the status bar shows "Running since 2:05 PM"', () => {
+      expect(sessionStatus()).toHaveTextContent('Running since 2:05 PM');
     });
 
     And('the main action is "Stop" instead of "Play"', () => {
@@ -95,9 +95,9 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       expect(confirmation).toHaveTextContent('Unsaved in-game progress may be lost.');
       const confirm = within(confirmation).getByRole('button', { name: 'Stop game' });
       expect(confirm).toHaveClass('btn-danger');
-      // Focus moves to the confirm action so the keyboard user can answer right away.
-      expect(confirm).toHaveFocus();
-      expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+      // Focus moves to the safe answer (#89): Enter or Space right after opening never stops the game.
+      expect(confirm).not.toHaveFocus();
+      expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toHaveFocus();
     });
 
     And('the session is not stopped until the user confirms', async () => {
@@ -185,7 +185,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     And('the main action is still "Stop"', async () => {
       await waitFor(() => expect(actionButton('Stop')).toBeEnabled());
       expect(actionButton('Stop')).not.toHaveAttribute('aria-disabled');
-      expect(sessionStatus()).toHaveTextContent('Running since 14:05');
+      expect(sessionStatus()).toHaveTextContent('Running since 2:05 PM');
       expect(actionButton('Play')).not.toBeInTheDocument();
     });
   });
@@ -203,13 +203,115 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       await launch({}, configure);
     });
 
-    Then('the status bar shows "Running since 14:05"', async () => {
-      await waitFor(() => expect(sessionStatus()).toHaveTextContent('Running since 14:05'));
+    Then('the status bar shows "Running since 2:05 PM"', async () => {
+      await waitFor(() => expect(sessionStatus()).toHaveTextContent('Running since 2:05 PM'));
     });
 
     And('Play is not offered', () => {
       expect(actionButton('Play')).not.toBeInTheDocument();
       expect(actionButton('Stop')).toBeEnabled();
+    });
+  });
+
+  Scenario('The Stop confirmation focuses Cancel', ({ Given, When, Then, And }) => {
+    let world: World;
+
+    Given('the game session is running', async () => {
+      world = await runningSession();
+    });
+
+    When('the user clicks "Stop"', async () => {
+      await world.user.click(actionButton('Stop')!);
+    });
+
+    Then('the focus is on "Cancel"', () => {
+      const confirmation = within(statusBar()).getByRole('group', { name: /Stop the game\?/ });
+      expect(within(confirmation).getByRole('button', { name: 'Cancel' })).toHaveFocus();
+    });
+
+    When('the user presses Enter', async () => {
+      await world.user.keyboard('{Enter}');
+    });
+
+    Then('the session is not stopped', () => {
+      expect(within(statusBar()).queryByRole('group')).not.toBeInTheDocument();
+      expect(world.gateway.callsOf('stopSession')).toHaveLength(0);
+      expect(world.controller.getState().session.kind).toBe('running');
+    });
+
+    And('the main action is "Stop"', () => {
+      // The question closed through Cancel, so the focus is back on the main action.
+      expect(actionButton('Stop')).toBeEnabled();
+      expect(actionButton('Stop')).toHaveFocus();
+    });
+  });
+
+  Scenario('Stop shows the busy indicator while the game is starting', ({ Given, Then, When }) => {
+    let world: World;
+
+    Given('the game is starting', async () => {
+      world = await launch();
+      await world.user.click(screen.getByRole('button', { name: 'Play' }));
+      await waitFor(() => expect(world.controller.getState().session.kind).toBe('starting'));
+    });
+
+    Then('the main action is "Stop" and it is marked busy', async () => {
+      const stop = actionButton('Stop')!;
+      expect(stop).toBeEnabled();
+      expect(stop).not.toHaveAttribute('aria-disabled');
+      expect(stop).toHaveAttribute('aria-busy', 'true');
+      expect(stop).toHaveClass('btn-danger', 'play', 'play-busy');
+      // Still a real action: it opens the confirmation while starting.
+      await world.user.click(stop);
+      expect(within(statusBar()).getByRole('group', { name: /Stop the game\?/ })).toBeInTheDocument();
+      await world.user.keyboard('{Escape}');
+      expect(actionButton('Stop')).toHaveFocus();
+    });
+
+    When('the backend reports the session is running', async () => {
+      act(() => world.session.emitSession({ state: 'started', cleaned: 0, started_at: SINCE_14_05 }));
+      await waitFor(() => expect(world.controller.getState().session.kind).toBe('running'));
+    });
+
+    Then('the main action "Stop" is no longer marked busy', () => {
+      const stop = actionButton('Stop')!;
+      expect(stop).toBeEnabled();
+      expect(stop).not.toHaveAttribute('aria-busy');
+      expect(stop).not.toHaveClass('play-busy');
+    });
+  });
+
+  Scenario('Running since follows the UI language', ({ Given, When, Then }) => {
+    let world: World;
+
+    /** Picks a language in Settings, the way the user does. */
+    async function chooseLanguage(locale: string) {
+      const nav = screen.getByRole('navigation', { name: /Main navigation|Navegação principal/ });
+      await world.user.click(within(nav).getByRole('button', { name: /^(Settings|Configurações)$/ }));
+      await world.user.selectOptions(screen.getByRole('combobox', { name: /Language|Idioma/ }), locale);
+    }
+
+    Given('the game session is running since 14:05', async () => {
+      world = await runningSession();
+    });
+
+    When('the language is "en"', async () => {
+      await chooseLanguage('en');
+    });
+
+    // toHaveTextContent collapses whitespace (U+202F included), so the narrow no-break space some
+    // ICU versions put before "PM" still matches a plain space.
+    Then('the status bar shows "Running since 2:05 PM"', () => {
+      expect(sessionStatus()).toHaveTextContent('Running since 2:05 PM');
+    });
+
+    When('the language is "pt-BR"', async () => {
+      await chooseLanguage('pt-BR');
+    });
+
+    Then('the status bar shows the Portuguese "running since" text with "14:05"', () => {
+      expect(sessionStatus()).toHaveTextContent('Em execução desde 14:05');
+      expect(sessionStatus()).not.toHaveTextContent(/PM|AM/);
     });
   });
 });

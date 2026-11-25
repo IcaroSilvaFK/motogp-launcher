@@ -5,7 +5,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { expect, vi } from 'vitest';
 import { createCatalogController } from '../../application';
-import type { CatalogController, CatalogGateway } from '../../application';
+import type { CatalogController, CatalogGateway, DiscoverView, DiscoverViewStore } from '../../application';
 import type { Catalog, CatalogEntry, CommandError, ModEntry } from '../../domain';
 import { App } from '../App';
 import { createFakeController } from './fakeController';
@@ -66,10 +66,22 @@ function setGateway(get: () => Promise<Catalog>) {
   catalog = createCatalogController({ gateway });
 }
 
-async function openDiscover() {
+/** An in-memory view preference store that survives a "restart" (a new render). */
+function memoryViewStore(): DiscoverViewStore & { value: DiscoverView | null } {
+  const store = {
+    value: null as DiscoverView | null,
+    load: () => store.value,
+    save: (view: DiscoverView) => {
+      store.value = view;
+    },
+  };
+  return store;
+}
+
+async function openDiscover({ discoverViewStore }: { discoverViewStore?: DiscoverViewStore } = {}) {
   user = userEvent.setup();
   launcher = createFakeController({ mods });
-  render(<App controller={launcher} catalog={catalog} locale="en" />);
+  render(<App controller={launcher} catalog={catalog} locale="en" discoverViewStore={discoverViewStore} />);
   await user.click(
     within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Discover' }),
   );
@@ -344,6 +356,70 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
       );
       await user.click(within(dialog()).getByRole('button', { name: 'Dismiss' }));
       expect(within(dialog()).queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  Scenario('The view choice survives a restart', ({ Given, When, Then }) => {
+    const store = memoryViewStore();
+    Given('the user switched Discover to the list view', async () => {
+      setGateway(() => Promise.resolve(catalogOf(sample)));
+      await openDiscover({ discoverViewStore: store });
+      await screen.findByRole('list', { name: /results/i });
+      await user.click(screen.getByRole('button', { name: 'List view' }));
+      expect(store.value).toBe('list');
+    });
+    When('the launcher restarts with the same preference store', async () => {
+      cleanup();
+      setGateway(() => Promise.resolve(catalogOf(sample)));
+      await openDiscover({ discoverViewStore: store });
+      await screen.findByRole('list', { name: /results/i });
+    });
+    Then('Discover opens in the list view', () => {
+      expect(results()).toHaveAttribute('data-view', 'list');
+      expect(screen.getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true');
+      expect(screen.getByRole('button', { name: 'Grid view' })).toHaveAttribute('aria-pressed', 'false');
+    });
+  });
+
+  Scenario('A broken view preference store falls back to the grid', ({ Given, When, Then }) => {
+    const broken: DiscoverViewStore = {
+      load: vi.fn(() => {
+        throw new Error('storage unavailable');
+      }),
+      save: vi.fn(() => {
+        throw new Error('storage unavailable');
+      }),
+    };
+    Given('the view preference store fails to read and write', () => {
+      setGateway(() => Promise.resolve(catalogOf(sample)));
+    });
+    When('the user opens Discover and switches to the list view', async () => {
+      await openDiscover({ discoverViewStore: broken });
+      await screen.findByRole('list', { name: /results/i });
+      expect(results()).toHaveAttribute('data-view', 'grid');
+      await user.click(screen.getByRole('button', { name: 'List view' }));
+    });
+    Then('Discover shows the list view without an error', () => {
+      expect(broken.load).toHaveBeenCalled();
+      expect(broken.save).toHaveBeenCalledWith('list');
+      expect(results()).toHaveAttribute('data-view', 'list');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
+
+  Scenario('Discover comes right after Library in the sidebar', ({ Given, Then }) => {
+    Given('a catalog is available', async () => {
+      setGateway(() => Promise.resolve(catalogOf(sample)));
+      render(<App controller={createFakeController({ mods })} catalog={catalog} locale="en" />);
+    });
+    Then('the sidebar lists Library, Discover, Profiles, Settings in that order', () => {
+      const nav = within(screen.getByRole('navigation', { name: 'Main navigation' }));
+      expect(nav.getAllByRole('button').map((item) => item.textContent)).toEqual([
+        'Library',
+        'Discover',
+        'Profiles',
+        'Settings',
+      ]);
     });
   });
 });

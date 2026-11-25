@@ -9,6 +9,7 @@ import {
 import type {
   AppInfo,
   CatalogController,
+  DiscoverViewStore,
   LauncherController,
   NavPreferenceStore,
   UpdateController,
@@ -62,6 +63,7 @@ function Shell({
   navStore,
   windowControls,
   catalog,
+  discoverViewStore,
 }: {
   controller: LauncherController;
   updater?: UpdateController;
@@ -69,6 +71,7 @@ function Shell({
   navStore?: NavPreferenceStore;
   windowControls?: WindowControls;
   catalog?: CatalogController;
+  discoverViewStore?: DiscoverViewStore;
 }) {
   const state = useLauncherState(controller);
   const screens = useMemo(() => (catalog ? ALL_SCREENS : ALL_SCREENS.filter((id) => id !== 'discover')), [catalog]);
@@ -133,7 +136,11 @@ function Shell({
                 <ScreenTransition key={screen}>
                   {screen === 'library' && <LibraryScreen />}
                   {screen === 'discover' && catalog && (
-                    <DiscoverScreen catalog={catalog} onGoToLibrary={() => setScreen('library')} />
+                    <DiscoverScreen
+                      catalog={catalog}
+                      onGoToLibrary={() => setScreen('library')}
+                      viewStore={discoverViewStore}
+                    />
                   )}
                   {screen === 'profiles' && <ProfilesScreen />}
                   {screen === 'settings' && <SettingsScreen />}
@@ -157,6 +164,7 @@ export function App({
   navStore,
   windowControls,
   catalog,
+  discoverViewStore,
 }: {
   controller: LauncherController;
   locale?: Locale;
@@ -167,6 +175,7 @@ export function App({
   windowControls?: WindowControls;
   /** The Discover tab (#73) is listed only when a catalog controller is wired. */
   catalog?: CatalogController;
+  discoverViewStore?: DiscoverViewStore;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
@@ -177,6 +186,7 @@ export function App({
         navStore={navStore}
         windowControls={windowControls}
         catalog={catalog}
+        discoverViewStore={discoverViewStore}
       />
     </I18nProvider>
   );

@@ -1012,8 +1012,8 @@ button {
 
 /* Stopping / cleaning up: the action keeps its place and size but reads as a quiet progress label.
    It is aria-disabled (still focusable), so the `:not(:disabled)` hover and press feedback still
-   match it and are switched off here. While starting, Stop (enabled) holds the slot instead and gets
-   no spinner: it must read as clickable, and the pulsing dot plus the status text say "starting". */
+   match it and are switched off here. While starting, Stop (enabled) holds the slot instead: it keeps
+   its danger look and press feedback and only adds the spinner below through `play-busy` (#89). */
 .play-progress,
 .play-progress:hover:not(:disabled) {
   border-color: var(--border);
@@ -1026,9 +1026,11 @@ button {
   transform: none;
 }
 
-/* Busy spinner after the label (#71). Under reduced motion the ring is static and the
-   "Stopping the game…" / "Cleaning up…" status text carries the meaning. */
-.play-progress::after {
+/* Busy spinner after the label (#71), shared by Stop while the game starts (`play-busy`, #89). Under
+   reduced motion the ring is static and the "Starting the game…" / "Stopping the game…" /
+   "Cleaning up…" status text carries the meaning. */
+.play-progress::after,
+.play-busy::after {
   content: '';
   flex: none;
   width: var(--spinner-size);
