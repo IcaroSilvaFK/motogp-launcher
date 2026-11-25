@@ -31,10 +31,7 @@ function InlineError({ error, onDismiss }: { error: CommandError; onDismiss: () 
   return (
     <div role="alert" className="notice notice-error">
       <BannerIcon variant="error" />
-      <p>
-        {t.errors[error.code]}
-        {error.message !== '' && <span className="notice-detail"> {error.message}</span>}
-      </p>
+      <p>{t.errors[error.code]}</p>
       <button type="button" className="btn btn-ghost" onClick={onDismiss}>
         {t.dismiss}
       </button>
@@ -299,7 +296,6 @@ export function DiscoverScreen({
           <Icon name="discover" />
         </span>
         <p className="empty-title">{t.errors[state.error.code]}</p>
-        {state.error.message !== '' && <p className="hint">{state.error.message}</p>}
         <button type="button" className="btn btn-accent-outline" onClick={() => void catalog.refresh()}>
           <Icon name="refresh" />
           {t.discover.retry}
@@ -310,7 +306,13 @@ export function DiscoverScreen({
 
   const banners = (
     <>
-      {state.catalog?.stale === true && (
+      {state.catalog?.source === 'bundled' && (
+        <div role="status" className="notice notice-info">
+          <BannerIcon variant="info" />
+          <p>{t.discover.bundled}</p>
+        </div>
+      )}
+      {state.catalog?.source === 'cache' && state.catalog.stale && (
         <div role="status" className="notice notice-warning">
           <BannerIcon variant="warning" />
           <p>{t.discover.stale(formatInstantDate(state.catalog.fetchedAt, locale))}</p>

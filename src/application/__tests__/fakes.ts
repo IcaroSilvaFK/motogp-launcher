@@ -303,11 +303,23 @@ export class FakeGateway implements LauncherGateway {
 
   // Online catalog (#72): an empty, fresh catalog.
   getCatalog(): Promise<Catalog> {
-    return this.run('getCatalog', [], () => ({ entries: [], fetchedAt: 0, stale: false, skipped: 0 }));
+    return this.run('getCatalog', [], () => ({
+      entries: [],
+      fetchedAt: 0,
+      stale: false,
+      source: 'remote',
+      skipped: 0,
+    }));
   }
 
   refreshCatalog(): Promise<Catalog> {
-    return this.run('refreshCatalog', [], () => ({ entries: [], fetchedAt: 0, stale: false, skipped: 0 }));
+    return this.run('refreshCatalog', [], () => ({
+      entries: [],
+      fetchedAt: 0,
+      stale: false,
+      source: 'remote',
+      skipped: 0,
+    }));
   }
 
   openCatalogPage(id: string): Promise<void> {

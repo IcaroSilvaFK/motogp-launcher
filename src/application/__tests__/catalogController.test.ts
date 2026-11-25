@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Catalog, CommandError } from '../../domain';
 import type { CatalogGateway } from '../catalogController';
 import { createCatalogController } from '../useCases/catalog';
@@ -7,6 +7,7 @@ const catalog = (patch: Partial<Catalog> = {}): Catalog => ({
   entries: [],
   fetchedAt: 1,
   stale: false,
+  source: 'remote',
   skipped: 0,
   ...patch,
 });
@@ -133,5 +134,34 @@ describe('catalog controller', () => {
     expect(controller.getState().pageError).toBeNull();
     controller.dismissPageError();
     controller.dismissError();
+  });
+});
+
+describe('catalog controller logging', () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it('logs the English backend message of a failure instead of leaving it for the screen', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { gateway, queue } = scripted();
+    queue.getCatalog?.push({ code: 'catalog_not_published', message: 'HTTP 404' });
+    queue.refreshCatalog?.push(unavailable);
+    const controller = createCatalogController({ gateway });
+
+    await controller.load();
+    await controller.refresh();
+
+    expect(warn).toHaveBeenCalledWith('Catalog request failed (catalog_not_published): HTTP 404');
+    expect(warn).toHaveBeenCalledWith('Catalog request failed (catalog_unavailable): offline');
+  });
+
+  it('logs a failure to open a page', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const { gateway, queue } = scripted();
+    queue['openCatalogPage:x'] = [{ code: 'open_page_failed', message: 'no browser' }];
+    const controller = createCatalogController({ gateway });
+
+    await controller.openPage('x');
+
+    expect(warn).toHaveBeenCalledWith('Catalog request failed (open_page_failed): no browser');
   });
 });

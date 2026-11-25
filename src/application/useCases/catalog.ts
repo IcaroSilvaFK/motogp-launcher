@@ -1,6 +1,11 @@
-import type { Catalog } from '../../domain';
+import type { Catalog, CommandError } from '../../domain';
 import { toCommandError } from '../../domain';
 import type { CatalogController, CatalogDeps, CatalogState } from '../catalogController';
+
+/** The English backend message is for logs only: the UI shows the translated text of the code (#91). */
+function logFailure(error: CommandError): void {
+  console.warn(`Catalog request failed (${error.code}): ${error.message}`);
+}
 
 export function createCatalogController(deps: CatalogDeps): CatalogController {
   let state: CatalogState = { status: 'idle', catalog: null, error: null, refreshing: false, pageError: null };
@@ -22,6 +27,7 @@ export function createCatalogController(deps: CatalogDeps): CatalogController {
         (catalog) => set({ status: 'ready', catalog, error: null, refreshing: false }),
         (caught: unknown) => {
           const error = toCommandError(caught);
+          logFailure(error);
           set(state.catalog === null ? { status: 'error', error } : { error, refreshing: false });
         },
       )
@@ -51,7 +57,9 @@ export function createCatalogController(deps: CatalogDeps): CatalogController {
         await deps.gateway.openCatalogPage(id);
         if (state.pageError !== null) set({ pageError: null });
       } catch (caught) {
-        set({ pageError: toCommandError(caught) });
+        const error = toCommandError(caught);
+        logFailure(error);
+        set({ pageError: error });
       }
     },
     dismissError() {

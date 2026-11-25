@@ -80,6 +80,8 @@ export const en: Messages = {
     refreshing: 'Refreshing…',
     loading: 'Loading the catalog…',
     stale: (date) => `Showing the catalog saved on ${date}. It could not be refreshed right now.`,
+    bundled:
+      'Showing the catalog shipped with this version of the launcher. It will update once the online catalog is available.',
     categories: 'Categories',
     all: 'All',
     search: 'Search the catalog',
@@ -314,6 +316,7 @@ export const en: Messages = {
     catalog_unavailable: 'The mod catalog could not be loaded. Check your connection and try again.',
     catalog_unsupported_schema:
       'The mod catalog needs a newer version of the launcher. Update the launcher to browse it.',
+    catalog_not_published: 'No mod catalog has been published yet. Try again later.',
     catalog_entry_not_found: 'That mod is no longer in the catalog. Refresh the catalog and try again.',
     catalog_page_not_allowed: 'The page of this mod cannot be opened because its address is not trusted.',
     open_page_failed: 'The page could not be opened in your browser.',

@@ -10,6 +10,10 @@ impl From<&CatalogError> for CommandError {
                 "catalog_unavailable",
                 "The mod catalog could not be loaded. Check your connection and try again.",
             ),
+            CatalogError::NotPublished => (
+                "catalog_not_published",
+                "No mod catalog has been published yet. Try again later.",
+            ),
             CatalogError::UnsupportedSchema { .. } => (
                 "catalog_unsupported_schema",
                 "The mod catalog needs a newer version of the launcher. Update the launcher to browse it.",
@@ -51,6 +55,13 @@ mod tests {
         });
         assert_eq!(error.code, "catalog_unavailable");
         assert!(!error.message.contains("dns"));
+    }
+
+    #[test]
+    fn not_published_has_its_own_stable_code() {
+        let error = CommandError::from(CatalogError::NotPublished);
+        assert_eq!(error.code, "catalog_not_published");
+        assert!(error.message.contains("No mod catalog has been published"));
     }
 
     #[test]

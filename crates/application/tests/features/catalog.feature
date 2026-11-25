@@ -48,3 +48,48 @@ Feature: Online mod catalog (application, fake ports)
     Given the cache is stale and the source answers "not modified"
     When the catalog is requested
     Then the cached entries are returned as fresh
+
+  Scenario: Serve the bundled catalog when nothing is cached and the source is offline
+    Given no cached catalog
+    And a bundled catalog with the entry "dhb-livery"
+    And the catalog source is offline
+    When the catalog is requested
+    Then the catalog shows the entry "dhb-livery"
+    And the catalog origin is "bundled" and it is stale
+    And nothing is written to the catalog cache
+
+  Scenario: Serve the bundled catalog when the catalog is not published
+    Given no cached catalog
+    And a bundled catalog with the entry "dhb-livery"
+    And the catalog source answers "not published"
+    When the catalog is requested
+    Then the catalog origin is "bundled"
+
+  Scenario: A stale cache wins over the bundled catalog
+    Given a stale cached catalog with the entry "cached-mod"
+    And a bundled catalog with the entry "dhb-livery"
+    And the catalog source is offline
+    When the catalog is requested
+    Then the catalog shows the entry "cached-mod"
+    And the catalog origin is "cache" and it is stale
+
+  Scenario: A remote catalog wins over the bundled catalog
+    Given no cached catalog
+    And a bundled catalog with the entry "dhb-livery"
+    And the catalog source returns the entry "remote-mod"
+    When the catalog is requested
+    Then the catalog shows the entry "remote-mod"
+    And the catalog origin is "remote" and it is not stale
+
+  Scenario: Report "not published" when there is no fallback at all
+    Given no cached catalog
+    And no bundled catalog
+    And the catalog source answers "not published"
+    When the catalog is requested
+    Then the request fails as "not published"
+
+  Scenario: A "not published" answer is retried only after the backoff
+    Given no cached catalog
+    And the catalog source answers "not published"
+    When the catalog is requested twice within 30 seconds
+    Then the catalog source was asked once

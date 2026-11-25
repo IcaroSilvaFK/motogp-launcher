@@ -170,6 +170,28 @@ pub fn service(source: &FakeSource, cache: &FakeCache, clock: &FakeClock) -> Tes
     CatalogService::new(source.clone(), cache.clone(), clock.clone())
 }
 
+/// Like [`service`], with a bundled catalog when given.
+pub fn service_with(
+    source: &FakeSource,
+    cache: &FakeCache,
+    clock: &FakeClock,
+    bundled: Option<RawCatalog>,
+) -> TestService {
+    let svc = service(source, cache, clock);
+    match bundled {
+        Some(bundled) => svc.with_bundled(bundled),
+        None => svc,
+    }
+}
+
+/// A bundled catalog (schema 1) with one valid entry per id.
+pub fn bundled(ids: &[&str]) -> RawCatalog {
+    RawCatalog {
+        schema_version: 1,
+        entries: ids.iter().map(|id| raw(id)).collect(),
+    }
+}
+
 pub fn draft(id: &str) -> CatalogEntryDraft {
     CatalogEntryDraft {
         id: id.into(),

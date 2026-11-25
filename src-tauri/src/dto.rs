@@ -1,8 +1,8 @@
 //! IPC data transfer objects. Fields are snake_case on the wire; the
 //! JS-side command arguments are camelCase (handled by `#[tauri::command]`).
 use motogp_application::{
-    CatalogSnapshot, DeploySession, RecoveryState, RecoveryStatus, SessionEvent, SessionPhase,
-    SessionSnapshot, SessionState,
+    CatalogOrigin, CatalogSnapshot, DeploySession, RecoveryState, RecoveryStatus, SessionEvent,
+    SessionPhase, SessionSnapshot, SessionState,
 };
 use motogp_domain::{
     CatalogDownload, CatalogEntry, Config, FileConflict, GameInfo, ModEntry, Profile,
@@ -325,6 +325,25 @@ impl From<CatalogEntry> for CatalogEntryDto {
     }
 }
 
+/// Where the catalog came from, as the frontend reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
+pub enum CatalogSourceDto {
+    Remote,
+    Cache,
+    Bundled,
+}
+
+impl From<CatalogOrigin> for CatalogSourceDto {
+    fn from(origin: CatalogOrigin) -> Self {
+        match origin {
+            CatalogOrigin::Remote => CatalogSourceDto::Remote,
+            CatalogOrigin::Cache => CatalogSourceDto::Cache,
+            CatalogOrigin::Bundled => CatalogSourceDto::Bundled,
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CatalogDto {
@@ -332,6 +351,8 @@ pub struct CatalogDto {
     /// Unix milliseconds of the last successful fetch.
     pub fetched_at: u64,
     pub stale: bool,
+    /// Where the entries came from.
+    pub source: CatalogSourceDto,
     pub skipped: usize,
 }
 
@@ -341,6 +362,7 @@ impl From<CatalogSnapshot> for CatalogDto {
             entries: snapshot.entries.into_iter().map(Into::into).collect(),
             fetched_at: snapshot.fetched_at_ms,
             stale: snapshot.stale,
+            source: snapshot.origin.into(),
             skipped: snapshot.skipped,
         }
     }
@@ -413,6 +435,18 @@ mod tests {
     }
 
     #[test]
+    fn catalog_source_names_every_origin_in_lowercase() {
+        for (origin, name) in [
+            (CatalogOrigin::Remote, "remote"),
+            (CatalogOrigin::Cache, "cache"),
+            (CatalogOrigin::Bundled, "bundled"),
+        ] {
+            let value = serde_json::to_value(CatalogSourceDto::from(origin)).unwrap();
+            assert_eq!(value, name);
+        }
+    }
+
+    #[test]
     fn catalog_dto_is_camel_case_with_null_optionals() {
         let entry = CatalogEntry {
             id: "rebalanced-ai".to_string(),
@@ -435,12 +469,14 @@ mod tests {
             entries: vec![entry],
             fetched_at_ms: 5,
             stale: true,
+            origin: CatalogOrigin::Bundled,
             skipped: 2,
             warnings: Vec::new(),
         };
         let value = serde_json::to_value(CatalogDto::from(snapshot)).unwrap();
         assert_eq!(value["fetchedAt"], 5);
         assert_eq!(value["stale"], true);
+        assert_eq!(value["source"], "bundled");
         assert_eq!(value["skipped"], 2);
         let first = &value["entries"][0];
         assert_eq!(first["pageUrl"], "https://example.com/m");

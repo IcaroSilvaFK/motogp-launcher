@@ -8,6 +8,8 @@ import { createCatalogController } from '../../application';
 import type { CatalogController, CatalogGateway, DiscoverView, DiscoverViewStore } from '../../application';
 import type { Catalog, CatalogEntry, CommandError, ModEntry } from '../../domain';
 import { App } from '../App';
+import { en } from '../i18n/en';
+import { ptBR } from '../i18n/pt-BR';
 import { createFakeController } from './fakeController';
 import { loadFrontendFeature } from './features';
 
@@ -47,6 +49,7 @@ const catalogOf = (entries: CatalogEntry[], patch: Partial<Catalog> = {}): Catal
   entries,
   fetchedAt: Date.UTC(2026, 10, 24, 12),
   stale: false,
+  source: 'remote',
   skipped: 0,
   ...patch,
 });
@@ -78,12 +81,17 @@ function memoryViewStore(): DiscoverViewStore & { value: DiscoverView | null } {
   return store;
 }
 
-async function openDiscover({ discoverViewStore }: { discoverViewStore?: DiscoverViewStore } = {}) {
+async function openDiscover({
+  discoverViewStore,
+  locale = 'en',
+}: { discoverViewStore?: DiscoverViewStore; locale?: 'en' | 'pt-BR' } = {}) {
   user = userEvent.setup();
   launcher = createFakeController({ mods });
-  render(<App controller={launcher} catalog={catalog} locale="en" discoverViewStore={discoverViewStore} />);
+  render(<App controller={launcher} catalog={catalog} locale={locale} discoverViewStore={discoverViewStore} />);
   await user.click(
-    within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Discover' }),
+    within(
+      screen.getByRole('navigation', { name: locale === 'en' ? 'Main navigation' : 'Navegação principal' }),
+    ).getByRole('button', { name: locale === 'en' ? 'Discover' : 'Descobrir' }),
   );
 }
 
@@ -298,7 +306,7 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
 
   Scenario('Stale banner with the saved date', ({ Given, Then }) => {
     Given('the catalog is stale and was fetched on 2026-11-20', () =>
-      withSample({ stale: true, fetchedAt: Date.UTC(2026, 10, 20, 12) }),
+      withSample({ stale: true, source: 'cache', fetchedAt: Date.UTC(2026, 10, 20, 12) }),
     );
     Then('a banner says the catalog saved on that date is shown', () => {
       const banner = screen.getByText(/Showing the catalog saved on/).closest('[role="status"]');
@@ -420,6 +428,88 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
         'Profiles',
         'Settings',
       ]);
+    });
+  });
+
+  Scenario('Say that the catalog shipped with this version is shown', ({ Given, When, Then, And }) => {
+    Given('the backend returns a catalog with source "bundled"', () => {
+      setGateway(() => Promise.resolve(catalogOf(sample, { source: 'bundled', stale: true, fetchedAt: 0 })));
+    });
+    When('the user opens Discover', async () => {
+      await openDiscover();
+      await screen.findByRole('list', { name: /results/i });
+    });
+    Then('a notice says the catalog shipped with this version is shown', () => {
+      const notice = screen.getByText(/Showing the catalog shipped with this version/).closest('[role="status"]');
+      expect(notice).toHaveClass('notice-info');
+    });
+    And('no "saved on" stale notice is shown', () => {
+      expect(screen.queryByText(/saved on/)).not.toBeInTheDocument();
+    });
+  });
+
+  Scenario('The error state shows only the translated message', ({ Given, And, When, Then }) => {
+    let locale: 'en' | 'pt-BR' = 'en';
+    let warn: ReturnType<typeof vi.spyOn>;
+    Given('the language is Portuguese', () => {
+      locale = 'pt-BR';
+    });
+    And('loading the catalog fails with code "catalog_unavailable" and an English message', () => {
+      warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const error: CommandError = {
+        code: 'catalog_unavailable',
+        message: 'The mod catalog could not be loaded (HTTP 404).',
+      };
+      setGateway(() => Promise.reject(error));
+    });
+    When('the user opens Discover', async () => {
+      await openDiscover({ locale });
+    });
+    Then('the error state shows the Portuguese text for "catalog_unavailable"', async () => {
+      expect(await screen.findByRole('alert')).toHaveTextContent(ptBR.errors.catalog_unavailable);
+    });
+    And('the English message is not on the screen', () => {
+      expect(screen.queryByText(/HTTP 404/)).not.toBeInTheDocument();
+    });
+    And('the English message is logged as a warning', () => {
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('HTTP 404'));
+      warn.mockRestore();
+    });
+  });
+
+  Scenario('A refresh failure keeps the catalog on screen', ({ Given, When, Then, And }) => {
+    Given('a catalog is shown', async () => {
+      await withSample();
+    });
+    When('a refresh fails with code "catalog_unavailable"', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      gateway.refreshCatalog.mockRejectedValueOnce({ code: 'catalog_unavailable', message: 'HTTP 404' });
+      await user.click(screen.getByRole('button', { name: 'Refresh catalog' }));
+    });
+    Then('the entries stay visible with an inline error', async () => {
+      expect(await screen.findByRole('alert')).toHaveTextContent(en.errors.catalog_unavailable);
+      expect(screen.queryByText(/HTTP 404/)).not.toBeInTheDocument();
+      expect(titles()).toContain('Rebalanced AI');
+    });
+    And('the full-screen error state is not shown', () => {
+      expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+      vi.restoreAllMocks();
+    });
+  });
+
+  Scenario('"Not published" is translated', ({ Given, When, Then }) => {
+    Given('loading the catalog fails with code "catalog_not_published"', () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      setGateway(() => Promise.reject({ code: 'catalog_not_published', message: 'raw backend text' }));
+    });
+    When('the user opens Discover', async () => {
+      await openDiscover();
+    });
+    Then('the error state shows the text for "catalog_not_published" in the current language', async () => {
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(en.errors.catalog_not_published);
+      expect(alert).not.toHaveTextContent('raw backend text');
+      vi.restoreAllMocks();
     });
   });
 });

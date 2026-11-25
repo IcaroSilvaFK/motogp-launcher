@@ -84,6 +84,8 @@ export interface Messages {
     loading: string;
     /** Stale banner: the catalog shown is the one saved on `date`. */
     stale: (date: string) => string;
+    /** Notice: the catalog shown is the one shipped with this version of the launcher. */
+    bundled: string;
     categories: string;
     all: string;
     search: string;

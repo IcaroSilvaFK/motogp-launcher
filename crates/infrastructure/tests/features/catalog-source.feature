@@ -30,3 +30,13 @@ Feature: HTTPS catalog source and cache (infrastructure, local server)
     Given a data folder "Usuário Padrão"
     When a snapshot is saved and loaded
     Then the same entries and timestamp come back
+
+  Scenario: A missing catalog file is "not published", not a network error
+    Given a catalog server that answers 404
+    When the catalog is fetched
+    Then the fetch fails as "not published"
+
+  Scenario: The bundled catalog is the repository catalog
+    When the bundled catalog is parsed
+    Then it equals the parsed repository file "catalog/catalog.json"
+    And it passes the strict validation

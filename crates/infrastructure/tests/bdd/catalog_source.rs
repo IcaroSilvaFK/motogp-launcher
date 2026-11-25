@@ -4,10 +4,13 @@ use crate::feature;
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
 use motogp_application::{
-    CachedCatalog, CatalogCache, CatalogSource, CatalogSourceError, RawEntry, SourceFetch,
+    validate_catalog_strict, CachedCatalog, CatalogCache, CatalogSource, CatalogSourceError,
+    RawCatalog, RawEntry, SourceFetch,
 };
 use motogp_domain::{CatalogEntry, CatalogEntryDraft};
-use motogp_infrastructure::{DataDir, HttpCatalogConfig, HttpCatalogSource, JsonCatalogCache};
+use motogp_infrastructure::{
+    bundled_catalog, parse_catalog, DataDir, HttpCatalogConfig, HttpCatalogSource, JsonCatalogCache,
+};
 use std::time::Duration;
 use tempfile::TempDir;
 
@@ -22,6 +25,7 @@ const SMALL_CAP: u64 = 200;
 struct CatalogSourceWorld {
     server: Option<TestServer>,
     max_bytes: Option<u64>,
+    bundled: Option<RawCatalog>,
     outcome: Option<Result<SourceFetch, CatalogSourceError>>,
     tmp: Option<TempDir>,
     cache: Option<JsonCatalogCache>,
@@ -149,6 +153,46 @@ fn fails_rate_limited(w: &mut CatalogSourceWorld, secs: u64) {
             retry_after_secs: Some(secs)
         }))
     );
+}
+
+// ---------- Not published ----------
+
+#[given("a catalog server that answers 404")]
+fn answers_404(w: &mut CatalogSourceWorld) {
+    w.start(Reply::new(404));
+}
+
+#[when("the catalog is fetched")]
+fn catalog_fetched(w: &mut CatalogSourceWorld) {
+    w.fetch(None);
+}
+
+#[then(expr = "the fetch fails as {string}")]
+fn fetch_fails_as(w: &mut CatalogSourceWorld, what: String) {
+    assert_eq!(what, "not published");
+    assert_eq!(w.outcome, Some(Err(CatalogSourceError::NotPublished)));
+}
+
+// ---------- Bundled catalog ----------
+
+#[when("the bundled catalog is parsed")]
+fn bundled_parsed(w: &mut CatalogSourceWorld) {
+    w.bundled = Some(bundled_catalog().expect("bundled catalog parses"));
+}
+
+#[then(expr = "it equals the parsed repository file {string}")]
+fn bundled_equals_file(w: &mut CatalogSourceWorld, path: String) {
+    let file = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(path);
+    let parsed = parse_catalog(&std::fs::read(file).expect("repository catalog")).unwrap();
+    assert_eq!(w.bundled.as_ref(), Some(&parsed));
+}
+
+#[then("it passes the strict validation")]
+fn bundled_is_strictly_valid(w: &mut CatalogSourceWorld) {
+    let bundled = w.bundled.clone().expect("bundled catalog not parsed");
+    assert!(validate_catalog_strict(bundled).is_ok());
 }
 
 // ---------- User-Agent ----------

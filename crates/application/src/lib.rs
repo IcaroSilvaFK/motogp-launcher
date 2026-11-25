@@ -47,8 +47,8 @@ pub use catalog_ports::{
     CachedCatalog, CatalogCache, CatalogSource, RawCatalog, RawEntry, SourceFetch, WebPageOpener,
 };
 pub use catalog_service::{
-    validate_catalog, validate_catalog_strict, CatalogService, CatalogSnapshot, CatalogWarning,
-    DEFAULT_CATALOG_TTL,
+    validate_catalog, validate_catalog_strict, CatalogOrigin, CatalogService, CatalogSnapshot,
+    CatalogWarning, DEFAULT_CATALOG_TTL,
 };
 pub use config_service::ConfigService;
 pub use deploy_error::DeployError;

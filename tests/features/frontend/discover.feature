@@ -87,3 +87,28 @@ Feature: Discover tab
   Scenario: Discover comes right after Library in the sidebar
     Given a catalog is available
     Then the sidebar lists Library, Discover, Profiles, Settings in that order
+
+  Scenario: Say that the catalog shipped with this version is shown
+    Given the backend returns a catalog with source "bundled"
+    When the user opens Discover
+    Then a notice says the catalog shipped with this version is shown
+    And no "saved on" stale notice is shown
+
+  Scenario: The error state shows only the translated message
+    Given the language is Portuguese
+    And loading the catalog fails with code "catalog_unavailable" and an English message
+    When the user opens Discover
+    Then the error state shows the Portuguese text for "catalog_unavailable"
+    And the English message is not on the screen
+    And the English message is logged as a warning
+
+  Scenario: A refresh failure keeps the catalog on screen
+    Given a catalog is shown
+    When a refresh fails with code "catalog_unavailable"
+    Then the entries stay visible with an inline error
+    And the full-screen error state is not shown
+
+  Scenario: "Not published" is translated
+    Given loading the catalog fails with code "catalog_not_published"
+    When the user opens Discover
+    Then the error state shows the text for "catalog_not_published" in the current language
