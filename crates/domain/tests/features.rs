@@ -7,6 +7,8 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+#[path = "bdd/catalog.rs"]
+mod catalog;
 #[path = "bdd/deploy_names.rs"]
 mod deploy_names;
 #[path = "bdd/load_order.rs"]
@@ -28,6 +30,7 @@ const FEATURES: &[(&str, Runner)] = &[
         Box::pin(storage_classification::run())
     }),
     ("load-order", || Box::pin(load_order::run())),
+    ("catalog", || Box::pin(catalog::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

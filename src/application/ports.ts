@@ -1,4 +1,5 @@
 import type {
+  Catalog,
   Config,
   FileConflict,
   CurrentSession,
@@ -48,6 +49,11 @@ export interface LauncherGateway {
   getGameArtwork(): Promise<string | null>;
   /** Opens the launcher data folder in the system file manager; the backend decides the path. */
   openDataFolder(): Promise<void>;
+  // Online catalog (#72): fetched by the backend, cached on disk, available offline.
+  /** The catalog while the cache is fresh, otherwise a fetch (an older copy is flagged `stale` when offline). */
+  getCatalog(): Promise<Catalog>;
+  /** Forces a fetch, still bounded by the backend's backoff after a failure. */
+  refreshCatalog(): Promise<Catalog>;
 }
 
 /** `null` means the user cancelled the dialog. */

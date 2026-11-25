@@ -3,10 +3,11 @@
 //! only runs with a real window and WebView2; everything it wires is tested
 //! through `compose`, `commands`, `adapters` and `startup`.
 use crate::adapters::{TauriEvents, TauriFolderOpener, TauriOpener};
-use crate::{compose, configure, run_recovery};
-use motogp_application::{InstanceGuard, InstanceLock};
+use crate::{compose, configure, run_recovery, UnavailableCatalogSource};
+use motogp_application::{CatalogSource, InstanceGuard, InstanceLock};
 use motogp_infrastructure::{
-    DataDir, FileInstanceLock, SteamArtwork, SteamLibraries, SysinfoProcesses, ThreadRunner,
+    DataDir, FileInstanceLock, HttpCatalogConfig, HttpCatalogSource, SteamArtwork, SteamLibraries,
+    SysinfoProcesses, ThreadRunner,
 };
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -29,6 +30,18 @@ fn steam_artwork() -> SteamArtwork {
 #[cfg(not(windows))]
 fn steam_artwork() -> SteamArtwork {
     SteamArtwork::new(None)
+}
+
+/// The HTTPS catalog source; if its client cannot be built the catalog is
+/// served from the offline cache only and the app still starts.
+fn catalog_source() -> Arc<dyn CatalogSource> {
+    match HttpCatalogSource::new(HttpCatalogConfig::github(env!("CARGO_PKG_VERSION"))) {
+        Ok(source) => Arc::new(source),
+        Err(error) => {
+            eprintln!("catalog source unavailable: {error}");
+            Arc::new(UnavailableCatalogSource::new(error.to_string()))
+        }
+    }
 }
 
 /// Keeps the single-instance lock alive in the managed state.
@@ -68,6 +81,7 @@ pub fn run() {
             SysinfoProcesses::default(),
             Arc::new(TauriEvents::new(handle)),
             Arc::new(ThreadRunner),
+            catalog_source(),
         );
         // Recovery finishes before the state exists, so no command can run
         // `play` earlier. A failure is already on the error channel and blocks

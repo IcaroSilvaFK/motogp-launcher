@@ -1,11 +1,12 @@
 //! IPC data transfer objects. Fields are snake_case on the wire; the
 //! JS-side command arguments are camelCase (handled by `#[tauri::command]`).
 use motogp_application::{
-    DeploySession, RecoveryState, RecoveryStatus, SessionEvent, SessionPhase, SessionSnapshot,
-    SessionState,
+    CatalogSnapshot, DeploySession, RecoveryState, RecoveryStatus, SessionEvent, SessionPhase,
+    SessionSnapshot, SessionState,
 };
 use motogp_domain::{
-    Config, FileConflict, GameInfo, ModEntry, Profile, StorageCategory, StorageUsage,
+    CatalogDownload, CatalogEntry, Config, FileConflict, GameInfo, ModEntry, Profile,
+    StorageCategory, StorageUsage,
 };
 use serde::Serialize;
 
@@ -270,6 +271,81 @@ pub fn artwork_data_url(artwork: &motogp_application::Artwork) -> String {
     )
 }
 
+// ---- Online catalog (#72): camelCase on the wire, unlike the DTOs above. ----
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogDownloadDto {
+    pub url: String,
+    pub size: u64,
+    pub sha256: String,
+}
+
+impl From<CatalogDownload> for CatalogDownloadDto {
+    fn from(download: CatalogDownload) -> Self {
+        CatalogDownloadDto {
+            url: download.url,
+            size: download.size,
+            sha256: download.sha256,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogEntryDto {
+    pub id: String,
+    pub title: String,
+    pub author: String,
+    pub game: String,
+    pub category: String,
+    pub description: String,
+    pub version: String,
+    pub updated_at: String,
+    pub page_url: String,
+    pub thumbnail_url: Option<String>,
+    pub download: Option<CatalogDownloadDto>,
+}
+
+impl From<CatalogEntry> for CatalogEntryDto {
+    fn from(entry: CatalogEntry) -> Self {
+        CatalogEntryDto {
+            id: entry.id,
+            title: entry.title,
+            author: entry.author,
+            game: entry.game,
+            category: entry.category,
+            description: entry.description,
+            version: entry.version,
+            updated_at: entry.updated_at,
+            page_url: entry.page_url,
+            thumbnail_url: entry.thumbnail_url,
+            download: entry.download.map(Into::into),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogDto {
+    pub entries: Vec<CatalogEntryDto>,
+    /// Unix milliseconds of the last successful fetch.
+    pub fetched_at: u64,
+    pub stale: bool,
+    pub skipped: usize,
+}
+
+impl From<CatalogSnapshot> for CatalogDto {
+    fn from(snapshot: CatalogSnapshot) -> Self {
+        CatalogDto {
+            entries: snapshot.entries.into_iter().map(Into::into).collect(),
+            fetched_at: snapshot.fetched_at_ms,
+            stale: snapshot.stale,
+            skipped: snapshot.skipped,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -334,5 +410,43 @@ mod tests {
                 ]
             })
         );
+    }
+
+    #[test]
+    fn catalog_dto_is_camel_case_with_null_optionals() {
+        let entry = CatalogEntry {
+            id: "rebalanced-ai".to_string(),
+            title: "Rebalanced AI".to_string(),
+            author: "A".to_string(),
+            game: "MotoGP 26".to_string(),
+            category: "AI".to_string(),
+            description: "d".to_string(),
+            version: "1.0".to_string(),
+            updated_at: "2026-11-01".to_string(),
+            page_url: "https://example.com/m".to_string(),
+            thumbnail_url: None,
+            download: Some(CatalogDownload {
+                url: "https://example.com/m.zip".to_string(),
+                size: 10,
+                sha256: "a".repeat(64),
+            }),
+        };
+        let snapshot = CatalogSnapshot {
+            entries: vec![entry],
+            fetched_at_ms: 5,
+            stale: true,
+            skipped: 2,
+            warnings: Vec::new(),
+        };
+        let value = serde_json::to_value(CatalogDto::from(snapshot)).unwrap();
+        assert_eq!(value["fetchedAt"], 5);
+        assert_eq!(value["stale"], true);
+        assert_eq!(value["skipped"], 2);
+        let first = &value["entries"][0];
+        assert_eq!(first["pageUrl"], "https://example.com/m");
+        assert_eq!(first["updatedAt"], "2026-11-01");
+        assert_eq!(first["thumbnailUrl"], serde_json::Value::Null);
+        assert_eq!(first["download"]["size"], 10);
+        assert_eq!(first["download"]["sha256"], "a".repeat(64));
     }
 }

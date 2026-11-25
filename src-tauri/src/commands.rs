@@ -7,8 +7,8 @@
 //! blocking pool, never on the main thread, and mutations are serialized
 //! through `AppState::write_lock` so they cannot lose each other's updates.
 use crate::dto::{
-    ConfigDto, ConflictDto, CurrentSessionDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto,
-    RecoveryStatusDto, StorageUsageDto,
+    CatalogDto, ConfigDto, ConflictDto, CurrentSessionDto, DeploySessionDto, GameInfoDto, ModDto,
+    ProfileDto, RecoveryStatusDto, StorageUsageDto,
 };
 use crate::{AppState, CommandError};
 use motogp_application::{import_mods as import_batch, remove_mod as remove_everywhere};
@@ -262,6 +262,19 @@ pub async fn get_game_artwork(state: State<'_, AppState>) -> CommandResult<Optio
     .await
 }
 
+/// The online catalog: the cached copy while fresh, else a fetch (offline
+/// falls back to a stale copy). Blocking network I/O, so off the async runtime.
+#[tauri::command]
+pub async fn get_catalog(state: State<'_, AppState>) -> CommandResult<CatalogDto> {
+    read_blocking(state, |state| Ok(state.catalog.get()?.into())).await
+}
+
+/// Forces a catalog fetch (still bounded by the backoff after a failure).
+#[tauri::command]
+pub async fn refresh_catalog(state: State<'_, AppState>) -> CommandResult<CatalogDto> {
+    read_blocking(state, |state| Ok(state.catalog.refresh()?.into())).await
+}
+
 /// Registers every command on the builder; shared by the real app and the
 /// contract tests.
 pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
@@ -289,6 +302,8 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         clean_stale_session,
         get_storage_usage,
         open_data_folder,
-        get_game_artwork
+        get_game_artwork,
+        get_catalog,
+        refresh_catalog
     ])
 }

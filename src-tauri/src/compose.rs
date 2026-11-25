@@ -2,20 +2,21 @@
 //! varies between production and tests (Steam, opener, process table,
 //! background execution, events) is injected.
 use motogp_application::{
-    ArtworkService, BackgroundRunner, DeployService, FolderOpener, GameService, GameSettings,
-    PlayService, ProcessInspector, ProfileModPlanner, ProfileService, SessionPublisher,
-    SessionService, StorageService, UrlOpener,
+    ArtworkService, BackgroundRunner, CatalogService, CatalogSource, DeployService, FolderOpener,
+    GameService, GameSettings, PlayService, ProcessInspector, ProfileModPlanner, ProfileService,
+    SessionPublisher, SessionService, StorageService, UrlOpener,
 };
 use motogp_infrastructure::{
     mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsGameFiles, FsStorageScanner,
-    JsonConfigStore, JsonDeployedRepository, JsonModRepository, JsonProfileStore, ModLibrary,
-    MonotonicClock, SteamArtwork, SteamLibraries, SystemClock,
+    JsonCatalogCache, JsonConfigStore, JsonDeployedRepository, JsonModRepository, JsonProfileStore,
+    ModLibrary, MonotonicClock, SteamArtwork, SteamLibraries, SystemClock,
 };
 use std::sync::{Arc, Mutex};
 
 pub type Profiles = ProfileService<JsonProfileStore, SystemClock>;
 pub type Settings = GameSettings<JsonConfigStore, SteamLibraries, FsGameFiles>;
 pub type Storage = StorageService<FsStorageScanner, Arc<dyn FolderOpener + Send + Sync>>;
+pub type Catalog = CatalogService<Arc<dyn CatalogSource>, JsonCatalogCache, SystemClock>;
 
 /// Everything the commands need. Managed as Tauri state; cheap to clone so
 /// blocking use cases can run off the main thread.
@@ -34,8 +35,12 @@ pub struct AppState {
     /// Serializes every mutation of the shared JSON stores, so concurrent
     /// commands cannot lose each other's updates.
     pub write_lock: Arc<Mutex<()>>,
+    /// Online catalog (#72). Blocking network I/O: commands run it off the
+    /// async runtime and never under `write_lock`.
+    pub catalog: Arc<Catalog>,
 }
 
+// The composition root receives every injected port, so it is wide on purpose.
 #[allow(clippy::too_many_arguments)]
 pub fn compose<O, P>(
     data: &DataDir,
@@ -46,6 +51,7 @@ pub fn compose<O, P>(
     inspector: P,
     publisher: Arc<dyn SessionPublisher>,
     runner: Arc<dyn BackgroundRunner>,
+    catalog_source: Arc<dyn CatalogSource>,
 ) -> AppState
 where
     O: UrlOpener + Send + Sync + 'static,
@@ -91,6 +97,11 @@ where
             data.root().to_path_buf(),
             FsStorageScanner,
             folder_opener,
+        )),
+        catalog: Arc::new(CatalogService::new(
+            catalog_source,
+            JsonCatalogCache::new(data.catalog_cache_file()),
+            SystemClock,
         )),
     }
 }

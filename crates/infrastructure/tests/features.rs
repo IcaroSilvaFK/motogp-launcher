@@ -12,6 +12,8 @@ mod steam;
 #[path = "bdd/steam_artwork.rs"]
 mod steam_artwork;
 
+#[path = "bdd/catalog_source.rs"]
+mod catalog_source;
 #[path = "bdd/file_deploy.rs"]
 mod file_deploy;
 #[path = "bdd/file_import.rs"]
@@ -31,6 +33,7 @@ mod profile_persistence;
 type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
 const FEATURES: &[(&str, Runner)] = &[
+    ("catalog-source", || Box::pin(catalog_source::run())),
     ("persistence", || Box::pin(persistence::run())),
     ("profile-persistence", || {
         Box::pin(profile_persistence::run())

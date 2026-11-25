@@ -121,6 +121,9 @@ export const BACKEND_ERROR_CODES = [
   'deploy_session_not_stale',
   'no_active_session',
   'stop_failed',
+  // Online catalog (#72).
+  'catalog_unavailable',
+  'catalog_unsupported_schema',
 ] as const;
 
 export const FRONTEND_ERROR_CODES = [
@@ -137,4 +140,41 @@ export type ErrorCode = (typeof ERROR_CODES)[number];
 export interface CommandError {
   code: ErrorCode;
   message: string;
+}
+
+// ---- Online catalog (#72): camelCase, mapped 1:1 from the backend DTO. ----
+
+/** A file the catalog author allows the launcher to download itself (#74 verifies size and hash). */
+export interface CatalogDownload {
+  url: string;
+  size: number;
+  /** 64 lowercase hex characters. */
+  sha256: string;
+}
+
+export interface CatalogEntry {
+  id: string;
+  title: string;
+  author: string;
+  game: string;
+  category: string;
+  description: string;
+  version: string;
+  /** `YYYY-MM-DD`. */
+  updatedAt: string;
+  /** https page where the mod lives. */
+  pageUrl: string;
+  thumbnailUrl: string | null;
+  /** Present only when the author allows redistribution. */
+  download: CatalogDownload | null;
+}
+
+export interface Catalog {
+  entries: CatalogEntry[];
+  /** Unix milliseconds of the last successful fetch. */
+  fetchedAt: number;
+  /** `true` when the source was unreachable and this is an older cached copy. */
+  stale: boolean;
+  /** Catalog entries the launcher dropped as invalid or duplicate. */
+  skipped: number;
 }

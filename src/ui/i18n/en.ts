@@ -251,6 +251,10 @@ export const en: Messages = {
     deploy_unauthorized_directory: 'The launcher is not allowed to use this directory.',
     deploy_cleanup_incomplete: 'Cleanup did not remove every deployed file.',
     deploy_session_not_stale: 'This is the current mods folder; it cannot be forgotten.',
+    // Online catalog (#72).
+    catalog_unavailable: 'The mod catalog could not be loaded. Check your connection and try again.',
+    catalog_unsupported_schema:
+      'The mod catalog needs a newer version of the launcher. Update the launcher to browse it.',
     session_error: 'The game session failed.',
     session_subscription_failed: 'Session events are unavailable.',
     recovery_failed: 'Recovery of a previous session failed.',

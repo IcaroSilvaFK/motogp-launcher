@@ -3,8 +3,8 @@
 //! opener / process / background / event ports. No real window, Steam or game.
 #![allow(dead_code)]
 use motogp_application::{
-    AppError, BackgroundRunner, FolderOpener, ProcessInspector, SessionEvent, SessionPublisher,
-    UrlOpener,
+    AppError, BackgroundRunner, CatalogSource, CatalogSourceError, FolderOpener, ProcessInspector,
+    RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch, UrlOpener,
 };
 use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries};
 use motogp_launcher_lib::{compose, configure, run_recovery, AppState};
@@ -41,6 +41,39 @@ impl FolderOpener for FakeFolderOpener {
     fn open_folder(&self, path: &Path) -> Result<(), AppError> {
         self.opened.lock().unwrap().push(path.to_path_buf());
         Ok(())
+    }
+}
+
+/// Catalog source that never touches the network: serves the given drafts, or
+/// fails as unreachable.
+pub struct FakeCatalogSource {
+    entries: Option<Vec<motogp_domain::CatalogEntryDraft>>,
+}
+
+impl FakeCatalogSource {
+    pub fn failing() -> Self {
+        Self { entries: None }
+    }
+
+    pub fn serving(entries: Vec<motogp_domain::CatalogEntryDraft>) -> Self {
+        Self {
+            entries: Some(entries),
+        }
+    }
+}
+
+impl CatalogSource for FakeCatalogSource {
+    fn fetch(&self, _etag: Option<&str>) -> Result<SourceFetch, CatalogSourceError> {
+        match &self.entries {
+            Some(entries) => Ok(SourceFetch::Fetched {
+                catalog: RawCatalog {
+                    schema_version: 1,
+                    entries: entries.iter().cloned().map(RawEntry::Draft).collect(),
+                },
+                etag: None,
+            }),
+            None => Err(CatalogSourceError::Network("offline".to_string())),
+        }
     }
 }
 
@@ -113,6 +146,10 @@ pub struct Harness {
 
 impl Harness {
     pub fn new() -> Harness {
+        Harness::with_catalog_source(Arc::new(FakeCatalogSource::failing()))
+    }
+
+    pub fn with_catalog_source(catalog_source: Arc<dyn CatalogSource>) -> Harness {
         let tmp = TempDir::new().unwrap();
         let data = DataDir::new(tmp.path().join("data"));
         fs::create_dir_all(data.root()).unwrap();
@@ -131,6 +168,7 @@ impl Harness {
             NoProcesses,
             recorder.clone(),
             runner.clone(),
+            catalog_source,
         );
         let app = configure(tauri::test::mock_builder())
             .manage(state)

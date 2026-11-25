@@ -56,5 +56,7 @@ export function createTauriGateway(invoke: InvokeFn = tauriInvoke): LauncherGate
     getStorageUsage: async () => toStorageUsage(await call<StorageUsageDto>('get_storage_usage')),
     getGameArtwork: () => call<string | null>('get_game_artwork'),
     openDataFolder: () => call('open_data_folder'),
+    getCatalog: () => call('get_catalog'),
+    refreshCatalog: () => call('refresh_catalog'),
   };
 }

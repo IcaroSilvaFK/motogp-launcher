@@ -1,5 +1,31 @@
 # Spike: online mod catalog from Overtake (issue #37)
 
+## Decision (2026-11-23, #72): a static catalog in this repository
+
+The #37 spike found no usable public API, so the launcher reads **its own static catalog**: `catalog/catalog.json` on the `main` branch of this repository, fetched from the raw URL `https://raw.githubusercontent.com/IcaroSilvaFK/motogp-launcher/main/catalog/catalog.json`. No server, no scraping, no login. All network access stays in Rust (`reqwest` blocking with rustls, run off the async runtime), so the WebView CSP does not change.
+
+- **Format**: `{ "$schema": "./catalog.schema.json", "schemaVersion": 1, "entries": [...] }`. JSON Schema (draft 2020-12) in `catalog/catalog.schema.json`. Entry fields: `id` (slug, unique, max 64), `title`, `author`, `game`, `category`, `description`, `version`, `updatedAt` (`YYYY-MM-DD`), `pageUrl` (https), optional `thumbnailUrl` (https), optional `download` `{ url (https), size (bytes, > 0), sha256 (64 lowercase hex) }` (all three or none). The file ships **empty** until real, verified entries are added.
+- **Cache**: `<data dir>/catalog-cache.json`, written atomically. TTL 6 h; a fresh cache is served without any request. Concurrent callers share one fetch (single-flight). Requests are conditional (`If-None-Match` / ETag; a 304 renews the cache timestamp). After a failure there is no new request until `Retry-After` (capped at 1 h) or an exponential backoff (30 s doubling, max 1 h) elapses; a success resets it. `refresh` ignores the TTL but respects the backoff. Body cap 2 MiB, connect timeout 10 s, total 20 s, descriptive User-Agent.
+- **Offline**: when the source fails and a cache exists, the cached catalog is returned with `stale: true`. With no cache the call fails with `catalog_unavailable`. A `schemaVersion` newer than the launcher supports fails with `catalog_unsupported_schema` (an existing cache is still served).
+- **Resilience**: an entry that is malformed (for example a `file://` URL) or repeats an id is skipped and counted in `skipped`; one bad entry never hides the others.
+- **Contract for #73 (Discover UI) and #74 (downloads)**, camelCase on the wire:
+  - Commands: `get_catalog` (cache while fresh, else fetch) and `refresh_catalog` (forced fetch). Both take no arguments and never block the UI thread.
+  - `CatalogDto { entries, fetchedAt (unix ms), stale, skipped }`.
+  - `CatalogEntryDto { id, title, author, game, category, description, version, updatedAt, pageUrl, thumbnailUrl | null, download | null }`.
+  - `CatalogDownloadDto { url, size, sha256 }`. #72 only publishes these values; downloading and checking the SHA-256 of the file is #74.
+  - Error codes: `catalog_unavailable`, `catalog_unsupported_schema` (en and pt-BR messages in `src/ui/i18n`).
+  - Frontend: `LauncherGateway.getCatalog()` / `refreshCatalog()`, types `Catalog`, `CatalogEntry`, `CatalogDownload` in `src/domain/types.ts`.
+
+## Add a mod to the catalog by PR
+
+1. Fork the repository and edit `catalog/catalog.json` (add an object to `entries`, keep the file valid JSON).
+2. Fill every required field: `id` (unique lowercase slug such as `rebalanced-ai`), `title`, `author`, `game` (for example `MotoGP 26`), `category`, `description`, `version`, `updatedAt` (`YYYY-MM-DD`) and `pageUrl`.
+3. Rules: every URL must be `https`; the id must be unique; `thumbnailUrl` is optional.
+4. Add a `download` block **only with the mod author's permission to redistribute**. It needs the direct `url`, the file `size` in bytes and the `sha256` of that exact file. Compute the hash on Windows with `certutil -hashfile <file> SHA256` (lowercase the result, no spaces) or on Linux/macOS with `sha256sum <file>`. Without the author's permission, leave `download` out: the launcher then only links to `pageUrl`.
+5. Run `cargo test -p motogp-infrastructure --test catalog_file`. It validates the shipped catalog strictly (every entry valid, ids unique, supported schema version) and fails on the first problem.
+6. Open a PR. Once it reaches `main`, launchers see the change after their cache expires (6 h) or when the user refreshes the catalog.
+
+
 Date: 2026-11-19. Status: research only, no production code.
 
 ## Method and limits of this research

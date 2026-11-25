@@ -3,6 +3,7 @@
 //! No I/O, no serde, no Tauri and no other project crates.
 //! Entities arrive in the next issues, always driven by tests.
 
+mod catalog;
 mod config;
 mod conflict;
 mod deploy;
@@ -13,6 +14,10 @@ mod profile;
 mod session;
 mod storage;
 
+pub use catalog::{
+    CatalogDownload, CatalogDownloadDraft, CatalogEntry, CatalogEntryDraft, CatalogEntryError,
+    SUPPORTED_CATALOG_SCHEMA,
+};
 pub use config::Config;
 pub use conflict::{detect_conflicts, FileConflict};
 pub use deploy::{deployed_name, is_mods_dir, is_safe_file_name, Deployed, DeployedFile};
