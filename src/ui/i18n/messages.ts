@@ -48,6 +48,8 @@ export interface Messages {
     /** Accessible name of the row switch; `profileName` is null without an active profile. */
     toggleNamed: (modName: string, profileName: string | null) => string;
     toggleLocked: string;
+    /** Reason the Remove buttons are inert while a game session is running. */
+    removeLocked: string;
     toggleVanilla: string;
     toggleNoProfile: string;
     /** Conflict badge of a row whose mod wins every file it shares in the active profile. */
@@ -75,6 +77,8 @@ export interface Messages {
     mods: string;
     noMods: string;
     vanillaLocked: string;
+    /** Reason the create, rename, delete and save actions are inert while a game session is running. */
+    locked: string;
     createTitle: string;
     createHint: string;
     listTitle: string;

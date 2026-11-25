@@ -44,6 +44,14 @@ describe('i18n dictionaries', () => {
     }
   });
 
+  it('translates the library lock in both locales', () => {
+    expect(en.errors.library_locked_by_session).toBe(
+      'Mods cannot be removed from the library while the game is running.',
+    );
+    expect(ptBR.errors.library_locked_by_session).toBe(
+      'Os mods não podem ser removidos da biblioteca enquanto o jogo está em execução.',
+    );
+  });
   it('translates the backend profile lock in both locales', () => {
     expect(en.errors.profile_locked_by_session).toBe('Profiles cannot be changed while the game is running.');
     expect(ptBR.errors.profile_locked_by_session).toBe(

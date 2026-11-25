@@ -454,3 +454,18 @@ The load order is `Profile.mod_ids` (index 0 loads first, the last one wins). Gh
 | The conflicts panel previews the draft order | `load-order.feature.test.tsx` (panel lists the path and the mods in load order, the winner follows the unsaved draft, nothing is saved) |
 | No conflicts | `load-order.feature.test.tsx` (status reads "No conflicts"; with one mod left no preview request is made) |
 | Library rows show a conflict badge for the active profile | `load-order.feature.test.tsx` ("Overridden" / "Wins" badges with their tooltip and accessible sentence, no badge without conflicts) |
+
+### Issue #82: scenario traceability
+
+A running game session locks every write that would change a profile or the library. The lock is the read-only `SessionActivity` port from #58; `remove_mod` checks it before touching the library. Session start/stop code is owned by #75.
+
+| Scenario | Tests |
+|----------|-------|
+| Removing a mod from every profile is refused while a session is active | application cucumber `profiles.feature`, `remove_mod_everywhere_is_refused_while_a_session_is_active` (`profile_service.rs`) |
+| Removing a mod from the library is refused while a session is active | application cucumber `commands-and-recovery.feature`, `remove_mod_is_refused_before_touching_anything_while_a_session_is_active` (`tests/commands.rs`), `batch_and_removal_errors_keep_the_inner_code` (`error_play.rs`, code `library_locked_by_session`) |
+| Removing a mod works again after the session ends | application cucumber `commands-and-recovery.feature` |
+| remove_mod is refused while a session is running | `tauri-interface.feature` (`interface_steps.rs`), IPC contract `commands_contract.rs` |
+| Library Remove buttons are locked | `tests/features/frontend/session-locks.feature` bound by `src/ui/__tests__/session-locks.feature.test.tsx`; controller "no library or profile write reaches the gateway" |
+| Profile management is locked | `session-locks.feature.test.tsx` (Create, Rename, Delete, Save: `aria-disabled`, `title`, `aria-describedby`, no gateway call) |
+| Actions unlock when the session ends | `session-locks.feature.test.tsx`, controller "When the session ends Then the writes work again" |
+| The new error code is translated | `session-locks.feature.test.tsx`, i18n "translates the library lock in both locales" |

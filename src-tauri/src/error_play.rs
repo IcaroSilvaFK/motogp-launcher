@@ -77,6 +77,10 @@ impl From<ImportBatchError> for CommandError {
 impl From<&RemoveModError> for CommandError {
     fn from(error: &RemoveModError) -> Self {
         match error {
+            RemoveModError::SessionActive => CommandError {
+                code: "library_locked_by_session".to_string(),
+                message: error.to_string(),
+            },
             RemoveModError::Library(inner) => CommandError::from(inner),
             RemoveModError::Profiles(inner) => CommandError::from(inner),
         }
@@ -212,5 +216,8 @@ mod tests {
         let locked =
             RemoveModError::Profiles(motogp_application::ProfileServiceError::SessionActive);
         assert_eq!(CommandError::from(locked).code, "profile_locked_by_session");
+        let active = CommandError::from(RemoveModError::SessionActive);
+        assert_eq!(active.code, "library_locked_by_session");
+        assert!(active.message.contains("game session is active"));
     }
 }

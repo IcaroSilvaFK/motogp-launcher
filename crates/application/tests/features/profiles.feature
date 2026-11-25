@@ -66,3 +66,10 @@ Feature: Maintain ordered profiles
     And a game session was active and has ended
     When I change the mods of "Race" to "m1"
     Then "Race" has the mods "m1"
+
+  Scenario: Removing a mod from every profile is refused while a session is active
+    Given a profile "Race" with the mods "m1" and "m2"
+    And a game session is active
+    When I remove "m1" from every profile
+    Then the attempt fails with "session active"
+    And "Race" still has the mods "m1" and "m2"

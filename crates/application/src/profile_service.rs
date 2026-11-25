@@ -60,8 +60,10 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
         self
     }
 
-    /// Checked before any read or write of storage by a guarded mutation.
-    fn ensure_idle(&self) -> Result<(), ProfileServiceError> {
+    /// Read-only lock check: `SessionActive` while a game session is running.
+    /// Checked before any read or write of storage by a guarded mutation, and
+    /// by other use cases that must not change state during a session.
+    pub fn ensure_idle(&self) -> Result<(), ProfileServiceError> {
         match &self.session {
             Some(session) if session.is_active() => Err(ProfileServiceError::SessionActive),
             _ => Ok(()),
@@ -174,6 +176,7 @@ impl<R: ProfileRepository, C: Clock> ProfileService<R, C> {
 
     /// Removes `mod_id` from every profile (used after a mod leaves the library).
     pub fn remove_mod_everywhere(&self, mod_id: &str) -> Result<(), ProfileServiceError> {
+        self.ensure_idle()?;
         let mut profiles = self.load_seeded()?;
         let changed = profiles
             .iter_mut()
@@ -539,6 +542,30 @@ mod tests {
         assert_eq!(service.list().unwrap().len(), 2);
         session.0.store(false, SeqCst);
         assert!(service.rename(&created.id, "B").is_ok());
+    }
+
+    #[test]
+    fn remove_mod_everywhere_is_refused_while_a_session_is_active() {
+        use std::sync::atomic::Ordering::SeqCst;
+        let session = Arc::new(FakeSession(Default::default()));
+        let service = service().with_session(session.clone());
+        let created = service.create("A").unwrap();
+        service.set_mods(&created.id, mods(&["a"])).unwrap();
+        let (saves, before) = (service.repository.saves.get(), stored(&service));
+        session.0.store(true, SeqCst);
+        assert_eq!(
+            service.ensure_idle(),
+            Err(ProfileServiceError::SessionActive)
+        );
+        assert_eq!(
+            service.remove_mod_everywhere("a"),
+            Err(ProfileServiceError::SessionActive)
+        );
+        assert_eq!(service.repository.saves.get(), saves);
+        assert_eq!(stored(&service), before);
+        session.0.store(false, SeqCst);
+        assert_eq!(service.ensure_idle(), Ok(()));
+        assert!(service.remove_mod_everywhere("a").is_ok());
     }
 
     #[test]

@@ -3,11 +3,13 @@
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
 use motogp_application::{
-    remove_mod, resolve_profile_mods, DeployMod, PlayError, SessionEvent, SessionState,
-    TrackOutcome,
+    remove_mod, resolve_profile_mods, DeployMod, PlayError, RemoveModError, SessionActivity,
+    SessionEvent, SessionState, TrackOutcome,
 };
 use motogp_domain::{Deployed, DeployedFile, LaunchError, ModEntry, Profile, WatchEvent};
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use crate::{config_fakes, library_fakes, play_fakes};
 
@@ -25,6 +27,9 @@ struct CommandsWorld {
     recovered: Option<usize>,
     mod_id: String,
     parts: Option<ProfileParts>,
+    session: Arc<ToggleSession>,
+    library_state: Option<library_fakes::Shared>,
+    removal: Option<Result<(), RemoveModError>>,
 }
 
 impl std::fmt::Debug for CommandsWorld {
@@ -462,6 +467,91 @@ fn status_keeps_the_failure(w: &mut CommandsWorld) {
     let status = w.rig().play.recovery_status();
     assert_eq!(status.state, motogp_application::RecoveryState::Failed);
     assert!(status.error.unwrap().contains("cleanup incomplete"));
+}
+
+// ---------- Scenarios: removing a mod while a game session is active (#82) ----------
+
+/// Session flag the scenarios switch on and off.
+#[derive(Debug, Default)]
+struct ToggleSession(AtomicBool);
+
+impl SessionActivity for ToggleSession {
+    fn is_active(&self) -> bool {
+        self.0.load(Ordering::SeqCst)
+    }
+}
+
+#[given(expr = "the library has the mod {string} referenced by the profile {string}")]
+fn library_mod_in_profile(w: &mut CommandsWorld, _mod_name: String, profile: String) {
+    let state = library_fakes::new_state();
+    library_fakes::put_file(&state, "src/A.pak", b"AAAAAA-pak");
+    let mods = library_fakes::service(&state);
+    w.mod_id = mods.import(Path::new("src/A.pak")).unwrap()[0].id.clone();
+    let profiles = config_fakes::FakeProfiles::default();
+    let config = config_fakes::FakeConfig::default();
+    // The session flag is still idle while the fixtures are built.
+    let service = config_fakes::profile_service(&profiles).with_session(w.session.clone());
+    let created = service.create(&profile).unwrap();
+    service
+        .set_mods(&created.id, vec![w.mod_id.clone()])
+        .unwrap();
+    w.parts = Some((mods, service, profiles, config, created.id));
+    w.library_state = Some(state);
+}
+
+#[given("a game session is active")]
+fn session_active(w: &mut CommandsWorld) {
+    w.session.0.store(true, Ordering::SeqCst);
+}
+
+#[given("a game session was active and has ended")]
+fn session_ended(w: &mut CommandsWorld) {
+    w.session.0.store(true, Ordering::SeqCst);
+    w.session.0.store(false, Ordering::SeqCst);
+}
+
+#[when(expr = "I remove the mod {string}")]
+fn remove_the_mod(w: &mut CommandsWorld, _mod_name: String) {
+    let (mods, service, _, _, _) = w.parts.as_ref().unwrap();
+    w.removal = Some(remove_mod(mods, service, &w.mod_id));
+}
+
+#[then(expr = "the removal fails with {string}")]
+fn removal_fails(w: &mut CommandsWorld, kind: String) {
+    assert_eq!(kind, "session active");
+    assert_eq!(w.removal, Some(Err(RemoveModError::SessionActive)));
+}
+
+fn library_ids(w: &CommandsWorld) -> Vec<String> {
+    let state = w.library_state.as_ref().expect("library state");
+    let ids = state.borrow().index.iter().map(|m| m.id.clone()).collect();
+    ids
+}
+
+#[then(expr = "{string} is still in the library")]
+fn still_in_library(w: &mut CommandsWorld, _mod_name: String) {
+    assert_eq!(library_ids(w), vec![w.mod_id.clone()]);
+}
+
+#[then(expr = "{string} is no longer in the library")]
+fn no_longer_in_library(w: &mut CommandsWorld, _mod_name: String) {
+    assert_eq!(w.removal, Some(Ok(())));
+    assert!(library_ids(w).is_empty());
+}
+
+#[then(expr = "{string} still has the mod {string}")]
+fn profile_still_has_mod(w: &mut CommandsWorld, _profile: String, _mod_name: String) {
+    let (_, service, _, _, profile_id) = w.parts.as_ref().unwrap();
+    assert_eq!(
+        service.get(profile_id).unwrap().mod_ids,
+        vec![w.mod_id.clone()]
+    );
+}
+
+#[then(expr = "{string} has no mods")]
+fn profile_has_no_mods(w: &mut CommandsWorld, _profile: String) {
+    let (_, service, _, _, profile_id) = w.parts.as_ref().unwrap();
+    assert!(service.get(profile_id).unwrap().mod_ids.is_empty());
 }
 
 /// Runs only `commands-and-recovery.feature`; returns `true` when every step passed.

@@ -220,6 +220,12 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     });
   }
 
+  /** A library or profile write: ignored while a game session is starting or running. */
+  async function mutateUnlessLocked(...args: Parameters<typeof mutate>): Promise<void> {
+    if (selectProfileLocked(state)) return;
+    await mutate(...args);
+  }
+
   return {
     getState: () => state,
     subscribe(listener) {
@@ -266,7 +272,7 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
       return release;
     },
     removeMod: (id) =>
-      mutate(
+      mutateUnlessLocked(
         ['mods', 'profiles'],
         async () => {
           await gateway.removeMod(id);
@@ -275,17 +281,17 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         true,
       ),
     createProfile: (name) =>
-      mutate(['profiles'], async () => {
+      mutateUnlessLocked(['profiles'], async () => {
         await gateway.createProfile(name);
         return null;
       }),
     renameProfile: (id, name) =>
-      mutate(['profiles'], async () => {
+      mutateUnlessLocked(['profiles'], async () => {
         await gateway.renameProfile(id, name);
         return null;
       }),
     deleteProfile: (id) =>
-      mutate(
+      mutateUnlessLocked(
         ['profiles', 'config'],
         async () => {
           await gateway.deleteProfile(id);
@@ -294,7 +300,7 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         true,
       ),
     setProfileMods: (id, modIds) =>
-      mutate(
+      mutateUnlessLocked(
         ['profiles'],
         async () => {
           await gateway.setProfileMods(id, modIds);

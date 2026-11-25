@@ -101,9 +101,10 @@ fn commands_preserve_camel_case_arguments_and_snake_case_dtos() {
     let config = h.invoke("get_config", json!({})).unwrap();
     assert_eq!(config["active_profile"], json!(id));
 
-    // Removing a mod from the library keeps the data consistent.
-    h.invoke("remove_mod", json!({ "id": mod_id })).unwrap();
-    assert_eq!(h.invoke("list_mods", json!({})).unwrap(), json!([]));
+    // Removing a mod from the library is refused too while the session is active (issue #82).
+    let refused = h.invoke("remove_mod", json!({ "id": mod_id })).unwrap_err();
+    assert_eq!(refused["code"], "library_locked_by_session");
+    assert_eq!(h.invoke("list_mods", json!({})).unwrap(), imported);
 }
 
 #[test]
