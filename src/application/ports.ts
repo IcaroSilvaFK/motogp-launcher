@@ -93,3 +93,12 @@ export interface NavPreferenceStore {
   load(): boolean | null;
   save(collapsed: boolean): void;
 }
+
+/** How the Discover results are laid out. */
+export type DiscoverView = 'grid' | 'list';
+
+/** The Discover grid/list choice. Synchronous so the first render already uses the stored layout. */
+export interface DiscoverViewStore {
+  load(): DiscoverView | null;
+  save(view: DiscoverView): void;
+}

@@ -116,12 +116,20 @@ describe('formatSize', () => {
 });
 
 describe('formatClockTime', () => {
-  it('formats a local time as a 24-hour hh:mm clock in every locale', () => {
-    // Built from local time, so it reads the same in whatever time zone the test runs.
-    const afternoon = new Date(2026, 10, 24, 14, 5).getTime();
-    const morning = new Date(2026, 10, 24, 9, 7).getTime();
-    expect(formatClockTime(afternoon, 'en')).toBe('14:05');
-    expect(formatClockTime(afternoon, 'pt-BR')).toBe('14:05');
-    expect(formatClockTime(morning, 'en')).toBe('09:07');
+  // Built from local time, so it reads the same in whatever time zone the test runs.
+  const afternoon = new Date(2026, 10, 24, 14, 5).getTime();
+  const morning = new Date(2026, 10, 24, 9, 7).getTime();
+  // Some ICU versions put a narrow no-break space (U+202F) before AM/PM; only the space kind is
+  // normalised, every digit, separator and the day period are still compared exactly.
+  const clock = (ms: number, locale: 'en' | 'pt-BR') => formatClockTime(ms, locale).replace(/\s/gu, ' ');
+
+  it('follows the 12-hour clock of English', () => {
+    expect(clock(afternoon, 'en')).toBe('2:05 PM');
+    expect(clock(morning, 'en')).toBe('9:07 AM');
+  });
+
+  it('follows the 24-hour clock of Brazilian Portuguese', () => {
+    expect(clock(afternoon, 'pt-BR')).toBe('14:05');
+    expect(clock(morning, 'pt-BR')).toBe('09:07');
   });
 });

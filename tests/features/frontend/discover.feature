@@ -73,3 +73,17 @@ Feature: Discover tab
     When I open the entry "Rebalanced AI"
     And I click "Open page"
     Then an error notice is shown
+
+  Scenario: The view choice survives a restart
+    Given the user switched Discover to the list view
+    When the launcher restarts with the same preference store
+    Then Discover opens in the list view
+
+  Scenario: A broken view preference store falls back to the grid
+    Given the view preference store fails to read and write
+    When the user opens Discover and switches to the list view
+    Then Discover shows the list view without an error
+
+  Scenario: Discover comes right after Library in the sidebar
+    Given a catalog is available
+    Then the sidebar lists Library, Discover, Profiles, Settings in that order

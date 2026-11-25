@@ -11,6 +11,7 @@ import {
   selectSessionClean,
 } from './application';
 import {
+  createLocalStorageDiscoverViewStore,
   createLocalStorageLocaleStore,
   createLocalStorageNavStore,
   createTauriAppInfo,
@@ -61,6 +62,7 @@ createRoot(container).render(
       navStore={createLocalStorageNavStore()}
       windowControls={createTauriWindowControls()}
       catalog={catalog}
+      discoverViewStore={createLocalStorageDiscoverViewStore()}
     />
   </StrictMode>,
 );
