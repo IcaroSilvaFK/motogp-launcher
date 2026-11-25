@@ -1,7 +1,8 @@
 //! IPC data transfer objects. Fields are snake_case on the wire; the
 //! JS-side command arguments are camelCase (handled by `#[tauri::command]`).
 use motogp_application::{
-    DeploySession, RecoveryState, RecoveryStatus, SessionEvent, SessionState,
+    DeploySession, RecoveryState, RecoveryStatus, SessionEvent, SessionPhase, SessionSnapshot,
+    SessionState,
 };
 use motogp_domain::{
     Config, FileConflict, GameInfo, ModEntry, Profile, StorageCategory, StorageUsage,
@@ -96,23 +97,52 @@ impl From<FileConflict> for ConflictDto {
     }
 }
 
-/// Payload of the `session` event: `state` is `started`, `ended` or `never-started`.
+/// Payload of the `session` event: `state` is `started`, `cleaning-up`, `ended`
+/// or `never-started`. `started_at` (Unix milliseconds) is set on `started`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct SessionEventDto {
     pub state: &'static str,
     pub cleaned: usize,
+    pub started_at: Option<u64>,
 }
 
 impl From<SessionEvent> for SessionEventDto {
     fn from(event: SessionEvent) -> Self {
         let state = match event.state {
             SessionState::Started => "started",
+            SessionState::CleaningUp => "cleaning-up",
             SessionState::Ended => "ended",
             SessionState::NeverStarted => "never-started",
         };
         SessionEventDto {
             state,
             cleaned: event.cleaned,
+            started_at: event.started_at_ms,
+        }
+    }
+}
+
+/// Result of `current_session`: `phase` is `idle`, `starting`, `running`,
+/// `stopping` or `cleaning-up`; `started_at` is Unix milliseconds (set once the
+/// game was seen).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CurrentSessionDto {
+    pub phase: &'static str,
+    pub started_at: Option<u64>,
+}
+
+impl From<SessionSnapshot> for CurrentSessionDto {
+    fn from(snapshot: SessionSnapshot) -> Self {
+        let phase = match snapshot.phase {
+            SessionPhase::Idle => "idle",
+            SessionPhase::Starting => "starting",
+            SessionPhase::Running => "running",
+            SessionPhase::Stopping => "stopping",
+            SessionPhase::CleaningUp => "cleaning-up",
+        };
+        CurrentSessionDto {
+            phase,
+            started_at: snapshot.started_at_ms,
         }
     }
 }

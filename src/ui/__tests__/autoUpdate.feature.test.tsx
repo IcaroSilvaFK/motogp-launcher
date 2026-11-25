@@ -389,7 +389,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
         service.checkResult = release('1.1.0', '1.0.0');
       });
       expect(updateButton()).toBeEnabled();
-      act(() => world.session.emitSession({ state: 'started', cleaned: 0 }));
+      act(() => world.session.emitSession({ state: 'started', cleaned: 0, started_at: null }));
     });
 
     When('an update becomes available', async () => {

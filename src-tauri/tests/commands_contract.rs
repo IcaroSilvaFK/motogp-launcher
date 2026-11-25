@@ -397,3 +397,54 @@ fn a_recovery_failure_is_visible_and_blocks_play() {
     assert_eq!(blocked["code"], "recovery_pending");
     assert!(h.opened.lock().unwrap().is_empty());
 }
+
+#[test]
+fn session_commands_report_the_live_session_and_stop_it() {
+    let h = Harness::new();
+    h.recover().expect("startup recovery");
+    let root = h.create_game();
+    let source = h.write_mod_source("Cool_P.pak", b"cool-pak-content");
+    h.invoke("set_game_dir", json!({ "path": root.to_string_lossy() }))
+        .unwrap();
+    let imported = h
+        .invoke(
+            "import_mods",
+            json!({ "paths": [source.to_string_lossy()] }),
+        )
+        .unwrap();
+    let profile = h
+        .invoke("create_profile", json!({ "name": "Race" }))
+        .unwrap();
+    h.invoke(
+        "set_profile_mods",
+        json!({ "id": profile["id"], "modIds": [imported[0]["id"]] }),
+    )
+    .unwrap();
+
+    // Nothing runs yet: idle, and a stop is refused with its own code.
+    let idle = h.invoke("current_session", json!({})).unwrap();
+    assert_eq!(keys(&idle), ["phase", "started_at"]);
+    assert_eq!(idle, json!({ "phase": "idle", "started_at": null }));
+    let refused = h.invoke("stop_session", json!({})).unwrap_err();
+    assert_eq!(refused["code"], "no_active_session");
+
+    // Play launched the game; the (manual) worker has not seen it yet.
+    h.invoke("play", json!({ "profileId": profile["id"] }))
+        .unwrap();
+    assert_eq!(
+        h.invoke("current_session", json!({})).unwrap(),
+        json!({ "phase": "starting", "started_at": null })
+    );
+
+    // Stop answers at once; the cleanup is reported through the events.
+    assert_eq!(h.invoke("stop_session", json!({})).unwrap(), Value::Null);
+    assert_eq!(
+        h.invoke("current_session", json!({})).unwrap(),
+        json!({ "phase": "stopping", "started_at": null })
+    );
+    assert_eq!(
+        h.invoke("stop_session", json!({})).unwrap_err()["code"],
+        "no_active_session",
+        "a second stop while stopping is refused"
+    );
+}

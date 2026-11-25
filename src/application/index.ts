@@ -19,6 +19,7 @@ export { loadLocale, saveLocale } from './localePreference';
 export { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarPreference';
 export { createLauncherController } from './createLauncherController';
 export { selectCanPlay } from './selectCanPlay';
+export { selectCanStop } from './selectCanStop';
 export { useLauncherState } from './useLauncherState';
 export type { UpdateService } from './ports/UpdateService';
 export type { UpdateController, UpdateDeps, UpdateState } from './updateController';

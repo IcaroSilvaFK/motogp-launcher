@@ -1,6 +1,7 @@
 import type { LauncherState } from './controller';
 
-/** True while a game session is starting or running: the active profile's mods must not change. */
+/** True while a game session is live (starting, running, stopping or cleaning up): the active profile's mods must not change. */
 export function selectProfileLocked(state: LauncherState): boolean {
-  return state.session.kind === 'starting' || state.session.kind === 'running';
+  const { kind } = state.session;
+  return kind === 'starting' || kind === 'running' || kind === 'stopping' || kind === 'cleaning-up';
 }

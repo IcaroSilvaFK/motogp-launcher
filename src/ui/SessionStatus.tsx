@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
-import { useI18n } from './i18n';
+import { formatClockTime, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 
 /** Announces session changes; renders `fallback` (plain, not announced) while there is nothing to say. */
 export function SessionStatus({ fallback = null }: { fallback?: ReactNode }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const { state } = useLauncher();
   const { session, error } = state;
 
@@ -14,7 +14,14 @@ export function SessionStatus({ fallback = null }: { fallback?: ReactNode }) {
       text = t.play.starting;
       break;
     case 'running':
-      text = t.session.running;
+      text =
+        session.since === null ? t.session.running : t.session.runningSince(formatClockTime(session.since, locale));
+      break;
+    case 'stopping':
+      text = t.session.stopping;
+      break;
+    case 'cleaning-up':
+      text = t.session.cleaningUp;
       break;
     // Never announce cleanup after an error.
     case 'ended':

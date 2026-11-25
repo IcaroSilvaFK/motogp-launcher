@@ -39,3 +39,9 @@ Feature: Expose the launcher use cases through Tauri commands
     When the interface calls "remove_mod" for a library mod
     Then the command fails with code "library_locked_by_session"
     And the mod is still in the library
+
+  Scenario: The interface can query and stop the session
+    Given the registered commands and controlled application ports
+    Then the commands "current_session" and "stop_session" are registered
+    And "current_session" answers phase "idle" with no start time on a fresh launch
+    And "stop_session" without a session fails with code "no_active_session"

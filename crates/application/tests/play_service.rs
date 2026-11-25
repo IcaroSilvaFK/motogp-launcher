@@ -15,6 +15,15 @@ fn ended(cleaned: usize) -> SessionEvent {
     SessionEvent {
         state: SessionState::Ended,
         cleaned,
+        started_at_ms: None,
+    }
+}
+
+fn cleaning_up() -> SessionEvent {
+    SessionEvent {
+        state: SessionState::CleaningUp,
+        cleaned: 0,
+        started_at_ms: Some(1_700_000_000_000),
     }
 }
 
@@ -22,6 +31,7 @@ fn started() -> SessionEvent {
     SessionEvent {
         state: SessionState::Started,
         cleaned: 0,
+        started_at_ms: Some(1_700_000_000_000),
     }
 }
 
@@ -179,7 +189,7 @@ fn ended_session_cleans_and_emits_count() {
 
     rig.runner.run_pending();
 
-    assert_eq!(rig.events(), vec![started(), ended(1)]);
+    assert_eq!(rig.events(), vec![started(), cleaning_up(), ended(1)]);
     assert!(disk_names(&rig.disk).is_empty());
     assert!(rig.disk.borrow().manifest.is_empty());
     assert!(rig.errors().is_empty());
@@ -198,10 +208,18 @@ fn never_started_session_cleans_and_releases_lock() {
 
     assert_eq!(
         rig.events(),
-        vec![SessionEvent {
-            state: SessionState::NeverStarted,
-            cleaned: 1
-        }]
+        vec![
+            SessionEvent {
+                state: SessionState::CleaningUp,
+                cleaned: 0,
+                started_at_ms: None,
+            },
+            SessionEvent {
+                state: SessionState::NeverStarted,
+                cleaned: 1,
+                started_at_ms: None,
+            },
+        ]
     );
     assert!(disk_names(&rig.disk).is_empty());
     rig.play.play("p1").expect("the lock was released");
@@ -295,8 +313,8 @@ fn cleanup_failure_keeps_recovery_pending() {
 
     assert_eq!(
         rig.events(),
-        vec![started()],
-        "no ended event on a failed cleanup"
+        vec![started(), cleaning_up()],
+        "cleaning up was announced but no ended event follows a failed cleanup"
     );
     assert_eq!(rig.errors().len(), 1);
     assert!(rig.errors()[0].contains("cleanup incomplete"));
@@ -333,4 +351,47 @@ fn tracking_failure_is_reported_without_a_false_success() {
         disk_has(&rig.disk, DEPLOYED_A),
         "files stay for a later cleanup"
     );
+}
+
+#[test]
+fn a_second_stop_while_stopping_is_refused() {
+    let rig = Rig::live(&["A.pak"]);
+    rig.play.play("p1").expect("play");
+    rig.wait_until("running", |r| {
+        r.play.current_session().phase == motogp_application::SessionPhase::Running
+    });
+    // Hold the session in `Stopping`: the worker reacts to the flag only after
+    // the terminate call returned, so a long terminate keeps the phase.
+    rig.play.stop_session().expect("first stop");
+    let second = rig.play.stop_session();
+    assert!(matches!(second, Ok(()) | Err(PlayError::NoActiveSession)));
+    rig.wait_until("idle", |r| {
+        r.play.current_session().phase == motogp_application::SessionPhase::Idle
+    });
+    assert_eq!(rig.play.stop_session(), Err(PlayError::NoActiveSession));
+}
+
+#[test]
+fn a_failed_stop_while_starting_returns_to_starting_and_can_be_retried() {
+    let rig = Rig::live(&["A.pak"]);
+    rig.runtime.events.lock().unwrap().clear();
+    rig.play.play("p1").expect("play");
+    *rig.runtime.terminate_result.lock().unwrap() = Err(motogp_application::AppError::Read {
+        location: "processes".into(),
+        detail: "denied".into(),
+    });
+
+    let error = rig.play.stop_session().unwrap_err();
+
+    assert!(matches!(error, PlayError::StopFailed { .. }));
+    assert!(error.to_string().contains("denied"));
+    assert_eq!(
+        rig.play.current_session().phase,
+        motogp_application::SessionPhase::Starting
+    );
+    *rig.runtime.terminate_result.lock().unwrap() = Ok(1);
+    rig.play.stop_session().expect("retry");
+    rig.wait_until("idle", |r| {
+        r.play.current_session().phase == motogp_application::SessionPhase::Idle
+    });
 }

@@ -10,16 +10,40 @@ use std::path::Path;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SessionState {
     Started,
+    /// The game is over and the deployed files are being removed.
+    CleaningUp,
     Ended,
     NeverStarted,
 }
 
 /// What the interface hears about a session. `cleaned` is the number of
-/// files actually removed (always 0 for `Started`).
+/// files actually removed (0 until `Ended`/`NeverStarted`). `started_at_ms`
+/// is the wall-clock Unix time the game was first seen (set on `Started`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct SessionEvent {
     pub state: SessionState,
     pub cleaned: usize,
+    pub started_at_ms: Option<u64>,
+}
+
+/// Where the live session stands right now.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionPhase {
+    Idle,
+    /// Launched, the game process has not been seen yet.
+    Starting,
+    Running,
+    /// A stop was requested and the game is being ended.
+    Stopping,
+    CleaningUp,
+}
+
+/// Queryable snapshot of the live session (the interface may load after the
+/// events were already emitted). `started_at_ms` is Unix milliseconds.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SessionSnapshot {
+    pub phase: SessionPhase,
+    pub started_at_ms: Option<u64>,
 }
 
 /// Port: the single "session active" flag. Held from the Play request until
@@ -117,10 +141,17 @@ pub trait SessionRuntime: Send + Sync {
     fn launch(&self, game: &GameInfo) -> Result<(), SessionError>;
     /// `true` when a process of the game installed in `root` is running.
     fn game_running(&self, root: &Path) -> Result<bool, AppError>;
-    /// Blocks until a terminal event (calls `emit` for every event).
+    /// Ends the game processes installed in `root`; returns how many.
+    fn terminate(&self, root: &Path) -> Result<usize, AppError>;
+    /// Wall-clock Unix milliseconds.
+    fn unix_now_ms(&self) -> u64;
+    /// Blocks until a terminal event (calls `emit` for every event). Once
+    /// `stop_requested` is true and no game process is left, the session ends
+    /// at once.
     fn track(
         &self,
         root: &Path,
+        stop_requested: &dyn Fn() -> bool,
         emit: &mut dyn FnMut(WatchEvent),
     ) -> Result<TrackOutcome, AppError>;
 }

@@ -36,6 +36,8 @@ impl From<&PlayError> for CommandError {
             PlayError::GameStillRunning => "game_still_running",
             PlayError::ProcessInspection { .. } => "process_inspection_failed",
             PlayError::SessionThread { .. } => "session_thread_failed",
+            PlayError::NoActiveSession => "no_active_session",
+            PlayError::StopFailed { .. } => "stop_failed",
             PlayError::Game(inner) => return CommandError::from(inner),
             PlayError::Profile(inner) => return CommandError::from(inner),
             PlayError::Library(inner) => return CommandError::from(inner),
@@ -128,6 +130,11 @@ mod tests {
         assert_eq!(
             code(PlayError::RecoveryPending { detail: "x".into() }),
             "recovery_pending"
+        );
+        assert_eq!(code(PlayError::NoActiveSession), "no_active_session");
+        assert_eq!(
+            code(PlayError::StopFailed { detail: "x".into() }),
+            "stop_failed"
         );
     }
 

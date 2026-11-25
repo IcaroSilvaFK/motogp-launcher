@@ -69,3 +69,11 @@ export function formatShare(share: number, locale: Locale): string {
   if (share > 0 && share < 0.01) return `<${percent.format(0.01)}`;
   return percent.format(share);
 }
+
+/**
+ * Formats Unix ms as a local wall-clock time, hours and minutes with two digits each. The clock is
+ * always 24-hour ("14:05"), as racing timetables are; the locale still picks the separator.
+ */
+export function formatClockTime(ms: number, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms);
+}

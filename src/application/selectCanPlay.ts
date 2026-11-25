@@ -8,4 +8,6 @@ export const selectCanPlay: SelectCanPlay = (state) =>
   state.session.kind !== 'unavailable' &&
   state.session.kind !== 'starting' &&
   state.session.kind !== 'running' &&
+  state.session.kind !== 'stopping' &&
+  state.session.kind !== 'cleaning-up' &&
   state.staleSession === null;

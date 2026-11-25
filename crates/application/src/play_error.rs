@@ -33,6 +33,10 @@ pub enum PlayError {
     /// The background worker could not be started; the files stay deployed
     /// and the next Play retries the cleanup first.
     SessionThread { detail: String },
+    /// Stop was requested but no session is starting or running.
+    NoActiveSession,
+    /// The game processes could not be ended; the session goes on.
+    StopFailed { detail: String },
 }
 
 impl fmt::Display for PlayError {
@@ -60,6 +64,10 @@ impl fmt::Display for PlayError {
             }
             PlayError::SessionThread { detail } => {
                 write!(f, "could not follow the game session: {detail}")
+            }
+            PlayError::NoActiveSession => write!(f, "no active session"),
+            PlayError::StopFailed { detail } => {
+                write!(f, "could not stop the game: {detail}")
             }
         }
     }

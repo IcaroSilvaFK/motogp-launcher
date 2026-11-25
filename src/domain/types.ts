@@ -34,11 +34,22 @@ export interface Profile {
   mod_ids: string[];
 }
 
-export type SessionState = 'started' | 'ended' | 'never-started';
+export type SessionState = 'started' | 'cleaning-up' | 'ended' | 'never-started';
 
 export interface SessionEvent {
   state: SessionState;
   cleaned: number;
+  /** Unix ms when the game was first seen; `null` while it never was. */
+  started_at: number | null;
+}
+
+export type SessionPhaseName = 'idle' | 'starting' | 'running' | 'stopping' | 'cleaning-up';
+
+/** The live session as the backend sees it (`current_session`). */
+export interface CurrentSession {
+  phase: SessionPhaseName;
+  /** Unix ms when the game was first seen; stays set while stopping and cleaning up. */
+  started_at: number | null;
 }
 
 export interface SessionErrorEvent {
@@ -108,6 +119,8 @@ export const BACKEND_ERROR_CODES = [
   'deploy_unauthorized_directory',
   'deploy_cleanup_incomplete',
   'deploy_session_not_stale',
+  'no_active_session',
+  'stop_failed',
 ] as const;
 
 export const FRONTEND_ERROR_CODES = [

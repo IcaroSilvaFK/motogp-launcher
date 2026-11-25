@@ -64,7 +64,12 @@ fn seed_manifest(rig: &Rig) {
 }
 
 fn event(state: SessionState, cleaned: usize) -> SessionEvent {
-    SessionEvent { state, cleaned }
+    let started_at_ms = (state == SessionState::Started).then_some(1_700_000_000_000);
+    SessionEvent {
+        state,
+        cleaned,
+        started_at_ms,
+    }
 }
 
 // ---------- Resolve ----------
@@ -217,7 +222,17 @@ fn event_has_count(w: &mut CommandsWorld) {
         w.rig().events(),
         vec![
             event(SessionState::Started, 0),
+            SessionEvent {
+                state: SessionState::CleaningUp,
+                cleaned: 0,
+                started_at_ms: Some(1_700_000_000_000),
+            },
             event(SessionState::Ended, 1),
+            SessionEvent {
+                state: SessionState::CleaningUp,
+                cleaned: 0,
+                started_at_ms: None,
+            },
             event(SessionState::NeverStarted, 1),
         ]
     );
@@ -321,7 +336,7 @@ fn no_false_success(w: &mut CommandsWorld) {
         assert!(rig
             .events()
             .iter()
-            .all(|e| e.state == SessionState::Started));
+            .all(|e| !matches!(e.state, SessionState::Ended | SessionState::NeverStarted)));
         let before = rig.materialized();
         assert!(matches!(
             rig.play.play("p1").unwrap_err(),

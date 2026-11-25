@@ -493,7 +493,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
 
   Scenario('Session status uses a variant per state', ({ Given, Then }) => {
     Given('a running session', () => {
-      launch({ session: { kind: 'running' } });
+      launch({ session: { kind: 'running', since: null } });
     });
     Then('the session status announces it is running with the running variant', () => {
       const status = screen.getByRole('status');

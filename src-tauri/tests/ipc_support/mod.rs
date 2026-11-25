@@ -50,6 +50,9 @@ impl ProcessInspector for NoProcesses {
     fn game_running(&self, _root: &Path) -> Result<bool, AppError> {
         Ok(false)
     }
+    fn terminate_inside(&self, _root: &Path) -> Result<usize, AppError> {
+        Ok(0)
+    }
 }
 
 type Task = Box<dyn FnOnce() + Send + 'static>;

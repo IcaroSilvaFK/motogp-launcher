@@ -5,11 +5,12 @@ use crate::ProcessInspector;
 use crate::{
     AppError, BackgroundRunner, DeployError, DeployFiles, DeployMod, DeployService, DeploySession,
     DeployedRepository, Deployer, ModPlanner, PlayError, PlayGame, RecoveryState, RecoveryStatus,
-    SessionClock, SessionError, SessionEvent, SessionLock, SessionPublisher, SessionRuntime,
-    SessionService, SessionState, TrackOutcome, UrlOpener,
+    SessionClock, SessionError, SessionEvent, SessionLock, SessionPhase, SessionPublisher,
+    SessionRuntime, SessionService, SessionSnapshot, SessionState, TrackOutcome, UrlOpener,
 };
 use motogp_domain::{launch_url, GameInfo, WatchEvent};
-use std::path::Path;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 /// Whether new deploys are allowed.
@@ -33,7 +34,18 @@ struct Inner {
     publisher: Arc<dyn SessionPublisher>,
     recovery: Mutex<Recovery>,
     status: Mutex<RecoveryStatus>,
+    /// Where the live session stands (read by `current_session`).
+    live: Mutex<SessionSnapshot>,
+    /// The user asked to stop: the worker ends the session once the game is gone.
+    stop_requested: AtomicBool,
+    /// Install root of the live session (what `stop_session` terminates).
+    session_root: Mutex<Option<PathBuf>>,
 }
+
+const IDLE: SessionSnapshot = SessionSnapshot {
+    phase: SessionPhase::Idle,
+    started_at_ms: None,
+};
 
 /// Holds the session lock and releases it on drop, also while unwinding. A
 /// panic, or a worker that never started, leaves the cleanup pending (new
@@ -72,6 +84,7 @@ impl Drop for LockGuard {
         } else if !self.started {
             self.inner.block("the session worker never started".into());
         }
+        *relock(&self.inner.live) = IDLE;
         self.inner.lock.release();
     }
 }
@@ -119,7 +132,55 @@ impl PlayService {
                 error: None,
                 cleaned_count: 0,
             }),
+            live: Mutex::new(IDLE),
+            stop_requested: AtomicBool::new(false),
+            session_root: Mutex::new(None),
         }))
+    }
+
+    /// The live session right now: idle, starting, running (with the Unix
+    /// time the game was first seen), stopping or cleaning up.
+    pub fn current_session(&self) -> SessionSnapshot {
+        *relock(&self.0.live)
+    }
+
+    /// Ends the game of the live session. The worker then closes the session
+    /// at once (no 120 s wait) with the normal cleanup. `NoActiveSession`
+    /// unless the session is starting or running; when the game cannot be
+    /// terminated the session carries on as before (`StopFailed`).
+    pub fn stop_session(&self) -> Result<(), PlayError> {
+        let inner = &self.0;
+        let previous = {
+            let mut live = relock(&inner.live);
+            if !matches!(live.phase, SessionPhase::Starting | SessionPhase::Running) {
+                return Err(PlayError::NoActiveSession);
+            }
+            let previous = *live;
+            live.phase = SessionPhase::Stopping;
+            previous
+        };
+        inner.stop_requested.store(true, Ordering::SeqCst);
+        let root = relock(&inner.session_root).clone();
+        let terminated = match root {
+            Some(root) => inner.runtime.terminate(&root),
+            None => Ok(0),
+        };
+        if let Err(error) = terminated {
+            inner.stop_requested.store(false, Ordering::SeqCst);
+            let mut live = relock(&inner.live);
+            if live.phase == SessionPhase::Stopping {
+                // The worker may have seen the game meanwhile: keep its time.
+                live.phase = if live.started_at_ms.is_some() {
+                    SessionPhase::Running
+                } else {
+                    previous.phase
+                };
+            }
+            return Err(PlayError::StopFailed {
+                detail: error.to_string(),
+            });
+        }
+        Ok(())
     }
 
     /// Cleans a session left deployed by a crash (same ownership and
@@ -295,6 +356,12 @@ impl Inner {
         mut guard: LockGuard,
     ) -> Result<(), PlayError> {
         guard.started = false;
+        self.stop_requested.store(false, Ordering::SeqCst);
+        *relock(&self.session_root) = Some(game.root.clone());
+        *relock(&self.live) = SessionSnapshot {
+            phase: SessionPhase::Starting,
+            started_at_ms: None,
+        };
         let shared = self.clone();
         let task = move || {
             let mut guard = guard;
@@ -375,13 +442,21 @@ impl Inner {
     /// (or when this unwinds).
     fn run_session(&self, game: &GameInfo, guard: LockGuard) {
         let mut terminal = None;
-        let outcome = self.runtime.track(&game.root, &mut |event| match event {
-            WatchEvent::Started => self.publisher.publish(SessionEvent {
-                state: SessionState::Started,
-                cleaned: 0,
-            }),
-            other => terminal = Some(other),
-        });
+        let stop = || self.stop_requested.load(Ordering::SeqCst);
+        let outcome = self
+            .runtime
+            .track(&game.root, &stop, &mut |event| match event {
+                WatchEvent::Started => {
+                    let started_at_ms = self.runtime.unix_now_ms();
+                    self.mark_started(started_at_ms);
+                    self.publisher.publish(SessionEvent {
+                        state: SessionState::Started,
+                        cleaned: 0,
+                        started_at_ms: Some(started_at_ms),
+                    });
+                }
+                other => terminal = Some(other),
+            });
         match (outcome, terminal) {
             (Ok(TrackOutcome::Finished), Some(event)) => self.finish(game, event, guard),
             (Err(error), _) => self.tracking_failed(&error, guard),
@@ -391,12 +466,32 @@ impl Inner {
         }
     }
 
+    /// The game was first seen at `started_at_ms`: Starting becomes Running
+    /// (a pending stop stays Stopping, but the time is kept).
+    fn mark_started(&self, started_at_ms: u64) {
+        let mut live = relock(&self.live);
+        live.started_at_ms = Some(started_at_ms);
+        if live.phase == SessionPhase::Starting {
+            live.phase = SessionPhase::Running;
+        }
+    }
+
     fn finish(&self, game: &GameInfo, event: WatchEvent, guard: LockGuard) {
         let state = match event {
             WatchEvent::Started => return guard.keep_held(),
             WatchEvent::Ended => SessionState::Ended,
             WatchEvent::NeverStarted => SessionState::NeverStarted,
         };
+        let started_at_ms = {
+            let mut live = relock(&self.live);
+            live.phase = SessionPhase::CleaningUp;
+            live.started_at_ms
+        };
+        self.publisher.publish(SessionEvent {
+            state: SessionState::CleaningUp,
+            cleaned: 0,
+            started_at_ms,
+        });
         match self.deployer.clean(&game.mods_dir) {
             Ok(cleaned) => {
                 *relock(&self.recovery) = Recovery::Ready;
@@ -405,7 +500,11 @@ impl Inner {
                     self.set_status(RecoveryState::Recovered, None, cleaned);
                 }
                 drop(guard);
-                self.publisher.publish(SessionEvent { state, cleaned });
+                self.publisher.publish(SessionEvent {
+                    state,
+                    cleaned,
+                    started_at_ms: None,
+                });
             }
             Err(error) => {
                 self.block_and_report(error.to_string());
@@ -470,11 +569,20 @@ where
         SessionService::game_running(self, root)
     }
 
+    fn terminate(&self, root: &Path) -> Result<usize, AppError> {
+        SessionService::terminate_game(self, root)
+    }
+
+    fn unix_now_ms(&self) -> u64 {
+        SessionService::unix_now_ms(self)
+    }
+
     fn track(
         &self,
         root: &Path,
+        stop_requested: &dyn Fn() -> bool,
         emit: &mut dyn FnMut(WatchEvent),
     ) -> Result<TrackOutcome, AppError> {
-        SessionService::track(self, root, || false, emit)
+        SessionService::track_stoppable(self, root, || false, stop_requested, emit)
     }
 }

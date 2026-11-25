@@ -18,6 +18,9 @@ impl SessionClock for FakeClock {
     fn sleep(&self, d: Duration) {
         self.0.set(self.0.get() + d);
     }
+    fn unix_now_ms(&self) -> u64 {
+        0
+    }
 }
 
 #[derive(Clone, Default)]
@@ -32,6 +35,9 @@ impl ProcessInspector for FakeInspector {
         queries.push(self.clock.now());
         // Present for the first two polls, then gone.
         Ok(queries.len() <= 2)
+    }
+    fn terminate_inside(&self, _root: &Path) -> Result<usize, AppError> {
+        Ok(0)
     }
 }
 

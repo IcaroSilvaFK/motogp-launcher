@@ -114,7 +114,13 @@ describe('App with an updater', () => {
       check: vi.fn(() => Promise.resolve()),
       install: vi.fn(() => Promise.resolve()),
     };
-    render(<App controller={createFakeController({ session: { kind: 'running' } })} locale="en" updater={updater} />);
+    render(
+      <App
+        controller={createFakeController({ session: { kind: 'running', since: null } })}
+        locale="en"
+        updater={updater}
+      />,
+    );
     expect(screen.getByRole('button', { name: 'Update' })).toBeDisabled();
   });
 });

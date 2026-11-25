@@ -2,7 +2,7 @@ import { act, render, renderHook, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { ERROR_CODES } from '../../../domain';
 import { en } from '../en';
-import { DEFAULT_LOCALE, formatSize, I18nProvider, useI18n } from '../index';
+import { DEFAULT_LOCALE, formatClockTime, formatSize, I18nProvider, useI18n } from '../index';
 import { ptBR } from '../pt-BR';
 
 function keysOf(value: object, prefix = ''): string[] {
@@ -114,5 +114,16 @@ describe('formatSize', () => {
     expect(formatSize(1536, 'en')).toBe('1.5 KB');
     expect(formatSize(5 * 1024 * 1024, 'en')).toBe('5 MB');
     expect(formatSize(1.5 * 1024 * 1024 * 1024, 'pt-BR')).toBe('1,5 GB');
+  });
+});
+
+describe('formatClockTime', () => {
+  it('formats a local time as a 24-hour hh:mm clock in every locale', () => {
+    // Built from local time, so it reads the same in whatever time zone the test runs.
+    const afternoon = new Date(2026, 10, 24, 14, 5).getTime();
+    const morning = new Date(2026, 10, 24, 9, 7).getTime();
+    expect(formatClockTime(afternoon, 'en')).toBe('14:05');
+    expect(formatClockTime(afternoon, 'pt-BR')).toBe('14:05');
+    expect(formatClockTime(morning, 'en')).toBe('09:07');
   });
 });

@@ -72,7 +72,7 @@ describeFeature(feature, ({ Background, Scenario, AfterEachScenario }) => {
     });
     And('a game session is running', async () => {
       const { session, controller } = await getWorld();
-      session.emitSession({ state: 'started', cleaned: 0 });
+      session.emitSession({ state: 'started', cleaned: 0, started_at: null });
       await waitFor(() => expect(controller.getState().session.kind).toBe('running'));
     });
   });
@@ -137,7 +137,7 @@ describeFeature(feature, ({ Background, Scenario, AfterEachScenario }) => {
   Scenario('Actions unlock when the session ends', ({ Given, When, Then }) => {
     Given('the game session has ended', async () => {
       const { session, controller } = await getWorld();
-      session.emitSession({ state: 'ended', cleaned: 1 });
+      session.emitSession({ state: 'ended', cleaned: 1, started_at: null });
       await waitFor(() => expect(controller.getState().session.kind).toBe('ended'));
     });
     When('the user clicks Remove for "Rain Tyres"', async () => {

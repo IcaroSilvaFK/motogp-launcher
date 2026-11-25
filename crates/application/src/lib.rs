@@ -51,8 +51,8 @@ pub use mod_service::ModService;
 pub use play_error::PlayError;
 pub use play_ports::{
     BackgroundRunner, Deployer, InstanceGuard, InstanceLock, ModPlanner, PlayGame, RecoveryState,
-    RecoveryStatus, SessionEvent, SessionLock, SessionPublisher, SessionRuntime, SessionState,
-    SpawnError,
+    RecoveryStatus, SessionEvent, SessionLock, SessionPhase, SessionPublisher, SessionRuntime,
+    SessionSnapshot, SessionState, SpawnError,
 };
 pub use play_service::PlayService;
 pub use ports::ConfigRepository;

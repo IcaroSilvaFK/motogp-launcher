@@ -381,13 +381,16 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       await world.user.click(playButton());
     });
 
-    Then('Play stays disabled during start and execution', async () => {
-      expect(playButton()).toBeDisabled();
-      expect(await screen.findByText('Starting…')).toBeInTheDocument();
+    Then('Play is replaced by Stop during start and execution', async () => {
+      const stopButton = () => screen.getByRole('button', { name: 'Stop' });
+      expect(await screen.findByText('Starting the game…')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
+      expect(stopButton()).toBeEnabled();
 
-      act(() => world.session.emitSession({ state: 'started', cleaned: 0 }));
+      act(() => world.session.emitSession({ state: 'started', cleaned: 0, started_at: null }));
       expect(await screen.findByText('Running…')).toBeInTheDocument();
-      expect(playButton()).toBeDisabled();
+      expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
+      expect(stopButton()).toBeEnabled();
     });
   });
 
@@ -406,7 +409,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
 
     When('I receive session with state "started"', () => {
-      act(() => world.session.emitSession({ state: 'started', cleaned: 0 }));
+      act(() => world.session.emitSession({ state: 'started', cleaned: 0, started_at: null }));
     });
 
     Then('I see "Running…"', async () => {
@@ -414,7 +417,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
 
     When('I receive session with state "ended" and cleaned 2', () => {
-      act(() => world.session.emitSession({ state: 'ended', cleaned: 2 }));
+      act(() => world.session.emitSession({ state: 'ended', cleaned: 2, started_at: null }));
     });
 
     Then('I see "Session ended — 2 files removed"', async () => {
@@ -434,7 +437,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
 
     When('I receive session with state "never-started" after the cleanup finishes', () => {
-      act(() => world.session.emitSession({ state: 'never-started', cleaned: 2 }));
+      act(() => world.session.emitSession({ state: 'never-started', cleaned: 2, started_at: null }));
     });
 
     Then('I see "The game did not open within 2 min; mods removed"', async () => {

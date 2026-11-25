@@ -5,7 +5,12 @@ import { selectProfileLocked } from '../selectProfileLocked';
 const state = (session: SessionPhase): LauncherState => ({ session }) as LauncherState;
 
 describe('selectProfileLocked', () => {
-  it.each([{ kind: 'starting' }, { kind: 'running' }] as const)('is locked while %o', (session) => {
+  it.each([
+    { kind: 'starting' },
+    { kind: 'running', since: null },
+    { kind: 'stopping', since: null },
+    { kind: 'cleaning-up' },
+  ] as const)('is locked while %o', (session) => {
     expect(selectProfileLocked(state(session))).toBe(true);
   });
 

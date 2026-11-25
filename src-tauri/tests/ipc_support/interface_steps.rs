@@ -312,6 +312,33 @@ fn profile_keeps_mods(w: &mut InterfaceWorld) {
     assert_eq!(race["mod_ids"], json!(["m1"]));
 }
 
+#[then(expr = "the commands {string} and {string} are registered")]
+fn session_commands_registered(w: &mut InterfaceWorld, first: String, second: String) {
+    // An unregistered command is rejected by the handler without a launcher
+    // error code; a registered one answers with data or a coded error.
+    let h = w.h();
+    for command in [first, second] {
+        if let Err(error) = h.invoke(&command, json!({})) {
+            assert!(
+                error.get("code").is_some(),
+                "{command} is not registered: {error}"
+            );
+        }
+    }
+}
+
+#[then(expr = "{string} answers phase {string} with no start time on a fresh launch")]
+fn current_session_idle(w: &mut InterfaceWorld, command: String, phase: String) {
+    let answer = w.h().invoke(&command, json!({})).unwrap();
+    assert_eq!(answer, json!({ "phase": phase, "started_at": null }));
+}
+
+#[then(expr = "{string} without a session fails with code {string}")]
+fn stop_without_session(w: &mut InterfaceWorld, command: String, code: String) {
+    let error = w.h().invoke(&command, json!({})).unwrap_err();
+    assert_eq!(error["code"], json!(code));
+}
+
 /// Runs only `tauri-interface.feature`; returns `true` when every step passed.
 pub async fn run() -> bool {
     let writer = InterfaceWorld::cucumber()

@@ -990,15 +990,25 @@ button {
   fill: currentColor;
 }
 
-/* Busy while the game starts: Play stays disabled (StatusBar) but reads as working, not dead.
-   Keyed off the session status already in the bar, so StatusBar.tsx needs no new markup. Under
-   reduced motion the ring is static and the "Starting" status text carries the meaning. */
-.statusbar:has(.session-status-starting) .play:disabled {
-  opacity: 0.75;
+/* Stopping / cleaning up: the action keeps its place and size but reads as a quiet progress label.
+   It is aria-disabled (still focusable), so the `:not(:disabled)` hover and press feedback still
+   match it and are switched off here. While starting, Stop (enabled) holds the slot instead and gets
+   no spinner: it must read as clickable, and the pulsing dot plus the status text say "starting". */
+.play-progress,
+.play-progress:hover:not(:disabled) {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text-muted);
   cursor: progress;
 }
 
-.statusbar:has(.session-status-starting) .play:disabled::after {
+.play-progress:active:not(:disabled) {
+  transform: none;
+}
+
+/* Busy spinner after the label (#71). Under reduced motion the ring is static and the
+   "Stopping the game…" / "Cleaning up…" status text carries the meaning. */
+.play-progress::after {
   content: '';
   flex: none;
   width: var(--spinner-size);
@@ -1013,6 +1023,32 @@ button {
   to {
     transform: rotate(1turn);
   }
+}
+
+/* Inline Stop confirmation: replaces the profile field and the Stop button inside the status bar. */
+.session-confirm {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.session-confirm-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  margin: 0 var(--space-2) 0 0;
+  line-height: 1.3;
+}
+
+.session-confirm-text strong {
+  font-weight: 600;
+}
+
+.session-confirm-text span {
+  color: var(--text-muted);
+  font-size: var(--type-body-small);
 }
 
 /* ---------- Session status ---------- */
@@ -1050,11 +1086,17 @@ button {
   animation: pulse var(--pulse);
 }
 
+.session-status-stopping::before,
+.session-status-cleaning-up::before {
+  background: var(--warning-fg);
+  animation: pulse var(--pulse);
+}
+
 .session-status-unavailable::before {
   background: var(--accent-text);
 }
 
-/* Only the starting and running dots pulse; idle, unavailable and the "Ready" dot stay still. */
+/* Only live sessions pulse (starting, running, stopping, cleaning up); idle, unavailable and the "Ready" dot stay still. */
 @keyframes pulse {
   from {
     opacity: 0.45;

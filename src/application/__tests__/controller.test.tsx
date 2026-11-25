@@ -201,11 +201,11 @@ describe('Given the launcher controller', () => {
     await controller.play();
     expect(gateway.callsOf('play')[0]?.args).toEqual([VANILLA_ID]);
     expect(controller.getState().session).toEqual({ kind: 'starting' });
-    session.emitSession({ state: 'started', cleaned: 0 });
-    expect(controller.getState().session).toEqual({ kind: 'running' });
-    session.emitSession({ state: 'ended', cleaned: 4 });
+    session.emitSession({ state: 'started', cleaned: 0, started_at: null });
+    expect(controller.getState().session).toEqual({ kind: 'running', since: null });
+    session.emitSession({ state: 'ended', cleaned: 4, started_at: null });
     expect(controller.getState().session).toEqual({ kind: 'ended', cleaned: 4 });
-    session.emitSession({ state: 'never-started', cleaned: 2 });
+    session.emitSession({ state: 'never-started', cleaned: 2, started_at: null });
     expect(controller.getState().session).toEqual({ kind: 'never-started', cleaned: 2 });
   });
 
@@ -349,7 +349,7 @@ describe('Given selectCanPlay', () => {
     expect(selectCanPlay({ ...base, config: { ...base.config, active_profile: null } })).toBe(false);
     expect(selectCanPlay({ ...base, busy: true })).toBe(false);
     expect(selectCanPlay({ ...base, session: { kind: 'starting' } })).toBe(false);
-    expect(selectCanPlay({ ...base, session: { kind: 'running' } })).toBe(false);
+    expect(selectCanPlay({ ...base, session: { kind: 'running', since: null } })).toBe(false);
     expect(selectCanPlay({ ...base, session: { kind: 'ended', cleaned: 1 } })).toBe(true);
   });
 
@@ -552,7 +552,7 @@ describe('Given a stale deploy session', () => {
     it.each(['starting', 'running'] as const)('When the session is %s Then nothing happens', async (kind) => {
       const { controller, gateway, session, id } = await withActive(['a']);
       await controller.play();
-      if (kind === 'running') session.emitSession({ state: 'started', cleaned: 0 });
+      if (kind === 'running') session.emitSession({ state: 'started', cleaned: 0, started_at: null });
       expect(controller.getState().session.kind).toBe(kind);
       const before = gateway.callsOf('setProfileMods').length;
       await controller.toggleModInActiveProfile('b');
@@ -583,7 +583,7 @@ describe('Given a stale deploy session', () => {
       await ctx.controller.createProfile('Mine');
       const id = ctx.controller.getState().profiles.find((p) => p.name === 'Mine')?.id ?? '';
       ctx.controller.dismissNotice();
-      ctx.session.emitSession({ state: 'started', cleaned: 0 });
+      ctx.session.emitSession({ state: 'started', cleaned: 0, started_at: null });
       expect(ctx.controller.getState().session.kind).toBe('running');
       const writes = ['createProfile', 'renameProfile', 'deleteProfile', 'setProfileMods', 'removeMod'] as const;
       const before = writes.map((method) => ctx.gateway.callsOf(method).length);
@@ -605,7 +605,7 @@ describe('Given a stale deploy session', () => {
 
     it('When the session ends Then the writes work again', async () => {
       const { controller, session, gateway } = await locked();
-      session.emitSession({ state: 'ended', cleaned: 0 });
+      session.emitSession({ state: 'ended', cleaned: 0, started_at: null });
       await controller.removeMod('a');
       expect(gateway.callsOf('removeMod')).toHaveLength(1);
       expect(controller.getState().mods.map((m) => m.id)).toEqual(['b']);

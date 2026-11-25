@@ -250,7 +250,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
   });
 
-  Scenario('The session dot pulses only while the game is starting or running', ({ Given, Then, And }) => {
+  Scenario('The session dot pulses only while a session is live', ({ Given, Then, And }) => {
     Given('the launcher stylesheet', () => {
       expect(rulesOnly.length).toBeGreaterThan(0);
     });
@@ -261,6 +261,11 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       expect(pulse).toMatch(/opacity/);
       expect(pulse).toMatch(/transform:\s*scale/);
     });
+    And('the stopping and cleaning-up session dots pulse too', () => {
+      expect(rule('.session-status-stopping::before,\n.session-status-cleaning-up::before')).toMatch(
+        /animation:\s*pulse\b/,
+      );
+    });
     And('the idle session status has none', () => {
       expect(rule('.session-status::before')).not.toMatch(/animation/);
       expect(rule('.statusbar-idle::before')).not.toMatch(/animation/);
@@ -268,15 +273,29 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
   });
 
-  Scenario('Play looks busy while the game is starting', ({ Given, Then }) => {
+  Scenario('The session action looks busy while the game stops or cleans up', ({ Given, Then, And }) => {
     Given('the launcher stylesheet', () => {
       expect(rulesOnly.length).toBeGreaterThan(0);
     });
-    Then('a disabled Play button shows a spinner while the session is starting', () => {
-      const spinner = rule('.statusbar:has(.session-status-starting) .play:disabled::after');
+    Then('the stopping and cleaning-up progress button shows a spinner and a progress cursor', () => {
+      const spinner = rule('.play-progress::after');
+      expect(spinner).toMatch(/content:\s*''/);
+      expect(spinner).toMatch(/border-radius:\s*50%/);
       expect(spinner).toMatch(/animation:\s*spin\b/);
       const spin = keyframes().find(([name]) => name === 'spin')?.[1] ?? '';
       expect(spin).toMatch(/transform:\s*rotate/);
+      expect(rule('.play-progress,\n.play-progress:hover:not(:disabled)')).toMatch(/cursor:\s*progress/);
+    });
+    And('the progress button gives no hover or press feedback', () => {
+      // It is aria-disabled, not disabled, so the `:not(:disabled)` hover and press rules still match it.
+      expect(rule('.play-progress,\n.play-progress:hover:not(:disabled)')).toMatch(/background:\s*transparent/);
+      expect(rule('.play-progress:active:not(:disabled)')).toMatch(/transform:\s*none/);
+    });
+    And('Stop stays a plain action while the game is starting', () => {
+      // Under #75 Play is not rendered while starting (Stop takes its slot), so no rule may key a busy
+      // look off the starting status: Stop must read as clickable, the pulsing dot and the text say "starting".
+      expect(rulesOnly).not.toMatch(/session-status-starting\)?[^{,]*\.play/);
+      expect(rulesOnly).not.toMatch(/\.btn-danger\.play[^{]*::after/);
     });
   });
 });

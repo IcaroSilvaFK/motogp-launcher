@@ -1,7 +1,8 @@
-import type { CommandError } from '../domain';
+import type { CommandError, SessionEvent } from '../domain';
 import { VANILLA_ID, isSupportedModFile, isVanilla, toCommandError, toggleMod } from '../domain';
-import type { LauncherController, LauncherDeps, LauncherState, Notice } from './controller';
+import type { LauncherController, LauncherDeps, LauncherState, Notice, SessionPhase } from './controller';
 import { selectCanPlay } from './selectCanPlay';
+import { selectCanStop } from './selectCanStop';
 import { selectProfileLocked } from './selectProfileLocked';
 import type { Unsubscribe } from './ports';
 
@@ -33,6 +34,22 @@ async function passThrough<T>(call: () => Promise<T>): Promise<T> {
   }
 }
 
+/** Maps a session event to the phase it announces. */
+function phaseOfEvent(event: SessionEvent, current: SessionPhase): SessionPhase {
+  switch (event.state) {
+    case 'started':
+      // A stop requested right before the game was seen keeps showing "stopping" (cleanup follows at once).
+      return current.kind === 'stopping'
+        ? { kind: 'stopping', since: event.started_at }
+        : { kind: 'running', since: event.started_at };
+    case 'cleaning-up':
+      return { kind: 'cleaning-up' };
+    case 'ended':
+    case 'never-started':
+      return { kind: event.state, cleaned: event.cleaned };
+  }
+}
+
 /** Framework-free observable store holding the launcher state and its use cases. */
 export function createLauncherController(deps: LauncherDeps): LauncherController {
   const { gateway, picker, session, drop } = deps;
@@ -44,7 +61,11 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
   let generation = 0;
   const releases: Unsubscribe[] = [];
 
+  /** Bumped on every session change, so an async result can tell that an event overtook it. */
+  let sessionVersion = 0;
+
   function set(patch: Partial<LauncherState>): void {
+    if ('session' in patch) sessionVersion += 1;
     state = { ...state, ...patch };
     for (const listener of [...listeners]) listener();
   }
@@ -144,12 +165,7 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
   async function subscribeSession(run: number): Promise<CommandError | null> {
     const obtained: Unsubscribe[] = [];
     try {
-      obtained.push(
-        await session.onSession((event) => {
-          if (event.state === 'started') set({ session: { kind: 'running' } });
-          else set({ session: { kind: event.state, cleaned: event.cleaned } });
-        }),
-      );
+      obtained.push(await session.onSession((event) => set({ session: phaseOfEvent(event, state.session) })));
       obtained.push(
         await session.onSessionError((event) => {
           set({ session: { kind: 'idle' }, error: { code: 'session_error', message: event.message } });
@@ -161,6 +177,29 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     }
     for (const release of obtained) track(release, run);
     return null;
+  }
+
+  /** Adopts the backend's live session (a reloaded UI), unless an event already changed the phase. */
+  async function resumeSession(run: number): Promise<void> {
+    const version = sessionVersion;
+    const current = await gateway.currentSession();
+    if (disposed || run !== generation || version !== sessionVersion) return;
+    switch (current.phase) {
+      case 'idle':
+        return;
+      case 'starting':
+        set({ session: { kind: 'starting' } });
+        return;
+      case 'running':
+        set({ session: { kind: 'running', since: current.started_at } });
+        return;
+      case 'stopping':
+        set({ session: { kind: 'stopping', since: current.started_at } });
+        return;
+      case 'cleaning-up':
+        set({ session: { kind: 'cleaning-up' } });
+        return;
+    }
   }
 
   async function runStart(run: number): Promise<void> {
@@ -178,6 +217,14 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         notice = { kind: 'recovered', cleaned: recovery.cleaned_count };
       } else if (recovery.state === 'game-running') {
         notice = { kind: 'game-running' };
+      }
+      // A failed query only costs the resumed phase, so it must not abort the data load below.
+      if (subscriptionError === null) {
+        try {
+          await resumeSession(run);
+        } catch (caught) {
+          error ??= toCommandError(caught);
+        }
       }
       await load(['config', 'game', 'mods', 'profiles']);
     } catch (caught) {
@@ -360,6 +407,22 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         await gateway.play(state.config.active_profile ?? VANILLA_ID);
       } catch (caught) {
         set({ session: { kind: 'idle' }, error: toCommandError(caught) });
+      }
+    },
+    async stopSession() {
+      if (!selectCanStop(state)) return;
+      const previous = state.session;
+      set({
+        error: null,
+        notice: null,
+        session: { kind: 'stopping', since: previous.kind === 'running' ? previous.since : null },
+      });
+      const version = sessionVersion;
+      try {
+        await gateway.stopSession();
+      } catch (caught) {
+        // The phase goes back unless a session event already moved it past "stopping".
+        set({ error: toCommandError(caught), ...(version === sessionVersion ? { session: previous } : {}) });
       }
     },
     getStorageUsage: () => passThrough(() => gateway.getStorageUsage()),

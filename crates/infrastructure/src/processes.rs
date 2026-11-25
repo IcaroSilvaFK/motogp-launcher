@@ -3,7 +3,7 @@ use motogp_application::{AppError, ProcessInspector};
 use std::collections::HashMap;
 use std::path::{Component, Path, PathBuf, Prefix};
 use std::sync::Mutex;
-use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, System, UpdateKind};
 
 /// Lexical normalization: case-insensitive components, `.` dropped, `..`
 /// applied, and verbatim prefixes (`\?\C:`, `\?\UNC\s\sh`) mapped to their
@@ -119,11 +119,126 @@ impl ProcessInspector for SysinfoProcesses {
         *exes = live;
         Ok(found)
     }
+
+    fn terminate_inside(&self, root: &Path) -> Result<usize, AppError> {
+        let mut guard = self.state.lock().unwrap_or_else(|e| e.into_inner());
+        let system = &mut guard.system;
+        system.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::nothing().with_exe(UpdateKind::OnlyIfNotSet),
+        );
+        let root = resolved(root);
+        let own = std::process::id();
+        let seeds: Vec<u32> = system
+            .processes()
+            .iter()
+            .filter(|(_, process)| {
+                process
+                    .exe()
+                    .is_some_and(|exe| starts_with(&resolved(exe), &root))
+            })
+            .map(|(pid, _)| pid.as_u32())
+            .collect();
+        let parents: HashMap<u32, u32> = system
+            .processes()
+            .iter()
+            .filter_map(|(pid, process)| Some((pid.as_u32(), process.parent()?.as_u32())))
+            .collect();
+        let mut ended = 0;
+        let mut failures = Vec::new();
+        for pid in kill_order(&seeds, &parents, own) {
+            let pid = Pid::from_u32(pid);
+            let Some(process) = system.process(pid) else {
+                continue;
+            };
+            if process.kill() {
+                ended += 1;
+                continue;
+            }
+            // It may have exited on its own since the snapshot.
+            system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
+            if system.process(pid).is_some() {
+                failures.push(pid.to_string());
+            }
+        }
+        if failures.is_empty() {
+            Ok(ended)
+        } else {
+            Err(AppError::Write {
+                location: "processes".into(),
+                detail: format!("could not end process {}", failures.join(", ")),
+            })
+        }
+    }
+}
+
+/// Order in which to end the processes of the game: `seeds` (processes of the
+/// game by executable) plus every descendant, deepest first, so children go
+/// before their parents. `own` is never included. `parents` maps a pid to its
+/// parent pid.
+fn kill_order(seeds: &[u32], parents: &HashMap<u32, u32>, own: u32) -> Vec<u32> {
+    let mut depth: HashMap<u32, usize> = seeds
+        .iter()
+        .copied()
+        .filter(|pid| *pid != own)
+        .map(|pid| (pid, 0))
+        .collect();
+    loop {
+        let mut grew = false;
+        for (&pid, &parent) in parents {
+            if pid == own || depth.contains_key(&pid) {
+                continue;
+            }
+            if let Some(&parent_depth) = depth.get(&parent) {
+                depth.insert(pid, parent_depth + 1);
+                grew = true;
+            }
+        }
+        if !grew {
+            break;
+        }
+    }
+    let mut order: Vec<(u32, usize)> = depth.into_iter().collect();
+    order.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(&b.0)));
+    order.into_iter().map(|(pid, _)| pid).collect()
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn parents(pairs: &[(u32, u32)]) -> HashMap<u32, u32> {
+        pairs.iter().copied().collect()
+    }
+
+    #[test]
+    fn kill_order_ends_descendants_before_their_parents() {
+        // 10 is the game, 11 its child, 12 its grandchild; 20 is unrelated.
+        let table = parents(&[(11, 10), (12, 11), (20, 1)]);
+        assert_eq!(kill_order(&[10], &table, 999), vec![12, 11, 10]);
+    }
+
+    #[test]
+    fn kill_order_never_includes_the_own_process_or_unrelated_ones() {
+        let table = parents(&[(11, 10), (20, 1)]);
+        assert_eq!(kill_order(&[10, 999], &table, 999), vec![11, 10]);
+        // A child of the own process is not the game's descendant.
+        let table = parents(&[(30, 999)]);
+        assert!(kill_order(&[], &table, 999).is_empty());
+    }
+
+    #[test]
+    fn kill_order_survives_a_parent_cycle() {
+        let table = parents(&[(1, 2), (2, 1)]);
+        assert_eq!(kill_order(&[1], &table, 999), vec![2, 1]);
+    }
+
+    #[test]
+    fn terminating_in_an_unused_root_ends_nothing() {
+        let root = Path::new("Z:/definitely/not/a/real/game/root");
+        assert_eq!(SysinfoProcesses::default().terminate_inside(root), Ok(0));
+    }
 
     #[test]
     fn process_path_comparison_is_case_insensitive() {

@@ -18,8 +18,14 @@ describe('selectSessionClean', () => {
     expect(selectSessionClean(state({ session }))).toBe(true);
   });
 
-  it.each(['starting', 'running', 'unavailable'] as const)('is not clean while %s', (kind) => {
-    expect(selectSessionClean(state({ session: { kind } }))).toBe(false);
+  it.each([
+    { kind: 'starting' },
+    { kind: 'running', since: null },
+    { kind: 'stopping', since: null },
+    { kind: 'cleaning-up' },
+    { kind: 'unavailable' },
+  ] as const)('is not clean while %o', (session) => {
+    expect(selectSessionClean(state({ session }))).toBe(false);
   });
 
   it.each(['game-running', 'failed'] as const)('is not clean when recovery is %s', (s) => {

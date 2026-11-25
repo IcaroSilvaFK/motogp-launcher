@@ -13,7 +13,10 @@ import type { DropEvents, FilePicker, LauncherGateway, SessionEvents, Unsubscrib
 export type SessionPhase =
   | { kind: 'idle' }
   | { kind: 'starting' }
-  | { kind: 'running' }
+  /** `since`: Unix ms when the game was first seen; `null` when unknown. */
+  | { kind: 'running'; since: number | null }
+  | { kind: 'stopping'; since: number | null }
+  | { kind: 'cleaning-up' }
   | { kind: 'ended'; cleaned: number }
   | { kind: 'never-started'; cleaned: number }
   | { kind: 'unavailable' };
@@ -83,6 +86,11 @@ export interface LauncherController {
   /** Cleans the stale folder, confirming the folder shown in the notice; no-op without a stale session. */
   cleanStaleSession(): Promise<void>;
   play(): Promise<void>;
+  /**
+   * Stops the game (only while `selectCanStop`): the phase becomes `stopping` until the session events
+   * report the cleanup. On failure the previous phase returns and `state.error` is set.
+   */
+  stopSession(): Promise<void>;
   /**
    * Measures the launcher data folder. A plain pass-through: no state change, no global error;
    * rejects with a CommandError so the caller shows the failure inline.

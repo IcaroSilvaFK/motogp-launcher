@@ -20,6 +20,8 @@ mod load_order;
 #[path = "bdd/profiles.rs"]
 mod profiles;
 
+#[path = "bdd/session_control.rs"]
+mod session_control;
 #[path = "bdd/session_tracking.rs"]
 mod session_tracking;
 #[path = "bdd/stale_manifest.rs"]
@@ -46,6 +48,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("load-order", || Box::pin(load_order::run())),
     ("library", || Box::pin(library::run())),
     ("session-tracking", || Box::pin(session_tracking::run())),
+    ("session-control", || Box::pin(session_control::run())),
     ("deploy", || Box::pin(deploy::run())),
     ("commands-and-recovery", || {
         Box::pin(commands_and_recovery::run())
