@@ -238,7 +238,7 @@ describe('Given the shell', () => {
     renderApp(createFakeController({ error: { code: 'missing_app_id', message: 'no app id in manifest' } }));
     const alert = screen.getByRole('alert');
     expect(alert).toHaveTextContent('game App ID not found');
-    expect(alert).toHaveTextContent('no app id in manifest');
+    expect(alert).not.toHaveTextContent('no app id in manifest');
   });
 
   it('error_notice_is_announced: When an error exists Then role alert is shown without a success status', async () => {
