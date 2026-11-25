@@ -5,6 +5,9 @@
 
 mod artwork_ports;
 mod artwork_service;
+mod catalog_error;
+mod catalog_ports;
+mod catalog_service;
 mod config_service;
 mod deploy_error;
 mod deploy_ports;
@@ -34,6 +37,14 @@ mod storage_service;
 
 pub use artwork_ports::{Artwork, GameArtworkSource, ImageMime};
 pub use artwork_service::ArtworkService;
+pub use catalog_error::{CatalogCacheError, CatalogError, CatalogSourceError};
+pub use catalog_ports::{
+    CachedCatalog, CatalogCache, CatalogSource, RawCatalog, RawEntry, SourceFetch,
+};
+pub use catalog_service::{
+    validate_catalog, validate_catalog_strict, CatalogService, CatalogSnapshot, CatalogWarning,
+    DEFAULT_CATALOG_TTL,
+};
 pub use config_service::ConfigService;
 pub use deploy_error::DeployError;
 pub use deploy_ports::{DeployFiles, DeployedRepository, DirCheck};

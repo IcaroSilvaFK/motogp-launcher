@@ -253,6 +253,10 @@ export const ptBR: Messages = {
     deploy_unauthorized_directory: 'O launcher não tem permissão para usar este diretório.',
     deploy_cleanup_incomplete: 'A limpeza não removeu todos os arquivos implantados.',
     deploy_session_not_stale: 'Esta é a pasta de mods atual; ela não pode ser esquecida.',
+    // Online catalog (#72).
+    catalog_unavailable: 'Não foi possível carregar o catálogo de mods. Verifique sua conexão e tente novamente.',
+    catalog_unsupported_schema:
+      'O catálogo de mods exige uma versão mais nova do launcher. Atualize o launcher para navegar nele.',
     session_error: 'A sessão do jogo falhou.',
     session_subscription_failed: 'Os eventos da sessão estão indisponíveis.',
     recovery_failed: 'A recuperação de uma sessão anterior falhou.',

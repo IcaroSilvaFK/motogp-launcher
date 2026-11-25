@@ -7,6 +7,8 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+#[path = "bdd/catalog.rs"]
+mod catalog;
 #[path = "bdd/commands_and_recovery.rs"]
 mod commands_and_recovery;
 #[path = "bdd/deploy.rs"]
@@ -31,6 +33,8 @@ mod stale_session_recovery;
 #[path = "bdd/storage.rs"]
 mod storage;
 
+#[path = "support/catalog_fakes.rs"]
+pub mod catalog_fakes;
 #[path = "support/config_fakes.rs"]
 pub mod config_fakes;
 #[path = "support/deploy_fakes.rs"]
@@ -58,6 +62,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("stale-session-recovery", || {
         Box::pin(stale_session_recovery::run())
     }),
+    ("catalog", || Box::pin(catalog::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

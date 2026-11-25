@@ -488,3 +488,34 @@ Gherkin: `crates/application/tests/features/session-control.feature`, the new sc
 | The interface can query and stop the session | src-tauri cucumber "The interface can query and stop the session", IPC `session_commands_report_the_live_session_and_stop_it` |
 
 Frontend unit tests (domain/application/infrastructure, #75): `src/application/__tests__/sessionStop.test.tsx` (the `cleaning-up` phase and `since` from session events, `controller.stopSession` with its race orders and failure rollback, `selectCanStop`, the reload scenario via `current_session`, a failing query not breaking the load), the selector tests (`selectCanPlay`, `selectProfileLocked`, `selectSessionClean` treat `stopping` and `cleaning-up` as live) and `tauriGateway.test.ts` (`current_session`, `stop_session` commands). The UI scenarios are bound separately: `tests/features/frontend/session-control.feature` (Play turns into Stop while the game runs, Stop asks for confirmation, Confirming Stop stops the session and shows the cleanup, A failed stop is reported and Stop stays available, The session survives a page reload) in `src/ui/__tests__/session-control.feature.test.tsx`, plus `formatClockTime` in `src/ui/i18n/__tests__/i18n.test.tsx`. The `interface.feature` step "Play stays disabled during start and execution" became "Play is replaced by Stop during start and execution", since Play is no longer rendered while a session can be stopped.
+### Issue #72: scenario traceability
+
+Online catalog source (static catalog on GitHub, cached on disk). Gherkin: `crates/domain/tests/features/catalog.feature`, `crates/application/tests/features/catalog.feature`, `crates/infrastructure/tests/features/catalog-source.feature` (Rust cucumber, steps in each crate's `tests/bdd/`), `tests/features/frontend/catalog-gateway.feature` and `catalog-errors.feature` (vitest-cucumber). The IPC scenarios are plain contract tests named after the scenario.
+
+| Scenario | Tests |
+|----------|-------|
+| A complete entry is valid | `complete_draft_is_valid_and_trimmed`, `entry_without_optional_fields_is_valid` (domain `src/catalog.rs`), domain cucumber |
+| Reject a non-https URL | `urls_must_be_https_with_a_host` (domain), domain cucumber |
+| Reject a download without a valid checksum | `download_rejects_bad_checksums`, `download_needs_size_and_sha256_together` (domain), domain cucumber |
+| Reject a blank title | `blank_required_fields_name_the_field` (domain), domain cucumber |
+| Use the cache while fresh | `fresh_cache_is_served_without_calling_the_source` (application `tests/catalog_service.rs`), application cucumber |
+| Refresh a stale cache | `stale_cache_is_refreshed_and_saved_sending_the_etag`, `empty_cache_fetches_without_an_etag` (application), application cucumber |
+| Work offline | `offline_with_a_stale_cache_returns_it_flagged_stale` (application), application cucumber |
+| No cache and no network | `offline_without_a_cache_is_unavailable` (application), application cucumber |
+| Skip malformed entries | `malformed_entries_are_skipped_with_warnings` (application), application cucumber |
+| Skip duplicate ids | `duplicate_ids_keep_the_first` (application), application cucumber |
+| Single-flight refresh | `two_concurrent_stale_requests_fetch_once`, `concurrent_explicit_refreshes_share_one_failure` (application), application cucumber |
+| Respect Retry-After | `retry_after_blocks_the_source_until_it_elapses`, `retry_after_is_capped_at_one_hour` (application), application cucumber |
+| Reject a newer schema | `a_newer_schema_without_cache_is_unsupported`, `a_newer_schema_with_a_cache_falls_back_to_it` (application), application cucumber |
+| Not modified renews the cache | `not_modified_renews_the_cache_timestamp` (application), application cucumber |
+| Fetch and parse the catalog | `fetches_and_parses_with_etag_and_user_agent`, `parse_keeps_optional_fields` (infrastructure `src/catalog_http.rs`, local server), infrastructure cucumber |
+| Conditional request | `sends_if_none_match_and_maps_304` (infrastructure), infrastructure cucumber |
+| Size cap | `content_length_over_the_cap_is_too_large`, `streamed_body_over_the_cap_is_too_large` (infrastructure), infrastructure cucumber |
+| Rate limit | `rate_limit_reads_retry_after_seconds` (infrastructure), infrastructure cucumber |
+| Identify the launcher | `fetches_and_parses_with_etag_and_user_agent` (infrastructure), infrastructure cucumber |
+| Cache roundtrip in a path with accents | `save_then_load_roundtrips_and_creates_parents` (infrastructure `src/catalog_cache.rs`), infrastructure cucumber (folder `Usuário Padrão`, accented on purpose) |
+| The repository catalog is valid | `the_repository_catalog_is_valid`, `schema_requires_the_fields_the_rust_rules_require`, `schema_url_and_hash_patterns_match_the_rust_rules` (infrastructure `tests/catalog_file.rs`) |
+| get_catalog returns camelCase DTOs | `get_catalog_returns_camel_case_dtos` (`src-tauri/tests/catalog_contract.rs`), `catalog_dto_is_camel_case_with_null_optionals` (`src-tauri/src/dto.rs`) |
+| Unavailable catalog maps to a stable code | `unavailable_catalog_maps_to_a_stable_code` (`catalog_contract.rs`), `unavailable_maps_to_a_stable_code_without_leaking_the_reason`, `unsupported_schema_maps_to_a_stable_code` (`src-tauri/src/error_catalog.rs`) |
+| The gateway calls the catalog commands | vitest-cucumber `catalog-gateway.feature` bound by `src/infrastructure/__tests__/catalogGateway.feature.test.ts` |
+| Catalog error codes are known and translated | vitest-cucumber `catalog-errors.feature` bound by `src/ui/__tests__/catalog-errors.feature.test.ts`; also the i18n completeness test |
