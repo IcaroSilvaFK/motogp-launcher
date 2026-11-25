@@ -101,6 +101,8 @@ export interface LauncherController {
   getStorageUsage(): Promise<StorageUsage>;
   /** Opens the launcher data folder; rejects with a CommandError, no global error. */
   openDataFolder(): Promise<void>;
+  /** Opens the support page in the browser; rejects with a CommandError, no global error. */
+  openSupportPage(): Promise<void>;
   /**
    * Downloads and installs a catalog entry (also the retry from `failed`). Ignored while the entry is
    * already installing or while the library is locked by a session (`selectCanInstall`). Failures

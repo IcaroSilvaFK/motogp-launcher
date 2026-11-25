@@ -94,6 +94,7 @@ export function createFakeController(patch: Partial<LauncherState> = {}): FakeCo
     stopSession: action(),
     getStorageUsage: vi.fn(() => Promise.resolve(emptyStorage())),
     openDataFolder: action(),
+    openSupportPage: action(),
     installCatalogEntry: action(),
     cancelCatalogInstall: action(),
     dismissError: vi.fn(),

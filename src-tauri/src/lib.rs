@@ -16,6 +16,7 @@ mod error_install;
 mod error_library;
 mod error_play;
 mod error_profiles;
+mod error_support;
 mod startup;
 
 pub use adapters::{

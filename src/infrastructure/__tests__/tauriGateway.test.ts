@@ -25,6 +25,7 @@ const CASES: [keyof LauncherGateway, unknown[], string, Record<string, unknown> 
   ['forgetStaleSession', [], 'forget_stale_session', undefined],
   ['cleanStaleSession', ['D:/old/~mods'], 'clean_stale_session', { confirmedDir: 'D:/old/~mods' }],
   ['openDataFolder', [], 'open_data_folder', undefined],
+  ['openSupportPage', [], 'open_support_page', undefined],
 ];
 
 describe('Given the Tauri gateway', () => {

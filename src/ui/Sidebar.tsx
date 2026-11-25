@@ -1,6 +1,7 @@
 import { useId } from 'react';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
+import { SupportLink } from './SupportLink';
 
 export type ScreenId = 'library' | 'discover' | 'profiles' | 'settings';
 
@@ -9,7 +10,7 @@ export const ALL_SCREENS: readonly ScreenId[] = ['library', 'discover', 'profile
 
 /**
  * Left sidebar: the main navigation (icon + label, `aria-current="page"` on the current screen)
- * and a collapse toggle pinned at the bottom. The custom title bar already shows the mark and the
+ * and a footer pinned at the bottom: the "Support the project" entry (#94) and the collapse toggle. The custom title bar already shows the mark and the
  * app name, so the sidebar has no brand row (#71); the document's single h1 (the app name) stays
  * here, visually hidden. Collapsed, only the icons show: the labels stay in the DOM visually
  * hidden, and each item gets its label as a tooltip.
@@ -51,17 +52,20 @@ export function Sidebar({
           </button>
         ))}
       </nav>
-      <button
-        type="button"
-        className="sidebar-toggle"
-        aria-expanded={!collapsed}
-        aria-controls={navId}
-        title={toggleLabel}
-        onClick={onToggle}
-      >
-        <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} className="nav-icon" />
-        <span className={hidden ?? 'nav-label'}>{toggleLabel}</span>
-      </button>
+      <div className="sidebar-footer">
+        <SupportLink placement="sidebar" collapsed={collapsed} />
+        <button
+          type="button"
+          className="sidebar-toggle"
+          aria-expanded={!collapsed}
+          aria-controls={navId}
+          title={toggleLabel}
+          onClick={onToggle}
+        >
+          <Icon name={collapsed ? 'chevron-right' : 'chevron-left'} className="nav-icon" />
+          <span className={hidden ?? 'nav-label'}>{toggleLabel}</span>
+        </button>
+      </div>
     </aside>
   );
 }
