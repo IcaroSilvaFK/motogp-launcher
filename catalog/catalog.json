@@ -1,5 +1,28 @@
 {
   "$schema": "./catalog.schema.json",
   "schemaVersion": 1,
-  "entries": []
+  "entries": [
+    {
+      "id": "gresini-racing-brazil-special-livery",
+      "title": "MotoGP 26 Gresini Racing Brazil Special Livery",
+      "author": "CilokMayo57",
+      "game": "MotoGP 26",
+      "category": "liveries",
+      "description": "Recreates the special livery Gresini Racing ran at the Brazil round, applied to the bike and rider suit only. Helmets, gloves and boots are not included.",
+      "version": "0.5",
+      "updatedAt": "2026-07-08",
+      "pageUrl": "https://www.overtake.gg/downloads/motogp-26-gresini-racing-brazil-special-livery.85275/"
+    },
+    {
+      "id": "motogp-26-sponsors-mod",
+      "title": "MotoGP 26 Sponsors Mod",
+      "author": "ColangeloDesigns",
+      "game": "MotoGP 26",
+      "category": "other",
+      "description": "Adds real-world brands and sponsors to the in-game editor so they can be used on helmets and rider stickers. Installed by extracting the files into the game's Paks folder.",
+      "version": "1.3.1",
+      "updatedAt": "2026-11-25",
+      "pageUrl": "https://www.overtake.gg/downloads/motogp-26-sponsors-mod.84131/"
+    }
+  ]
 }
