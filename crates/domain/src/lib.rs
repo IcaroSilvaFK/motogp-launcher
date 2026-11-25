@@ -14,12 +14,15 @@ mod mod_grouping;
 mod profile;
 mod session;
 mod storage;
+mod support_page;
 
 pub use catalog::{
     CatalogDownload, CatalogDownloadDraft, CatalogEntry, CatalogEntryDraft, CatalogEntryError,
     SUPPORTED_CATALOG_SCHEMA,
 };
-pub use catalog_page::{check_page_url, PageUrlError, ALLOWED_PAGE_HOSTS};
+pub use catalog_page::{
+    check_https_url_on_hosts, check_page_url, PageUrlError, ALLOWED_PAGE_HOSTS,
+};
 pub use config::Config;
 pub use conflict::{detect_conflicts, FileConflict};
 pub use deploy::{deployed_name, is_mods_dir, is_safe_file_name, Deployed, DeployedFile};
@@ -38,3 +41,4 @@ pub use session::{
     NEVER_STARTED_AFTER,
 };
 pub use storage::{classify_entry, StorageCategory, StorageUsage};
+pub use support_page::{check_support_url, SUPPORT_PAGE_HOST, SUPPORT_PAGE_URL};

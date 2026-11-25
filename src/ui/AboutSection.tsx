@@ -6,8 +6,12 @@ import { Icon } from './Icon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 import { stagger } from './motion';
+import { SupportLink } from './SupportLink';
 
-/** Settings > About: the launcher version and, when the updater exists, a manual update check. */
+/**
+ * Settings > About: the launcher version, a manual update check when the updater exists, and the
+ * "Support the project" row (#94).
+ */
 export function AboutSection() {
   const { t } = useI18n();
   const { version, updater } = useAppInfo();
@@ -37,6 +41,7 @@ export function AboutSection() {
           </div>
         </div>
         {updater && <UpdateCheckRow updater={updater} />}
+        <SupportLink placement="settings" />
       </div>
     </section>
   );

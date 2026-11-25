@@ -50,6 +50,8 @@ export interface LauncherGateway {
   getGameArtwork(): Promise<string | null>;
   /** Opens the launcher data folder in the system file manager; the backend decides the path. */
   openDataFolder(): Promise<void>;
+  /** Opens the project's support page in the default browser; the backend owns the URL. */
+  openSupportPage(): Promise<void>;
   // Online catalog (#72): fetched by the backend, cached on disk, available offline.
   /** The catalog while the cache is fresh, otherwise a fetch (an older copy is flagged `stale` when offline). */
   getCatalog(): Promise<Catalog>;

@@ -59,6 +59,7 @@ export function createTauriGateway(invoke: InvokeFn = tauriInvoke, listen: Liste
     getStorageUsage: async () => toStorageUsage(await call<StorageUsageDto>('get_storage_usage')),
     getGameArtwork: () => call<string | null>('get_game_artwork'),
     openDataFolder: () => call('open_data_folder'),
+    openSupportPage: () => call('open_support_page'),
     getCatalog: () => call('get_catalog'),
     refreshCatalog: () => call('refresh_catalog'),
     openCatalogPage: (id) => call('open_catalog_page', { id }),

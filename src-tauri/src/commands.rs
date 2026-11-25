@@ -286,6 +286,18 @@ pub async fn open_catalog_page(state: State<'_, AppState>, id: String) -> Comman
     .await
 }
 
+/// Opens the project's support page in the default browser. Takes no
+/// arguments: the URL is a constant checked against its own host policy.
+#[tauri::command]
+pub async fn open_support_page(state: State<'_, AppState>) -> CommandResult<()> {
+    read_blocking(state, |state| {
+        Ok(motogp_application::open_support_page(
+            state.web_opener.as_ref(),
+        )?)
+    })
+    .await
+}
+
 /// Registers every command on the builder; shared by the real app and the
 /// contract tests.
 pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
@@ -317,6 +329,7 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         get_catalog,
         refresh_catalog,
         open_catalog_page,
+        open_support_page,
         crate::commands_install::install_catalog_entry,
         crate::commands_install::cancel_catalog_install
     ])

@@ -37,6 +37,12 @@ impl std::error::Error for PageUrlError {}
 /// Checks that `url` is an `https` URL without credentials whose host is on
 /// the allow-list (exact match or dot-suffix, case-insensitive).
 pub fn check_page_url(url: &str) -> Result<(), PageUrlError> {
+    check_https_url_on_hosts(url, &ALLOWED_PAGE_HOSTS)
+}
+
+/// Like [`check_page_url`] but against an explicit host list: `https` only,
+/// no credentials, host equal to one of `hosts` or a subdomain of it.
+pub fn check_https_url_on_hosts(url: &str, hosts: &[&str]) -> Result<(), PageUrlError> {
     let scheme_ok = url
         .get(..8)
         .is_some_and(|s| s.eq_ignore_ascii_case("https://"));
@@ -55,7 +61,7 @@ pub fn check_page_url(url: &str) -> Result<(), PageUrlError> {
         return Err(PageUrlError::NotHttps);
     }
     let host = host.trim_end_matches('.').to_ascii_lowercase();
-    let allowed = ALLOWED_PAGE_HOSTS
+    let allowed = hosts
         .iter()
         .any(|allowed| host == *allowed || host.ends_with(&format!(".{allowed}")));
     if allowed {

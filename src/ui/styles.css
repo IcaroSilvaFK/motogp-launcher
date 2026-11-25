@@ -62,6 +62,8 @@
   --progress-indeterminate-width: 40%;
   --install-control-width: 240px;
   --icon-size-sm: 14px;
+  /* Small status mark on an icon (the collapsed support entry's failure dot, #94) */
+  --status-dot-size: 6px;
 
   /* Spacing scale (4/8px grid) */
   --space-1: 4px;
@@ -455,6 +457,7 @@ code {
 }
 
 .nav-item,
+.support-entry,
 .sidebar-toggle {
   position: relative;
   display: flex;
@@ -480,6 +483,7 @@ code {
 }
 
 .nav-item .nav-icon,
+.support-entry .nav-icon,
 .sidebar-toggle .nav-icon {
   width: 18px;
   height: 18px;
@@ -492,6 +496,7 @@ code {
 }
 
 .nav-item:hover,
+.support-entry:hover,
 .sidebar-toggle:hover {
   color: var(--text);
   background: var(--surface-2);
@@ -499,6 +504,7 @@ code {
 
 /* Inset: the sidebar clips its overflow, so an outer ring would be cut. */
 .nav-item:focus-visible,
+.support-entry:focus-visible,
 .sidebar-toggle:focus-visible {
   outline: 2px solid var(--focus-ring);
   outline-offset: -2px;
@@ -523,15 +529,71 @@ code {
 
 /* Pressed: one surface step up and a slight press-in (after :hover and current, so it wins). */
 .nav-item:active,
+.support-entry:active,
 .sidebar-toggle:active {
   background: var(--surface-3);
   transform: scale(var(--motion-press-scale));
 }
 
-/* Pinned to the bottom of the sidebar, quieter than the navigation. */
-.sidebar-toggle {
+/* Footer pinned to the bottom of the sidebar (#94): the support entry, then the collapse toggle.
+   Future footer slots go here too. Both items are quieter than the navigation. */
+.sidebar-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
   margin-top: auto;
+}
+
+.support-entry,
+.sidebar-toggle {
   font-size: var(--type-body-medium);
+}
+
+.support-entry .nav-label {
+  flex: 1 1 auto;
+}
+
+/* Trailing "opens outside" hint, only when expanded; muted until the row is hovered or focused. */
+.support-entry-external {
+  flex: none;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  opacity: 0;
+  transition: opacity var(--transition);
+}
+
+.support-entry:hover .support-entry-external,
+.support-link:focus-within .support-entry-external {
+  opacity: 1;
+}
+
+/* Collapsed and failed: the message is visually hidden (announced and in the tooltip), so a small
+   error dot on the icon keeps the failure visible. */
+.support-link {
+  position: relative;
+}
+
+.sidebar[data-collapsed='true'] .support-link[data-failed='true'] .support-entry::after {
+  content: '';
+  position: absolute;
+  top: var(--space-2);
+  left: calc(var(--sidebar-inset) + 18px - var(--status-dot-size) / 2);
+  width: var(--status-dot-size);
+  height: var(--status-dot-size);
+  border-radius: 50%;
+  background: var(--error-fg);
+}
+
+.support-inline-error {
+  padding: var(--space-1) var(--sidebar-inset, 0) 0;
+  color: var(--error-fg);
+  font-size: var(--type-body-small);
+  white-space: normal;
+}
+
+/* In the Settings row the error sits under the help text, aligned with it. */
+.support-row .support-inline-error {
+  padding: 0;
 }
 
 /* The content fills the width next to the sidebar (no centred column, #71); the page gutter

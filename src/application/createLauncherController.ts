@@ -495,6 +495,7 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     },
     getStorageUsage: () => passThrough(() => gateway.getStorageUsage()),
     openDataFolder: () => passThrough(() => gateway.openDataFolder()),
+    openSupportPage: () => passThrough(() => gateway.openSupportPage()),
     dismissError() {
       set({ error: null });
     },

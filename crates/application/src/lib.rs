@@ -36,6 +36,7 @@ mod session_ports;
 mod session_service;
 mod storage_ports;
 mod storage_service;
+mod support_service;
 
 pub use artwork_ports::{Artwork, GameArtworkSource, ImageMime};
 pub use artwork_service::ArtworkService;
@@ -83,3 +84,4 @@ pub use session_ports::{ProcessInspector, SessionClock, TrackOutcome, UrlOpener,
 pub use session_service::SessionService;
 pub use storage_ports::{FolderOpener, ScannedEntry, StorageScanner};
 pub use storage_service::StorageService;
+pub use support_service::{open_support_page, SupportPageError};

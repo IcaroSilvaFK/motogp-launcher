@@ -214,6 +214,16 @@ export interface Messages {
     version: (version: string) => string;
     versionTitle: string;
   };
+  /** Support the project (#94): the sidebar footer entry and the Settings > About row. */
+  support: {
+    /** Sidebar entry text, its tooltip when collapsed, and the About row label. */
+    label: string;
+    /** Accessible description of both entries: the page opens outside the launcher. */
+    opensInBrowser: string;
+    aboutText: string;
+    button: string;
+    openFailed: string;
+  };
   about: {
     title: string;
     versionLabel: string;

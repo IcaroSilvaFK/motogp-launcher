@@ -212,6 +212,13 @@ export const en: Messages = {
     version: (version) => `v${version}`,
     versionTitle: 'Launcher version',
   },
+  support: {
+    label: 'Support the project',
+    opensInBrowser: 'Opens in your browser',
+    aboutText: 'MotoGP Launcher is free. If it helps you, you can support its development on Apoia.se.',
+    button: 'Support on Apoia.se',
+    openFailed: 'The page could not be opened in your browser.',
+  },
   about: {
     title: 'About',
     versionLabel: 'Launcher version',

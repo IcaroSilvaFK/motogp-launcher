@@ -213,6 +213,13 @@ export const ptBR: Messages = {
     version: (version) => `v${version}`,
     versionTitle: 'Versão do launcher',
   },
+  support: {
+    label: 'Apoie o projeto',
+    opensInBrowser: 'Abre no navegador',
+    aboutText: 'O MotoGP Launcher é gratuito. Se ele te ajuda, você pode apoiar o desenvolvimento no Apoia.se.',
+    button: 'Apoiar no Apoia.se',
+    openFailed: 'Não foi possível abrir a página no navegador.',
+  },
   about: {
     title: 'Sobre',
     versionLabel: 'Versão do launcher',
