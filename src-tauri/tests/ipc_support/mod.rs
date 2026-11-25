@@ -3,11 +3,14 @@
 //! opener / process / background / event ports. No real window, Steam or game.
 #![allow(dead_code)]
 use motogp_application::{
-    AppError, BackgroundRunner, CatalogSource, CatalogSourceError, FolderOpener, ProcessInspector,
-    RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch, UrlOpener, WebPageOpener,
+    AppError, BackgroundRunner, CatalogSource, CatalogSourceError, FolderOpener, ModDownloader,
+    ProcessInspector, RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch, UrlOpener,
+    WebPageOpener,
 };
 use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries};
-use motogp_launcher_lib::{compose, configure, run_recovery, AppState};
+use motogp_launcher_lib::{
+    compose_with_downloader, configure, production_downloader, run_recovery, AppState,
+};
 use serde_json::{json, Value};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -15,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use tauri::ipc::{CallbackFn, InvokeBody};
 use tauri::test::{get_ipc_response, mock_context, noop_assets, MockRuntime, INVOKE_KEY};
 use tauri::webview::InvokeRequest;
-use tauri::{App, Manager, WebviewWindow, WebviewWindowBuilder};
+use tauri::{App, Listener, Manager, WebviewWindow, WebviewWindowBuilder};
 use tempfile::TempDir;
 
 #[derive(Clone, Default)]
@@ -164,6 +167,14 @@ impl Harness {
     }
 
     pub fn with_catalog_source(catalog_source: Arc<dyn CatalogSource>) -> Harness {
+        Harness::with_services(catalog_source, production_downloader())
+    }
+
+    /// Catalog source and mod downloader injected (#74): no network either way.
+    pub fn with_services(
+        catalog_source: Arc<dyn CatalogSource>,
+        downloader: Arc<dyn ModDownloader>,
+    ) -> Harness {
         let tmp = TempDir::new().unwrap();
         let data = DataDir::new(tmp.path().join("data"));
         fs::create_dir_all(data.root()).unwrap();
@@ -175,7 +186,7 @@ impl Harness {
         let pages_opened = web_opener.opened.clone();
         let runner = Arc::new(ManualRunner::default());
         let recorder = Arc::new(Recorder::default());
-        let state = compose(
+        let state = compose_with_downloader(
             &data,
             SteamLibraries::new(None),
             SteamArtwork::new(Some(tmp.path().join("steam"))),
@@ -186,6 +197,7 @@ impl Harness {
             recorder.clone(),
             runner.clone(),
             catalog_source,
+            downloader,
         );
         let app = configure(tauri::test::mock_builder())
             .manage(state)
@@ -204,6 +216,17 @@ impl Harness {
             app,
             webview,
         }
+    }
+
+    /// Records the payloads of an app event, parsed as JSON, from now on.
+    pub fn capture_events(&self, event: &str) -> Arc<Mutex<Vec<Value>>> {
+        let seen = Arc::new(Mutex::new(Vec::new()));
+        let sink = seen.clone();
+        self.app.listen(event, move |e| {
+            let payload: Value = serde_json::from_str(e.payload()).expect("JSON payload");
+            sink.lock().unwrap().push(payload);
+        });
+        seen
     }
 
     pub fn data_dir(&self) -> PathBuf {

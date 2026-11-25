@@ -44,8 +44,13 @@ Feature: Discover tab
     When I press Escape
     Then the entry detail is closed
 
-  Scenario: Install stays hidden until downloads exist
+  Scenario: Install is offered only for entries with a download
     Given an entry with a download block
+    When I open the entry "Rebalanced AI"
+    Then an Install button is shown
+
+  Scenario: No Install button for an entry without a download
+    Given an entry without a download block
     When I open the entry "Rebalanced AI"
     Then no Install button is shown
 

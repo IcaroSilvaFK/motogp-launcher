@@ -45,11 +45,9 @@ describe('i18n dictionaries', () => {
   });
 
   it('translates the library lock in both locales', () => {
-    expect(en.errors.library_locked_by_session).toBe(
-      'Mods cannot be removed from the library while the game is running.',
-    );
+    expect(en.errors.library_locked_by_session).toBe('The library is locked while a game session is running.');
     expect(ptBR.errors.library_locked_by_session).toBe(
-      'Os mods não podem ser removidos da biblioteca enquanto o jogo está em execução.',
+      'A biblioteca fica bloqueada enquanto uma sessão de jogo está em execução.',
     );
   });
   it('translates the backend profile lock in both locales', () => {

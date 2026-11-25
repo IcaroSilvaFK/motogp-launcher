@@ -161,7 +161,7 @@ describeFeature(feature, ({ Background, Scenario, AfterEachScenario }) => {
     Then('the error "library_locked_by_session" has a Portuguese message', () => {
       expect(locale).toBe('pt-BR');
       const message = ptBR.errors.library_locked_by_session;
-      expect(message).toBe('Os mods não podem ser removidos da biblioteca enquanto o jogo está em execução.');
+      expect(message).toBe('A biblioteca fica bloqueada enquanto uma sessão de jogo está em execução.');
       expect(message).not.toBe(ptBR.errors.unknown);
     });
   });

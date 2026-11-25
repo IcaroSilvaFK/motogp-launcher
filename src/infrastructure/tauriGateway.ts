@@ -1,7 +1,10 @@
 import { invoke as tauriInvoke } from '@tauri-apps/api/core';
+import { listen as tauriListen } from '@tauri-apps/api/event';
 import type { LauncherGateway } from '../application/ports';
 import { toCommandError } from '../domain';
-import type { StorageCategory, StorageUsage } from '../domain';
+import type { CatalogInstallProgress, StorageCategory, StorageUsage } from '../domain';
+import { subscribe } from './subscription';
+import type { ListenFn } from './tauriSessionEvents';
 
 export type InvokeFn = (command: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -22,7 +25,7 @@ function toStorageUsage(dto: StorageUsageDto): StorageUsage {
   };
 }
 
-export function createTauriGateway(invoke: InvokeFn = tauriInvoke): LauncherGateway {
+export function createTauriGateway(invoke: InvokeFn = tauriInvoke, listen: ListenFn = tauriListen): LauncherGateway {
   async function call<T>(command: string, args?: Record<string, unknown>): Promise<T> {
     try {
       return (await (args === undefined ? invoke(command) : invoke(command, args))) as T;
@@ -59,5 +62,12 @@ export function createTauriGateway(invoke: InvokeFn = tauriInvoke): LauncherGate
     getCatalog: () => call('get_catalog'),
     refreshCatalog: () => call('refresh_catalog'),
     openCatalogPage: (id) => call('open_catalog_page', { id }),
+    installCatalogEntry: (id) => call('install_catalog_entry', { id }),
+    cancelCatalogInstall: (id) => call('cancel_catalog_install', { id }),
+    onCatalogInstallProgress: (handler) =>
+      subscribe<CatalogInstallProgress>(
+        (deliver) => listen<CatalogInstallProgress>('catalog-install-progress', (event) => deliver(event.payload)),
+        handler,
+      ),
   };
 }

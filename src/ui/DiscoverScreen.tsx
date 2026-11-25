@@ -8,16 +8,11 @@ import { BannerIcon } from './BannerIcon';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { formatDay, formatInstantDate, useI18n } from './i18n';
+import { CatalogInstallButton } from './InstallButton';
 import { useLauncher } from './LauncherContext';
 import { stagger } from './motion';
 
 type View = 'grid' | 'list';
-
-/**
- * Install slot for #74. The Install button renders only when the entry has a `download` block AND
- * this handler is provided; App does not pass one yet, so Install stays hidden.
- */
-export type InstallHandler = (entry: CatalogEntry) => void;
 
 const SKELETON_CARDS = [0, 1, 2, 3, 4, 5];
 
@@ -82,7 +77,6 @@ function EntryDetail({
   onOpenPage,
   onDismissPageError,
   onClose,
-  onInstall,
 }: {
   entry: CatalogEntry;
   owned: boolean;
@@ -90,7 +84,6 @@ function EntryDetail({
   onOpenPage: () => void;
   onDismissPageError: () => void;
   onClose: () => void;
-  onInstall?: InstallHandler;
 }) {
   const { t, locale } = useI18n();
   const titleId = useId();
@@ -184,12 +177,7 @@ function EntryDetail({
         <div className="sheet-actions">
           {host !== null && <p className="hint">{t.discover.detail.openPageHint(host)}</p>}
           <div className="sheet-buttons">
-            {entry.download !== null && onInstall && (
-              <button type="button" className="btn" onClick={() => onInstall(entry)}>
-                <Icon name="import" />
-                {t.discover.detail.install}
-              </button>
-            )}
+            {entry.download !== null && <CatalogInstallButton entryId={entry.id} />}
             <button type="button" className="btn btn-accent-outline" onClick={onOpenPage}>
               <Icon name="external" />
               {t.discover.detail.openPage}
@@ -229,17 +217,9 @@ function LoadingCatalog() {
 
 /**
  * Discover tab (#73): browse the curated online catalog. Loads on the first visit; the page of an
- * entry opens by id only (the backend owns the URL and its allow-list). `onInstall` is the #74 slot.
+ * entry opens by id only (the backend owns the URL and its allow-list). Entries with a download show the install control (#74).
  */
-export function DiscoverScreen({
-  catalog,
-  onGoToLibrary,
-  onInstall,
-}: {
-  catalog: CatalogController;
-  onGoToLibrary: () => void;
-  onInstall?: InstallHandler;
-}) {
+export function DiscoverScreen({ catalog, onGoToLibrary }: { catalog: CatalogController; onGoToLibrary: () => void }) {
   const { t, locale } = useI18n();
   const { state: launcher } = useLauncher();
   const state = useCatalogState(catalog);
@@ -466,7 +446,6 @@ export function DiscoverScreen({
             catalog.dismissPageError();
             setOpenId(null);
           }}
-          onInstall={onInstall}
         />
       )}
     </>,

@@ -12,7 +12,7 @@ use std::time::Duration;
 use tempfile::TempDir;
 
 #[path = "../support/http_server.rs"]
-mod http_server;
+pub mod http_server;
 use http_server::{Reply, TestServer};
 
 const USER_AGENT: &str = "motogp-launcher/9.9.9 (+https://github.com/IcaroSilvaFK/motogp-launcher)";

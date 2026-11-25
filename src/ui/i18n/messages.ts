@@ -256,5 +256,19 @@ export interface Messages {
     blockedBySession: string;
     errors: Record<UpdateErrorKind, string>;
   };
+  /** Labels of the catalog install button (#74). */
+  catalogInstall: {
+    install: string;
+    /** `percent` is an integer 0-100. */
+    downloading: (percent: number) => string;
+    verifying: string;
+    installing: string;
+    installed: string;
+    failed: string;
+    retry: string;
+    cancel: string;
+    /** Accessible name of the download progress bar. */
+    progressLabel: string;
+  };
   errors: Record<ErrorCode, string>;
 }

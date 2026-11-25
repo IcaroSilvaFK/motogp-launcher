@@ -18,7 +18,7 @@ use tauri::{Builder, Runtime, State};
 type CommandResult<T> = Result<T, CommandError>;
 
 /// Runs a blocking use case off the caller's thread, one mutation at a time.
-async fn mutate<T, F>(state: State<'_, AppState>, job: F) -> CommandResult<T>
+pub(crate) async fn mutate<T, F>(state: State<'_, AppState>, job: F) -> CommandResult<T>
 where
     T: Send + 'static,
     F: FnOnce(&AppState) -> CommandResult<T> + Send + 'static,
@@ -219,7 +219,7 @@ pub async fn clean_stale_session(
 
 /// Runs a read-only blocking use case off the caller's thread. It never takes
 /// `write_lock`: a long measurement must not wait for, or hold up, a mutation.
-async fn read_blocking<T, F>(state: State<'_, AppState>, job: F) -> CommandResult<T>
+pub(crate) async fn read_blocking<T, F>(state: State<'_, AppState>, job: F) -> CommandResult<T>
 where
     T: Send + 'static,
     F: FnOnce(&AppState) -> CommandResult<T> + Send + 'static,
@@ -316,6 +316,8 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         get_game_artwork,
         get_catalog,
         refresh_catalog,
-        open_catalog_page
+        open_catalog_page,
+        crate::commands_install::install_catalog_entry,
+        crate::commands_install::cancel_catalog_install
     ])
 }

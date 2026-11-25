@@ -20,6 +20,7 @@ export { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarPreference'
 export { createLauncherController } from './createLauncherController';
 export { selectCanPlay } from './selectCanPlay';
 export { selectCanStop } from './selectCanStop';
+export { selectCanInstall } from './selectCanInstall';
 export { useLauncherState } from './useLauncherState';
 export type { UpdateService } from './ports/UpdateService';
 export type { UpdateController, UpdateDeps, UpdateState } from './updateController';

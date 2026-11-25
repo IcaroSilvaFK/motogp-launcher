@@ -31,6 +31,7 @@ export const initialState: LauncherState = {
   conflicts: [],
   error: null,
   notice: null,
+  catalogInstalls: {},
 };
 
 export interface FakeController extends LauncherController {
@@ -93,6 +94,8 @@ export function createFakeController(patch: Partial<LauncherState> = {}): FakeCo
     stopSession: action(),
     getStorageUsage: vi.fn(() => Promise.resolve(emptyStorage())),
     openDataFolder: action(),
+    installCatalogEntry: action(),
+    cancelCatalogInstall: action(),
     dismissError: vi.fn(),
     dismissNotice: vi.fn(),
   };

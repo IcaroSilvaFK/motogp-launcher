@@ -1,6 +1,7 @@
-import type { CommandError, SessionEvent } from '../domain';
+import type { CatalogInstallProgress, CatalogInstallState, CommandError, SessionEvent } from '../domain';
 import { VANILLA_ID, isSupportedModFile, isVanilla, toCommandError, toggleMod } from '../domain';
 import type { LauncherController, LauncherDeps, LauncherState, Notice, SessionPhase } from './controller';
+import { selectCanInstall } from './selectCanInstall';
 import { selectCanPlay } from './selectCanPlay';
 import { selectCanStop } from './selectCanStop';
 import { selectProfileLocked } from './selectProfileLocked';
@@ -23,7 +24,27 @@ const initialState: LauncherState = {
   staleSession: null,
   error: null,
   notice: null,
+  catalogInstalls: {},
 };
+
+/** The install state announced by a progress event. */
+function installStateOf(progress: CatalogInstallProgress): CatalogInstallState {
+  switch (progress.phase) {
+    case 'downloading': {
+      const raw = progress.total > 0 ? Math.floor((progress.received * 100) / progress.total) : 0;
+      return {
+        status: 'downloading',
+        received: progress.received,
+        total: progress.total,
+        percent: Math.min(100, Math.max(0, raw)),
+      };
+    }
+    case 'verifying':
+      return { status: 'verifying' };
+    case 'importing':
+      return { status: 'importing' };
+  }
+}
 
 /** Calls the gateway without touching the state; any rejection becomes a CommandError for the caller. */
 async function passThrough<T>(call: () => Promise<T>): Promise<T> {
@@ -202,9 +223,27 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     }
   }
 
+  /** Entry ids with an install call in flight; progress events of any other id are ignored. */
+  const installing = new Set<string>();
+
+  function setInstall(id: string, install: CatalogInstallState): void {
+    set({ catalogInstalls: { ...state.catalogInstalls, [id]: install } });
+  }
+
   async function runStart(run: number): Promise<void> {
     const subscriptionError = await subscribeSession(run);
     if (disposed || run !== generation) return;
+    // Progress is cosmetic: a failed registration must not block the launcher.
+    try {
+      track(
+        gateway.onCatalogInstallProgress((progress) => {
+          if (installing.has(progress.id)) setInstall(progress.id, installStateOf(progress));
+        }),
+        run,
+      );
+    } catch {
+      // No progress events; the install still completes.
+    }
 
     let error: CommandError | null = null;
     let notice: Notice | null = null;
@@ -423,6 +462,35 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
       } catch (caught) {
         // The phase goes back unless a session event already moved it past "stopping".
         set({ error: toCommandError(caught), ...(version === sessionVersion ? { session: previous } : {}) });
+      }
+    },
+    async installCatalogEntry(id) {
+      if (installing.has(id) || !selectCanInstall(state)) return;
+      installing.add(id);
+      setInstall(id, { status: 'downloading', received: 0, total: 0, percent: 0 });
+      try {
+        await gateway.installCatalogEntry(id);
+      } catch (caught) {
+        const error = toCommandError(caught);
+        // A cancel is the user's choice, not a failure.
+        setInstall(id, error.code === 'download_cancelled' ? { status: 'idle' } : { status: 'failed', ...error });
+        return;
+      } finally {
+        installing.delete(id);
+      }
+      setInstall(id, { status: 'installed' });
+      try {
+        await load(['mods']);
+      } catch (caught) {
+        set({ error: toCommandError(caught) });
+      }
+    },
+    async cancelCatalogInstall(id) {
+      if (!installing.has(id)) return;
+      try {
+        await gateway.cancelCatalogInstall(id);
+      } catch (caught) {
+        set({ error: toCommandError(caught) });
       }
     },
     getStorageUsage: () => passThrough(() => gateway.getStorageUsage()),

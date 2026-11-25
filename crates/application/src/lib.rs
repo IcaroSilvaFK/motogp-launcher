@@ -6,6 +6,7 @@
 mod artwork_ports;
 mod artwork_service;
 mod catalog_error;
+mod catalog_install;
 mod catalog_ports;
 mod catalog_service;
 mod config_service;
@@ -13,6 +14,7 @@ mod deploy_error;
 mod deploy_ports;
 mod deploy_service;
 mod deploy_session;
+mod download_ports;
 mod error;
 mod game_error;
 mod game_ports;
@@ -38,6 +40,9 @@ mod storage_service;
 pub use artwork_ports::{Artwork, GameArtworkSource, ImageMime};
 pub use artwork_service::ArtworkService;
 pub use catalog_error::{CatalogCacheError, CatalogError, CatalogSourceError};
+pub use catalog_install::{
+    CatalogInstallError, CatalogInstaller, InstallPhase, InstallProgress, StagedDownload,
+};
 pub use catalog_ports::{
     CachedCatalog, CatalogCache, CatalogSource, RawCatalog, RawEntry, SourceFetch, WebPageOpener,
 };
@@ -50,6 +55,9 @@ pub use deploy_error::DeployError;
 pub use deploy_ports::{DeployFiles, DeployedRepository, DirCheck};
 pub use deploy_service::{DeployMod, DeployService};
 pub use deploy_session::DeploySession;
+pub use download_ports::{
+    CancelFlag, DownloadError, DownloadProgress, DownloadRequest, DownloadStaging, ModDownloader,
+};
 pub use error::AppError;
 pub use game_error::GameError;
 pub use game_ports::{GameFiles, SteamLocator};

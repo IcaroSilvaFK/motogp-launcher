@@ -55,6 +55,7 @@ let gateway: { [K in keyof CatalogGateway]: ReturnType<typeof vi.fn> & CatalogGa
 let catalog: CatalogController;
 let user: ReturnType<typeof userEvent.setup>;
 let mods: ModEntry[];
+let launcher: ReturnType<typeof createFakeController>;
 
 function setGateway(get: () => Promise<Catalog>) {
   gateway = {
@@ -67,7 +68,8 @@ function setGateway(get: () => Promise<Catalog>) {
 
 async function openDiscover() {
   user = userEvent.setup();
-  render(<App controller={createFakeController({ mods })} catalog={catalog} locale="en" />);
+  launcher = createFakeController({ mods });
+  render(<App controller={launcher} catalog={catalog} locale="en" />);
   await user.click(
     within(screen.getByRole('navigation', { name: 'Main navigation' })).getByRole('button', { name: 'Discover' }),
   );
@@ -251,10 +253,25 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
     });
   });
 
-  Scenario('Install stays hidden until downloads exist', ({ Given, When, Then }) => {
+  Scenario('Install is offered only for entries with a download', ({ Given, When, Then }) => {
     Given('an entry with a download block', async () => {
       const download = { url: 'https://github.com/x/y.zip', size: 10, sha256: 'a'.repeat(64) };
       setGateway(() => Promise.resolve(catalogOf([{ ...rebalanced, download }])));
+      await openDiscover();
+      await screen.findByRole('list', { name: /results/i });
+    });
+    When('I open the entry "Rebalanced AI"', async () => {
+      await user.click(screen.getByRole('button', { name: 'Rebalanced AI' }));
+    });
+    Then('an Install button is shown', async () => {
+      await user.click(within(dialog()).getByRole('button', { name: 'Install' }));
+      expect(launcher.installCatalogEntry).toHaveBeenCalledWith('rebalanced-ai');
+    });
+  });
+
+  Scenario('No Install button for an entry without a download', ({ Given, When, Then }) => {
+    Given('an entry without a download block', async () => {
+      setGateway(() => Promise.resolve(catalogOf([{ ...rebalanced, download: null }])));
       await openDiscover();
       await screen.findByRole('list', { name: /results/i });
     });

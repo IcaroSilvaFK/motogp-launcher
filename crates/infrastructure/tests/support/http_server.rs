@@ -13,6 +13,9 @@ pub struct Reply {
     pub status: u16,
     pub headers: Vec<(String, String)>,
     pub body: Vec<u8>,
+    /// `Content-Length` to announce when it differs from the body (a body
+    /// shorter than this is a dropped connection).
+    pub declared_len: Option<usize>,
 }
 
 impl Reply {
@@ -21,11 +24,17 @@ impl Reply {
             status,
             headers: Vec::new(),
             body: Vec::new(),
+            declared_len: None,
         }
     }
 
     pub fn header(mut self, name: &str, value: &str) -> Self {
         self.headers.push((name.to_string(), value.to_string()));
+        self
+    }
+
+    pub fn declared_len(mut self, len: usize) -> Self {
+        self.declared_len = Some(len);
         self
     }
 
@@ -113,7 +122,7 @@ fn write_reply(stream: &mut TcpStream, reply: &Reply) -> std::io::Result<()> {
     }
     head.push_str(&format!(
         "Content-Length: {}\r\nConnection: close\r\n\r\n",
-        reply.body.len()
+        reply.declared_len.unwrap_or(reply.body.len())
     ));
     stream.write_all(head.as_bytes())?;
     stream.write_all(&reply.body)?;
