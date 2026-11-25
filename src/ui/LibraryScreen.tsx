@@ -100,6 +100,8 @@ export function LibraryScreen() {
         ? t.library.toggleVanilla
         : null;
   const toggleInert = toggleBlocker !== null || state.busy;
+  // Removing a mod rewrites the library and every profile, so a session blocks it too.
+  const removeLocked = selectProfileLocked(state);
 
   const modNames = new Map(state.mods.map((mod) => [mod.id, mod.name]));
   const nameOf = (id: string) => modNames.get(id) ?? id;
@@ -200,6 +202,11 @@ export function LibraryScreen() {
                   {toggleBlocker}
                 </p>
               )}
+              {removeLocked && (
+                <p id="library-remove-hint" className="hint toggle-hint">
+                  {t.library.removeLocked}
+                </p>
+              )}
               <ul className="mod-list" aria-labelledby="library-title">
                 {visible.map((mod, index) => {
                   const enabled = activeModIds.has(mod.id);
@@ -246,7 +253,12 @@ export function LibraryScreen() {
                         type="button"
                         className="btn btn-danger btn-sm"
                         aria-label={t.library.removeNamed(mod.name)}
-                        onClick={() => void controller.removeMod(mod.id)}
+                        aria-disabled={removeLocked || undefined}
+                        aria-describedby={removeLocked ? 'library-remove-hint' : undefined}
+                        title={removeLocked ? t.library.removeLocked : undefined}
+                        onClick={() => {
+                          if (!removeLocked) void controller.removeMod(mod.id);
+                        }}
                       >
                         {t.library.remove}
                       </button>

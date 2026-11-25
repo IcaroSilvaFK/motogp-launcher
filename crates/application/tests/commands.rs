@@ -254,6 +254,41 @@ fn remove_mod_reports_library_failures_and_keeps_references() {
     );
 }
 
+struct Locked;
+
+impl motogp_application::SessionActivity for Locked {
+    fn is_active(&self) -> bool {
+        true
+    }
+}
+
+#[test]
+fn remove_mod_is_refused_before_touching_anything_while_a_session_is_active() {
+    let state = fakes::new_state();
+    fakes::put_file(&state, "src/A.pak", b"AAAAAA-pak");
+    let mods = fakes::service(&state);
+    let id = mods.import(Path::new("src/A.pak")).unwrap()[0].id.clone();
+    let profiles = FakeProfiles::default();
+    let service = profile_service(&profiles);
+    let profile = service.create("One").unwrap();
+    service.set_mods(&profile.id, vec![id.clone()]).unwrap();
+    let service = service.with_session(std::sync::Arc::new(Locked));
+
+    let error = remove_mod(&mods, &service, &id).unwrap_err();
+
+    assert_eq!(error, RemoveModError::SessionActive);
+    assert_eq!(state.borrow().index.len(), 1, "library untouched");
+    assert_eq!(service.get(&profile.id).unwrap().mod_ids, vec![id]);
+}
+
+#[test]
+fn remove_mod_session_error_explains_the_lock() {
+    assert_eq!(
+        RemoveModError::SessionActive.to_string(),
+        "mods cannot be removed from the library while a game session is active"
+    );
+}
+
 #[test]
 fn remove_unknown_mod_reports_not_found() {
     let state = fakes::new_state();

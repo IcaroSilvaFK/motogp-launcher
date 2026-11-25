@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
+import { selectProfileLocked } from '../application';
 import type { FileConflict, Profile } from '../domain';
 import { isVanilla, moveItem, toggleMod } from '../domain';
 import { Icon } from './Icon';
@@ -121,9 +122,17 @@ function ProfileEditor({ profile }: { profile: Profile }) {
     else moveButtons.current.delete(key);
   };
 
+  // aria-disabled (not disabled) keeps the actions focusable so the reason stays reachable.
+  const locked = selectProfileLocked(state);
+  const lockProps = {
+    'aria-disabled': locked || undefined,
+    'aria-describedby': locked ? 'profile-editor-lock-hint' : undefined,
+    title: locked ? t.profiles.locked : undefined,
+  };
+
   const rename = (event: FormEvent) => {
     event.preventDefault();
-    void controller.renameProfile(profile.id, name);
+    if (!locked) void controller.renameProfile(profile.id, name);
   };
 
   return (
@@ -135,12 +144,21 @@ function ProfileEditor({ profile }: { profile: Profile }) {
             type="button"
             className="btn btn-danger btn-sm"
             aria-label={t.profiles.deleteNamed(profile.name)}
-            onClick={() => void controller.deleteProfile(profile.id)}
+            {...lockProps}
+            onClick={() => {
+              if (!locked) void controller.deleteProfile(profile.id);
+            }}
           >
             {t.profiles.delete}
           </button>
         )}
       </div>
+
+      {locked && !isVanilla(profile) && (
+        <p id="profile-editor-lock-hint" className="hint">
+          {t.profiles.locked}
+        </p>
+      )}
 
       {isVanilla(profile) ? (
         <p className="hint">{t.profiles.vanillaLocked}</p>
@@ -155,7 +173,7 @@ function ProfileEditor({ profile }: { profile: Profile }) {
               onChange={(event) => setName(event.target.value)}
             />
           </div>
-          <button type="submit" className="btn">
+          <button type="submit" className="btn" {...lockProps}>
             {t.profiles.rename}
           </button>
         </form>
@@ -238,7 +256,10 @@ function ProfileEditor({ profile }: { profile: Profile }) {
             <button
               type="button"
               className="btn btn-accent-outline"
-              onClick={() => void controller.setProfileMods(profile.id, ordered)}
+              {...lockProps}
+              onClick={() => {
+                if (!locked) void controller.setProfileMods(profile.id, ordered);
+              }}
             >
               {t.profiles.save}
             </button>
@@ -258,8 +279,11 @@ export function ProfilesScreen() {
   const active = state.profiles.find((profile) => profile.id === state.config.active_profile) ?? null;
   const modIds = new Set(state.mods.map((mod) => mod.id));
 
+  const locked = selectProfileLocked(state);
+
   const create = (event: FormEvent) => {
     event.preventDefault();
+    if (locked) return;
     void controller.createProfile(newName);
     setNewName('');
   };
@@ -316,7 +340,18 @@ export function ProfilesScreen() {
                 onChange={(event) => setNewName(event.target.value)}
               />
             </div>
-            <button type="submit" className="btn">
+            {locked && (
+              <p id="profile-create-lock-hint" className="hint">
+                {t.profiles.locked}
+              </p>
+            )}
+            <button
+              type="submit"
+              className="btn"
+              aria-disabled={locked || undefined}
+              aria-describedby={locked ? 'profile-create-lock-hint' : undefined}
+              title={locked ? t.profiles.locked : undefined}
+            >
               <Icon name="plus" />
               {t.profiles.create}
             </button>

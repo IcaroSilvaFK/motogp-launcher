@@ -33,3 +33,9 @@ Feature: Expose the launcher use cases through Tauri commands
     When the interface calls "set_profile_mods" for a profile
     Then the command fails with code "profile_locked_by_session"
     And the profile keeps its previous mods
+
+  Scenario: remove_mod is refused while a session is running
+    Given the game is running after Play
+    When the interface calls "remove_mod" for a library mod
+    Then the command fails with code "library_locked_by_session"
+    And the mod is still in the library

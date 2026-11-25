@@ -52,6 +52,7 @@ export const ptBR: Messages = {
     toggleNamed: (modName, profileName) =>
       profileName === null ? `Incluir ${modName} no perfil ativo` : `Incluir ${modName} em ${profileName}`,
     toggleLocked: 'As alterações de perfil ficam bloqueadas enquanto o jogo está em execução.',
+    removeLocked: 'Os mods não podem ser removidos da biblioteca enquanto o jogo está em execução.',
     toggleVanilla: 'O Vanilla sempre roda sem mods. Escolha outro perfil para adicionar mods.',
     toggleNoProfile: 'Selecione um perfil primeiro.',
     conflictWins: 'Vence',
@@ -76,6 +77,7 @@ export const ptBR: Messages = {
     mods: 'Mods',
     noMods: 'A biblioteca não tem mods para escolher.',
     vanillaLocked: 'O perfil Vanilla não pode ser excluído.',
+    locked: 'As alterações de perfil ficam bloqueadas enquanto o jogo está em execução.',
     createTitle: 'Novo perfil',
     createHint: 'Um perfil é um conjunto de mods com uma ordem de carregamento.',
     listTitle: 'Seus perfis',
@@ -221,6 +223,7 @@ export const ptBR: Messages = {
     profile_not_found: 'Perfil não encontrado.',
     vanilla_protected: 'O perfil Vanilla não pode ser alterado nem excluído.',
     profile_locked_by_session: 'Os perfis não podem ser alterados enquanto o jogo está em execução.',
+    library_locked_by_session: 'Os mods não podem ser removidos da biblioteca enquanto o jogo está em execução.',
     already_running: 'Já existe uma sessão em execução.',
     game_not_configured: 'Nenhum jogo configurado. Escolha a pasta do jogo em Configurações.',
     missing_app_id: 'O App ID do jogo não foi encontrado. Abra o jogo pela Steam uma vez.',

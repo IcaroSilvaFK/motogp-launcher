@@ -401,6 +401,40 @@ fn has_mods(w: &mut ProfilesWorld, _name: String, mod_id: String) {
     assert_eq!(w.service().get(&w.target()).unwrap().mod_ids, [mod_id]);
 }
 
+#[given(expr = "a profile {string} with the mods {string} and {string}")]
+fn profile_with_two_mods(w: &mut ProfilesWorld, name: String, first: String, second: String) {
+    w.create_target(&name);
+    w.service()
+        .set_mods(&w.target(), vec![first, second])
+        .unwrap();
+    w.snapshot = Some(w.persisted());
+}
+
+#[when(expr = "I remove {string} from every profile")]
+fn remove_from_every_profile(w: &mut ProfilesWorld, mod_id: String) {
+    w.errors = w
+        .service()
+        .remove_mod_everywhere(&mod_id)
+        .err()
+        .into_iter()
+        .collect();
+}
+
+#[then(expr = "the attempt fails with {string}")]
+fn the_attempt_fails(w: &mut ProfilesWorld, kind: String) {
+    assert_eq!(kind, "session active");
+    assert_eq!(w.errors, vec![ProfileServiceError::SessionActive]);
+}
+
+#[then(expr = "{string} still has the mods {string} and {string}")]
+fn still_has_two_mods(w: &mut ProfilesWorld, _name: String, first: String, second: String) {
+    assert_eq!(Some(w.persisted()), w.snapshot);
+    assert_eq!(
+        w.service().get(&w.target()).unwrap().mod_ids,
+        [first, second]
+    );
+}
+
 /// Runs only `profiles.feature`; returns `true` when every step passed.
 pub async fn run() -> bool {
     let writer = ProfilesWorld::cucumber()

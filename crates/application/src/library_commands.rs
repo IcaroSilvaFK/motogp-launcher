@@ -68,6 +68,8 @@ where
 /// Why removing a mod did not complete.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RemoveModError {
+    /// A game session is active: the library and the profiles were left untouched.
+    SessionActive,
     /// The library could not remove the mod; profiles were left untouched.
     Library(LibraryError),
     /// The mod was removed but a profile could not be updated.
@@ -77,6 +79,10 @@ pub enum RemoveModError {
 impl fmt::Display for RemoveModError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            RemoveModError::SessionActive => write!(
+                f,
+                "mods cannot be removed from the library while a game session is active"
+            ),
             RemoveModError::Library(error) => write!(f, "{error}"),
             RemoveModError::Profiles(error) => write!(
                 f,
@@ -104,6 +110,10 @@ where
     PR: ProfileRepository,
     C: Clock,
 {
+    // The lock is checked first so a refused removal leaves everything untouched.
+    profiles
+        .ensure_idle()
+        .map_err(|_| RemoveModError::SessionActive)?;
     match mods.remove(id) {
         Ok(()) => profiles
             .remove_mod_everywhere(id)

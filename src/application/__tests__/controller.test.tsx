@@ -576,4 +576,39 @@ describe('Given a stale deploy session', () => {
       expect(modsOf(controller, id)).toEqual(['a']);
     });
   });
+
+  describe('session lock on library and profile writes', () => {
+    async function locked() {
+      const ctx = await ready({ mods: [mod('a'), mod('b')] });
+      await ctx.controller.createProfile('Mine');
+      const id = ctx.controller.getState().profiles.find((p) => p.name === 'Mine')?.id ?? '';
+      ctx.controller.dismissNotice();
+      ctx.session.emitSession({ state: 'started', cleaned: 0 });
+      expect(ctx.controller.getState().session.kind).toBe('running');
+      const writes = ['createProfile', 'renameProfile', 'deleteProfile', 'setProfileMods', 'removeMod'] as const;
+      const before = writes.map((method) => ctx.gateway.callsOf(method).length);
+      return { ...ctx, id, writes, before };
+    }
+
+    it('When a session is running Then no library or profile write reaches the gateway', async () => {
+      const { controller, gateway, id, writes, before } = await locked();
+      await controller.createProfile('Wet');
+      await controller.renameProfile(id, 'Dry');
+      await controller.deleteProfile(id);
+      await controller.setProfileMods(id, ['a']);
+      await controller.removeMod('a');
+      expect(writes.map((method) => gateway.callsOf(method).length)).toEqual(before);
+      expect(controller.getState().mods).toHaveLength(2);
+      expect(controller.getState().profiles.map((p) => p.name)).toEqual(['Vanilla', 'Mine']);
+      expect(controller.getState().error).toBeNull();
+    });
+
+    it('When the session ends Then the writes work again', async () => {
+      const { controller, session, gateway } = await locked();
+      session.emitSession({ state: 'ended', cleaned: 0 });
+      await controller.removeMod('a');
+      expect(gateway.callsOf('removeMod')).toHaveLength(1);
+      expect(controller.getState().mods.map((m) => m.id)).toEqual(['b']);
+    });
+  });
 });

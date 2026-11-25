@@ -70,3 +70,18 @@ Feature: Expose use cases and recover sessions through the launcher
     Given a manifest whose cleanup fails on startup
     When the interface reads the recovery status after subscribing
     Then it still sees the failure and its message
+
+  Scenario: Removing a mod from the library is refused while a session is active
+    Given the library has the mod "m1" referenced by the profile "Race"
+    And a game session is active
+    When I remove the mod "m1"
+    Then the removal fails with "session active"
+    And "m1" is still in the library
+    And "Race" still has the mod "m1"
+
+  Scenario: Removing a mod works again after the session ends
+    Given the library has the mod "m1" referenced by the profile "Race"
+    And a game session was active and has ended
+    When I remove the mod "m1"
+    Then "m1" is no longer in the library
+    And "Race" has no mods

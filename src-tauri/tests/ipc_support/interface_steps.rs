@@ -21,6 +21,7 @@ struct InterfaceWorld {
     second: Option<bool>,
     locked: Value,
     locked_profile: String,
+    removed_mod: String,
 }
 
 impl std::fmt::Debug for InterfaceWorld {
@@ -270,6 +271,33 @@ fn interface_calls_for_profile(w: &mut InterfaceWorld, command: String) {
 #[then(expr = "the command fails with code {string}")]
 fn command_fails_with_code(w: &mut InterfaceWorld, code: String) {
     assert_eq!(w.locked["code"], json!(code));
+}
+
+#[when(expr = "the interface calls {string} for a library mod")]
+fn interface_calls_for_library_mod(w: &mut InterfaceWorld, command: String) {
+    let source = w.h().write_mod_source("Cool_P.pak", b"cool-pak-content");
+    let imported = w
+        .h()
+        .invoke(
+            "import_mods",
+            json!({ "paths": [source.to_string_lossy()] }),
+        )
+        .unwrap();
+    w.removed_mod = imported[0]["id"].as_str().unwrap().to_string();
+    let id = w.removed_mod.clone();
+    w.locked = w.h().invoke(&command, json!({ "id": id })).unwrap_err();
+}
+
+#[then("the mod is still in the library")]
+fn mod_still_in_library(w: &mut InterfaceWorld) {
+    let listed = w.h().invoke("list_mods", json!({})).unwrap();
+    let ids: Vec<_> = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|m| m["id"].clone())
+        .collect();
+    assert_eq!(ids, vec![json!(w.removed_mod)]);
 }
 
 #[then("the profile keeps its previous mods")]
