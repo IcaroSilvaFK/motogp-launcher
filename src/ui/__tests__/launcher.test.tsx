@@ -217,10 +217,13 @@ describe('Given the shell', () => {
     );
     expect(screen.getByRole('button', { name: 'Play' })).toBeEnabled();
 
+    // While a session can be stopped, Stop takes Play's place (#75): Play is not offered at all.
     act(() => controller.setState({ session: { kind: 'starting' } }));
-    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
-    act(() => controller.setState({ session: { kind: 'running' } }));
-    expect(screen.getByRole('button', { name: 'Play' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
+    act(() => controller.setState({ session: { kind: 'running', since: null } }));
+    expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Stop' })).toBeEnabled();
   });
 
   it('play_button_calls_play: When I click Play Then play is requested', async () => {
@@ -254,7 +257,7 @@ describe('Given the shell', () => {
   });
 
   it('session_status_uses_cleaned_count: When the session ends Then I see the cleaned count', () => {
-    const controller = createFakeController({ session: { kind: 'running' } });
+    const controller = createFakeController({ session: { kind: 'running', since: null } });
     renderApp(controller);
     expect(screen.getByText('Running…')).toBeInTheDocument();
     act(() => controller.setState({ session: { kind: 'ended', cleaned: 2 } }));

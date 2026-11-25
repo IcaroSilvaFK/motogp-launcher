@@ -91,6 +91,17 @@ pub fn watch_step(
     (next, None)
 }
 
+/// The user asked to stop the game and no game process is left: the session
+/// ends now, without waiting for the missing-polls or never-started rules.
+pub fn watch_stop(state: WatchState) -> (WatchState, Option<WatchEvent>) {
+    if state.finished {
+        return (state, None);
+    }
+    let mut next = state;
+    next.finished = true;
+    (next, Some(WatchEvent::Ended))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -171,6 +182,29 @@ mod tests {
         assert_eq!(again, None);
         let (_, started) = watch_step(state, true, T0);
         assert_eq!(started, None);
+    }
+
+    #[test]
+    fn stop_ends_a_session_that_never_saw_the_game() {
+        let (state, event) = watch_stop(WatchState::default());
+        assert_eq!(event, Some(WatchEvent::Ended));
+        assert!(state.is_finished());
+    }
+
+    #[test]
+    fn stop_ends_a_running_session_at_once() {
+        let (state, _) = run(&[(true, 0)]);
+        let (state, event) = watch_stop(state);
+        assert_eq!(event, Some(WatchEvent::Ended));
+        assert!(state.is_finished());
+    }
+
+    #[test]
+    fn stop_after_the_end_emits_nothing() {
+        let (state, _) = watch_stop(WatchState::default());
+        let (again, event) = watch_stop(state);
+        assert_eq!(event, None);
+        assert!(again.is_finished());
     }
 
     #[test]

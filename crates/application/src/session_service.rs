@@ -1,7 +1,7 @@
 use crate::{
     AppError, ProcessInspector, SessionClock, SessionError, TrackOutcome, UrlOpener, POLL,
 };
-use motogp_domain::{launch_url, watch_step, GameInfo, WatchEvent, WatchState};
+use motogp_domain::{launch_url, watch_step, watch_stop, GameInfo, WatchEvent, WatchState};
 use std::path::Path;
 
 /// Launches the game and tracks its session through ports.
@@ -31,6 +31,16 @@ impl<O: UrlOpener, P: ProcessInspector, C: SessionClock> SessionService<O, P, C>
         self.inspector.game_running(root)
     }
 
+    /// Ends the game processes installed in `root`; returns how many.
+    pub fn terminate_game(&self, root: &Path) -> Result<usize, AppError> {
+        self.inspector.terminate_inside(root)
+    }
+
+    /// Wall-clock Unix milliseconds.
+    pub fn unix_now_ms(&self) -> u64 {
+        self.clock.unix_now_ms()
+    }
+
     /// Polls every `POLL` on a fixed schedule (inspection time never drifts it)
     /// until a terminal event; each event goes to `emit`. `cancel` is checked
     /// before every inspection (so also after every wait); when it fires the
@@ -39,6 +49,19 @@ impl<O: UrlOpener, P: ProcessInspector, C: SessionClock> SessionService<O, P, C>
         &self,
         root: &Path,
         cancel: impl Fn() -> bool,
+        emit: impl FnMut(WatchEvent),
+    ) -> Result<TrackOutcome, AppError> {
+        self.track_stoppable(root, cancel, || false, emit)
+    }
+
+    /// Like `track`, plus `stop_requested`: once it is true and no game
+    /// process is left, the session ends as `Ended` immediately (no waiting
+    /// for the missing-polls or the 120 s never-started rule).
+    pub fn track_stoppable(
+        &self,
+        root: &Path,
+        cancel: impl Fn() -> bool,
+        stop_requested: impl Fn() -> bool,
         mut emit: impl FnMut(WatchEvent),
     ) -> Result<TrackOutcome, AppError> {
         let start = self.clock.now();
@@ -50,7 +73,11 @@ impl<O: UrlOpener, P: ProcessInspector, C: SessionClock> SessionService<O, P, C>
             }
             let running = self.inspector.game_running(root)?;
             let elapsed = self.clock.now().saturating_sub(start);
-            let (next, event) = watch_step(state, running, elapsed);
+            let (next, event) = if !running && stop_requested() {
+                watch_stop(state)
+            } else {
+                watch_step(state, running, elapsed)
+            };
             state = next;
             if let Some(event) = event {
                 emit(event);
@@ -84,6 +111,9 @@ mod tests {
         fn sleep(&self, d: Duration) {
             self.0.set(self.0.get() + d);
         }
+        fn unix_now_ms(&self) -> u64 {
+            1_700_000_000_000 + self.0.get().as_millis() as u64
+        }
     }
 
     /// Reports `script[i]` on the i-th query (absent once the script ends)
@@ -94,6 +124,7 @@ mod tests {
         queries: RefCell<Vec<Duration>>,
         fail: bool,
         cost: Duration,
+        terminated: Cell<usize>,
     }
     impl FakeInspector {
         fn new(clock: &FakeClock, script: Vec<bool>) -> Self {
@@ -103,6 +134,7 @@ mod tests {
                 queries: RefCell::default(),
                 fail: false,
                 cost: Duration::ZERO,
+                terminated: Cell::new(0),
             }
         }
     }
@@ -119,6 +151,10 @@ mod tests {
             q.push(self.clock.now());
             self.clock.0.set(self.clock.0.get() + self.cost);
             Ok(self.script.get(i).copied().unwrap_or(false))
+        }
+        fn terminate_inside(&self, _root: &Path) -> Result<usize, AppError> {
+            self.terminated.set(self.terminated.get() + 1);
+            Ok(2)
         }
     }
 
@@ -227,6 +263,46 @@ mod tests {
         assert_eq!(outcome, TrackOutcome::Cancelled);
         assert_eq!(events, vec![WatchEvent::Started]);
         assert_eq!(queries.len(), 3);
+    }
+
+    #[test]
+    fn stop_requested_with_the_game_gone_ends_at_once_without_waiting() {
+        let clock = FakeClock::default();
+        let inspector = FakeInspector::new(&clock, vec![]);
+        let opener = FakeOpener::default();
+        let service = SessionService::new(&opener, &inspector, clock.clone());
+        let mut events = Vec::new();
+        let outcome = service
+            .track_stoppable(Path::new("root"), || false, || true, |e| events.push(e))
+            .expect("track");
+        assert_eq!(outcome, TrackOutcome::Finished);
+        assert_eq!(events, vec![WatchEvent::Ended]);
+        assert!(clock.now() < Duration::from_secs(1));
+    }
+
+    #[test]
+    fn stop_requested_keeps_tracking_while_the_game_is_still_running() {
+        let clock = FakeClock::default();
+        let inspector = FakeInspector::new(&clock, vec![true, true, false]);
+        let opener = FakeOpener::default();
+        let service = SessionService::new(&opener, &inspector, clock.clone());
+        let mut events = Vec::new();
+        service
+            .track_stoppable(Path::new("root"), || false, || true, |e| events.push(e))
+            .expect("track");
+        assert_eq!(events, vec![WatchEvent::Started, WatchEvent::Ended]);
+        assert_eq!(inspector.queries.borrow().len(), 3);
+    }
+
+    #[test]
+    fn terminate_and_wall_clock_delegate_to_the_ports() {
+        let clock = FakeClock::default();
+        let inspector = FakeInspector::new(&clock, vec![]);
+        let opener = FakeOpener::default();
+        let service = SessionService::new(&opener, &inspector, clock);
+        assert_eq!(service.terminate_game(Path::new("root")), Ok(2));
+        assert_eq!(inspector.terminated.get(), 1);
+        assert_eq!(service.unix_now_ms(), 1_700_000_000_000);
     }
 
     #[test]

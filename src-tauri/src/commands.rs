@@ -7,8 +7,8 @@
 //! blocking pool, never on the main thread, and mutations are serialized
 //! through `AppState::write_lock` so they cannot lose each other's updates.
 use crate::dto::{
-    ConfigDto, ConflictDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto,
-    StorageUsageDto,
+    ConfigDto, ConflictDto, CurrentSessionDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto,
+    RecoveryStatusDto, StorageUsageDto,
 };
 use crate::{AppState, CommandError};
 use motogp_application::{import_mods as import_batch, remove_mod as remove_everywhere};
@@ -163,6 +163,28 @@ pub async fn play(state: State<'_, AppState>, profile_id: String) -> CommandResu
     mutate(state, move |state| Ok(state.play.play(&profile_id)?)).await
 }
 
+/// The live session right now (the interface may load after the events were
+/// emitted, for example after a page reload).
+#[tauri::command]
+pub fn current_session(state: State<'_, AppState>) -> CurrentSessionDto {
+    state.play.current_session().into()
+}
+
+/// Ends the game of the live session. Returns once the game was asked to
+/// close; the cleanup that follows is reported through the `session` events.
+/// It skips the write lock: it must work while other commands are busy.
+#[tauri::command]
+pub async fn stop_session(state: State<'_, AppState>) -> CommandResult<()> {
+    let state = state.inner().clone();
+    tauri::async_runtime::spawn_blocking(move || state.play.stop_session())
+        .await
+        .map_err(|error| CommandError {
+            code: "task_failed".to_string(),
+            message: format!("the operation did not finish: {error}"),
+        })?
+        .map_err(CommandError::from)
+}
+
 /// The startup recovery result. The frontend reads it after subscribing to
 /// the session events, so a failure that happened before it listened is kept.
 #[tauri::command]
@@ -259,6 +281,8 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         list_conflicts,
         set_active_profile,
         play,
+        current_session,
+        stop_session,
         recovery_status,
         deploy_session,
         forget_stale_session,

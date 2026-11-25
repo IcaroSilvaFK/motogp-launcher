@@ -14,6 +14,10 @@ pub trait UrlOpener {
 pub trait ProcessInspector {
     /// True when a process whose executable lives inside `root` is running.
     fn game_running(&self, root: &Path) -> Result<bool, AppError>;
+    /// Ends every process whose executable lives inside `root` (and their
+    /// descendants). Returns how many processes were ended; never touches
+    /// a process outside `root`.
+    fn terminate_inside(&self, root: &Path) -> Result<usize, AppError>;
 }
 
 /// Port: monotonic time and waiting, so tests never sleep for real.
@@ -22,6 +26,8 @@ pub trait SessionClock {
     fn now(&self) -> Duration;
     /// Blocks (or advances a fake clock) for `duration`.
     fn sleep(&self, duration: Duration);
+    /// Wall-clock time as Unix milliseconds (for display, never for timing).
+    fn unix_now_ms(&self) -> u64;
 }
 
 /// How a `track` call ended.

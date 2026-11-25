@@ -57,7 +57,7 @@ Feature: Use the launcher through the interface
     Given the app without a configured game
     Then Play is disabled
     When I configure a game and request to start a session
-    Then Play stays disabled during start and execution
+    Then Play is replaced by Stop during start and execution
 
   Scenario: Show session events
     Given a requested session

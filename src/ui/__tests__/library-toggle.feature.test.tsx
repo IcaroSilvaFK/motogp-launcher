@@ -144,7 +144,7 @@ describeFeature(feature, ({ Background, Scenario, AfterEachScenario }) => {
   Scenario('Switches are locked while a game session is running', ({ Given, Then, And, When }) => {
     Given('a game session is running', async () => {
       const { session, controller } = await getWorld();
-      session.emitSession({ state: 'started', cleaned: 0 });
+      session.emitSession({ state: 'started', cleaned: 0, started_at: null });
       await waitFor(() => expect(controller.getState().session.kind).toBe('running'));
     });
     Then('every switch is marked as disabled', () => {

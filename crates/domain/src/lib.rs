@@ -27,7 +27,7 @@ pub use mod_grouping::{
 };
 pub use profile::{normalize_load_order, normalize_name, Profile, ProfileError, VANILLA_ID};
 pub use session::{
-    launch_url, watch_step, LaunchError, WatchEvent, WatchState, MISSING_POLLS_TO_END,
+    launch_url, watch_step, watch_stop, LaunchError, WatchEvent, WatchState, MISSING_POLLS_TO_END,
     NEVER_STARTED_AFTER,
 };
 pub use storage::{classify_entry, StorageCategory, StorageUsage};

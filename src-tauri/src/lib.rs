@@ -20,8 +20,8 @@ pub use bootstrap::run;
 pub use commands::configure;
 pub use compose::{compose, AppState, Profiles, Settings, Storage};
 pub use dto::{
-    ConfigDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto,
-    SessionErrorDto, SessionEventDto, StorageCategoryDto, StorageUsageDto,
+    ConfigDto, CurrentSessionDto, DeploySessionDto, GameInfoDto, ModDto, ProfileDto,
+    RecoveryStatusDto, SessionErrorDto, SessionEventDto, StorageCategoryDto, StorageUsageDto,
 };
 pub use error::CommandError;
 pub use startup::run_recovery;

@@ -19,6 +19,15 @@ fn ended(cleaned: usize) -> SessionEvent {
     SessionEvent {
         state: SessionState::Ended,
         cleaned,
+        started_at_ms: None,
+    }
+}
+
+fn cleaning_up() -> SessionEvent {
+    SessionEvent {
+        state: SessionState::CleaningUp,
+        cleaned: 0,
+        started_at_ms: Some(1_700_000_000_000),
     }
 }
 
@@ -26,6 +35,7 @@ fn started() -> SessionEvent {
     SessionEvent {
         state: SessionState::Started,
         cleaned: 0,
+        started_at_ms: Some(1_700_000_000_000),
     }
 }
 
@@ -76,7 +86,7 @@ fn restart_with_the_game_running_keeps_files_and_resumes_tracking() {
     rig.runner.run_pending();
 
     assert!(disk_names(&rig.disk).is_empty());
-    assert_eq!(rig.events(), vec![started(), ended(1)]);
+    assert_eq!(rig.events(), vec![started(), cleaning_up(), ended(1)]);
     let status = rig.play.recovery_status();
     assert_eq!(status.state, RecoveryState::Recovered);
     assert_eq!(status.cleaned_count, 1);
@@ -265,4 +275,32 @@ fn recovery_status_reports_the_cleaned_count() {
     assert_eq!(status.state, RecoveryState::Recovered);
     assert_eq!(status.cleaned_count, 1);
     assert_eq!(status.error, None);
+}
+
+#[test]
+fn a_session_resumed_at_startup_is_a_live_session_that_can_be_stopped() {
+    let rig = Rig::new();
+    leave_deployed(&rig);
+    set_running(&rig, Ok(true));
+    *rig.runtime.events.lock().unwrap() = vec![WatchEvent::Started];
+    rig.runtime.hold.store(true, Ordering::SeqCst);
+    rig.runner.threaded.store(true, Ordering::SeqCst);
+
+    rig.play.recover_on_startup().expect("recovery");
+    rig.wait_until("the resumed game is seen", |r| {
+        r.play.current_session().phase == motogp_application::SessionPhase::Running
+    });
+    assert_eq!(
+        rig.play.current_session().started_at_ms,
+        Some(1_700_000_000_000)
+    );
+
+    rig.play.stop_session().expect("stop");
+    rig.wait_until("the resumed session ended", |r| {
+        r.events()
+            .last()
+            .is_some_and(|e| e.state == SessionState::Ended)
+    });
+    assert!(disk_names(&rig.disk).is_empty());
+    assert_eq!(rig.play.recovery_status().state, RecoveryState::Recovered);
 }

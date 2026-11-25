@@ -12,7 +12,7 @@ use motogp_application::{
 };
 use motogp_domain::{GameInfo, WatchEvent};
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 pub const DEPLOYED_A: &str = "000_aaaaaaaaaaaa_A.pak";
@@ -55,6 +55,14 @@ pub struct FakeRuntime {
     /// What the process inspection answers (`game_running`).
     pub running: Mutex<Result<bool, AppError>>,
     pub track_panics: AtomicBool,
+    /// Keep tracking after the scripted events until a stop is requested
+    /// (the worker then ends the session), like a live game.
+    pub hold: AtomicBool,
+    /// The held game closes by itself (without a stop request).
+    pub exit: AtomicBool,
+    pub terminate_result: Mutex<Result<usize, AppError>>,
+    pub terminations: AtomicUsize,
+    pub now_ms: AtomicU64,
 }
 
 impl SessionRuntime for FakeRuntime {
@@ -67,9 +75,19 @@ impl SessionRuntime for FakeRuntime {
         self.running.lock().unwrap().clone()
     }
 
+    fn terminate(&self, _root: &Path) -> Result<usize, AppError> {
+        self.terminations.fetch_add(1, Ordering::SeqCst);
+        self.terminate_result.lock().unwrap().clone()
+    }
+
+    fn unix_now_ms(&self) -> u64 {
+        self.now_ms.load(Ordering::SeqCst)
+    }
+
     fn track(
         &self,
         _root: &Path,
+        stop_requested: &dyn Fn() -> bool,
         emit: &mut dyn FnMut(WatchEvent),
     ) -> Result<TrackOutcome, AppError> {
         if self.track_panics.load(Ordering::SeqCst) {
@@ -77,6 +95,16 @@ impl SessionRuntime for FakeRuntime {
         }
         for event in self.events.lock().unwrap().iter() {
             emit(*event);
+        }
+        if self.hold.load(Ordering::SeqCst) {
+            // A live game: the session only ends once a stop is requested.
+            let give_up = std::time::Instant::now() + std::time::Duration::from_secs(10);
+            while !stop_requested() && !self.exit.load(Ordering::SeqCst) {
+                assert!(std::time::Instant::now() < give_up, "stop never requested");
+                std::thread::sleep(std::time::Duration::from_millis(2));
+            }
+            emit(WatchEvent::Ended);
+            return Ok(TrackOutcome::Finished);
         }
         self.outcome.lock().unwrap().clone()
     }
@@ -102,12 +130,18 @@ pub struct ManualRunner {
     tasks: Mutex<Vec<Task>>,
     /// When set, `spawn` fails and drops the task (like a failed thread).
     pub fail_spawn: AtomicBool,
+    /// When set, `spawn` runs the task on a real thread right away.
+    pub threaded: AtomicBool,
 }
 
 impl BackgroundRunner for ManualRunner {
     fn spawn(&self, task: Task) -> Result<(), SpawnError> {
         if self.fail_spawn.load(Ordering::SeqCst) {
             return Err(SpawnError("no threads left".into()));
+        }
+        if self.threaded.load(Ordering::SeqCst) {
+            std::thread::spawn(task);
+            return Ok(());
         }
         self.tasks.lock().unwrap().push(task);
         Ok(())
@@ -181,6 +215,11 @@ impl Rig {
             outcome: Mutex::new(Ok(TrackOutcome::Finished)),
             running: Mutex::new(Ok(false)),
             track_panics: AtomicBool::new(false),
+            hold: AtomicBool::new(false),
+            exit: AtomicBool::new(false),
+            terminate_result: Mutex::new(Ok(1)),
+            terminations: AtomicUsize::new(0),
+            now_ms: AtomicU64::new(1_700_000_000_000),
         });
         let lock = Arc::new(AtomicLock::default());
         let runner = Arc::new(ManualRunner::default());
@@ -207,6 +246,29 @@ impl Rig {
         }
     }
 
+    /// Like `ready`, but the session runs on a real thread, the game "stays
+    /// open" until a stop is requested, and the profile deploys `files`.
+    pub fn live(files: &[&str]) -> Rig {
+        let rig = Rig::new();
+        let mods = vec![mod_of(ID_A, files)];
+        put_sources(&rig.disk, &mods);
+        *rig.planner.mods.lock().unwrap() = mods;
+        *rig.runtime.events.lock().unwrap() = vec![WatchEvent::Started];
+        rig.runtime.hold.store(true, Ordering::SeqCst);
+        rig.runner.threaded.store(true, Ordering::SeqCst);
+        rig.play.recover_on_startup().expect("startup recovery");
+        rig
+    }
+
+    /// Waits (bounded) for `condition`, polling the live session.
+    pub fn wait_until(&self, what: &str, condition: impl Fn(&Rig) -> bool) {
+        let give_up = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !condition(self) {
+            assert!(std::time::Instant::now() < give_up, "timed out: {what}");
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
+    }
+
     pub fn set_game(&self, game: Result<GameInfo, PlayError>) {
         *self.game.0.lock().unwrap() = game;
     }
@@ -225,5 +287,12 @@ impl Rig {
 
     pub fn materialized(&self) -> usize {
         self.disk.borrow().materialize_calls
+    }
+}
+
+impl Drop for Rig {
+    /// Lets a held game of a finished test close, so its thread ends quietly.
+    fn drop(&mut self) {
+        self.runtime.exit.store(true, Ordering::SeqCst);
     }
 }

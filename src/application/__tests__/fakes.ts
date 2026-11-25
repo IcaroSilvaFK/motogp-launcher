@@ -1,6 +1,7 @@
 import type {
   CommandError,
   Config,
+  CurrentSession,
   DeploySession,
   FileConflict,
   GameInfo,
@@ -89,6 +90,8 @@ export class FakeGateway implements LauncherGateway {
   deployed: string[] = [];
   /** The persisted deploy manifest; `null` when there is none. */
   manifest: FakeManifest | null;
+  /** What `currentSession` reports; tests set it to simulate a session that survived a reload. */
+  current: CurrentSession = { phase: 'idle', started_at: null };
   storage: StorageUsage;
   /** The artwork the backend would return for the configured game. */
   artwork: string | null;
@@ -246,6 +249,14 @@ export class FakeGateway implements LauncherGateway {
       }
       this.requireProfile(profileId);
     });
+  }
+
+  currentSession(): Promise<CurrentSession> {
+    return this.run('currentSession', [], () => ({ ...this.current }));
+  }
+
+  stopSession(): Promise<void> {
+    return this.run('stopSession', [], () => undefined);
   }
 
   recoveryStatus(): Promise<RecoveryStatus> {

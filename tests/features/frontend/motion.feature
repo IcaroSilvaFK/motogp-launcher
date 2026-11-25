@@ -41,11 +41,14 @@ Feature: Motion and micro-interactions
     When the user toggles a mod in the active profile
     Then the rows stay mounted, so their entrance does not play again
 
-  Scenario: The session dot pulses only while the game is starting or running
+  Scenario: The session dot pulses only while a session is live
     Given the launcher stylesheet
     Then the starting and running session dots have a pulse animation
+    And the stopping and cleaning-up session dots pulse too
     And the idle session status has none
 
-  Scenario: Play looks busy while the game is starting
+  Scenario: The session action looks busy while the game stops or cleans up
     Given the launcher stylesheet
-    Then a disabled Play button shows a spinner while the session is starting
+    Then the stopping and cleaning-up progress button shows a spinner and a progress cursor
+    And the progress button gives no hover or press feedback
+    And Stop stays a plain action while the game is starting

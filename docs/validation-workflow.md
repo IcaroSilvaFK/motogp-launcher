@@ -469,3 +469,22 @@ A running game session locks every write that would change a profile or the libr
 | Profile management is locked | `session-locks.feature.test.tsx` (Create, Rename, Delete, Save: `aria-disabled`, `title`, `aria-describedby`, no gateway call) |
 | Actions unlock when the session ends | `session-locks.feature.test.tsx`, controller "When the session ends Then the writes work again" |
 | The new error code is translated | `session-locks.feature.test.tsx`, i18n "translates the library lock in both locales" |
+
+### Session control: stop the game (#75, Rust part)
+
+Gherkin: `crates/application/tests/features/session-control.feature`, the new scenarios of `crates/infrastructure/tests/features/processes.feature` and `src-tauri/tests/features/tauri-interface.feature`. The frontend scenarios live in `tests/features/frontend/session-control.feature`. The live phase (`idle`, `starting`, `running`, `stopping`, `cleaning-up`) is held by `PlayService`; `SessionEvent` gains the `cleaning-up` state (published right before the cleanup) and `started_at_ms`.
+
+| Scenario | Tests |
+|----------|-------|
+| The current session is idle before any Play | application cucumber "The current session is idle before any Play" |
+| The current session is reported while the game runs | application cucumber "The current session is reported while the game runs", `a_session_resumed_at_startup_is_a_live_session_that_can_be_stopped` (application), IPC `session_commands_report_the_live_session_and_stop_it` |
+| The cleanup phase is published before the session ends | application cucumber "The cleanup phase is published before the session ends", `session_events_serialize_with_documented_states` (src-tauri) |
+| Stop ends the game and runs the normal cleanup | application cucumber "Stop ends the game and runs the normal cleanup", `stop_requested_with_the_game_gone_ends_at_once_without_waiting`, `stop_requested_keeps_tracking_while_the_game_is_still_running` (application), `watch_stop` unit tests (domain) |
+| Stop while the game is still starting does not wait for the deadline | application cucumber "Stop while the game is still starting does not wait for the deadline", `a_failed_stop_while_starting_returns_to_starting_and_can_be_retried` |
+| Stop without a session is refused | application cucumber "Stop without a session is refused", `a_second_stop_while_stopping_is_refused`, `play_errors_have_stable_codes` (`no_active_session`, `stop_failed`) |
+| A failed stop keeps the session consistent | application cucumber "A failed stop keeps the session consistent" |
+| Only processes inside the install root are terminated | infrastructure cucumber "Only processes inside the install root are terminated" (real processes copied into a temp root), `kill_order_*` unit tests (children first, never the own pid) |
+| Terminating with no game process ends nothing | infrastructure cucumber "Terminating with no game process ends nothing", `terminating_in_an_unused_root_ends_nothing` |
+| The interface can query and stop the session | src-tauri cucumber "The interface can query and stop the session", IPC `session_commands_report_the_live_session_and_stop_it` |
+
+Frontend unit tests (domain/application/infrastructure, #75): `src/application/__tests__/sessionStop.test.tsx` (the `cleaning-up` phase and `since` from session events, `controller.stopSession` with its race orders and failure rollback, `selectCanStop`, the reload scenario via `current_session`, a failing query not breaking the load), the selector tests (`selectCanPlay`, `selectProfileLocked`, `selectSessionClean` treat `stopping` and `cleaning-up` as live) and `tauriGateway.test.ts` (`current_session`, `stop_session` commands). The UI scenarios are bound separately: `tests/features/frontend/session-control.feature` (Play turns into Stop while the game runs, Stop asks for confirmation, Confirming Stop stops the session and shows the cleanup, A failed stop is reported and Stop stays available, The session survives a page reload) in `src/ui/__tests__/session-control.feature.test.tsx`, plus `formatClockTime` in `src/ui/i18n/__tests__/i18n.test.tsx`. The `interface.feature` step "Play stays disabled during start and execution" became "Play is replaced by Stop during start and execution", since Play is no longer rendered while a session can be stopped.

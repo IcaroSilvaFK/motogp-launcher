@@ -1,6 +1,7 @@
 import type {
   Config,
   FileConflict,
+  CurrentSession,
   DeploySession,
   GameInfo,
   Locale,
@@ -33,6 +34,10 @@ export interface LauncherGateway {
   listConflicts(modIds: string[]): Promise<FileConflict[]>;
   play(profileId: string): Promise<void>;
   recoveryStatus(): Promise<RecoveryStatus>;
+  /** The live session phase; lets a reloaded UI resume an ongoing session. */
+  currentSession(): Promise<CurrentSession>;
+  /** Terminates the game; the normal cleanup follows through the session events. */
+  stopSession(): Promise<void>;
   deploySession(): Promise<DeploySession>;
   forgetStaleSession(): Promise<void>;
   /** Cleans the stale folder; `confirmedDir` must equal the manifest's folder. Resolves with the files removed. */

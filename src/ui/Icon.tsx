@@ -34,6 +34,7 @@ const GLYPHS = {
     </>
   ),
   play: <path d="M7 4.8v10.4l8.2-5.2z" />,
+  stop: <rect x="5.5" y="5.5" width="9" height="9" rx="1.5" />,
   game: (
     <>
       <rect x="2.5" y="6" width="15" height="9" rx="3" />

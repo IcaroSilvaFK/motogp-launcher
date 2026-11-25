@@ -21,9 +21,21 @@ export interface Messages {
   };
   session: {
     running: string;
+    runningSince: (time: string) => string;
+    stopping: string;
+    cleaningUp: string;
     ended: (cleaned: number) => string;
     neverStarted: string;
     unavailable: string;
+  };
+  stop: {
+    button: string;
+    confirmTitle: string;
+    confirmDetail: string;
+    confirm: string;
+    cancel: string;
+    stopping: string;
+    cleaningUp: string;
   };
   library: {
     title: string;

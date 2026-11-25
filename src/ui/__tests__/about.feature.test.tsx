@@ -339,7 +339,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
 
     And('a game session is active', async () => {
-      act(() => world.session.emitSession({ state: 'started', cleaned: 0 }));
+      act(() => world.session.emitSession({ state: 'started', cleaned: 0, started_at: null }));
       await openAbout(world);
     });
 

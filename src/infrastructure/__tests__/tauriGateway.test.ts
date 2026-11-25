@@ -19,6 +19,8 @@ const CASES: [keyof LauncherGateway, unknown[], string, Record<string, unknown> 
   ['listConflicts', [['m1', 'm2']], 'list_conflicts', { modIds: ['m1', 'm2'] }],
   ['play', ['p1'], 'play', { profileId: 'p1' }],
   ['recoveryStatus', [], 'recovery_status', undefined],
+  ['currentSession', [], 'current_session', undefined],
+  ['stopSession', [], 'stop_session', undefined],
   ['deploySession', [], 'deploy_session', undefined],
   ['forgetStaleSession', [], 'forget_stale_session', undefined],
   ['cleanStaleSession', ['D:/old/~mods'], 'clean_stale_session', { confirmedDir: 'D:/old/~mods' }],

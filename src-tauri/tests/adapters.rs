@@ -21,14 +21,19 @@ fn collect(app: &tauri::App<tauri::test::MockRuntime>, name: &str) -> Arc<Mutex<
 fn session_events_serialize_with_documented_states() {
     let cases = [
         (SessionState::Started, "started"),
+        (SessionState::CleaningUp, "cleaning-up"),
         (SessionState::Ended, "ended"),
         (SessionState::NeverStarted, "never-started"),
     ];
     for (state, text) in cases {
-        let dto = SessionEventDto::from(SessionEvent { state, cleaned: 3 });
+        let dto = SessionEventDto::from(SessionEvent {
+            state,
+            cleaned: 3,
+            started_at_ms: None,
+        });
         assert_eq!(
             serde_json::to_value(dto).unwrap(),
-            json!({ "state": text, "cleaned": 3 })
+            json!({ "state": text, "cleaned": 3, "started_at": null })
         );
     }
 }
@@ -43,12 +48,21 @@ fn tauri_events_publish_session_and_report_errors_on_a_separate_channel() {
     events.publish(SessionEvent {
         state: SessionState::Ended,
         cleaned: 2,
+        started_at_ms: None,
+    });
+    events.publish(SessionEvent {
+        state: SessionState::Started,
+        cleaned: 0,
+        started_at_ms: Some(1_700_000_000_000),
     });
     events.report_error("cleanup incomplete");
 
     assert_eq!(
         *sessions.lock().unwrap(),
-        vec![json!({ "state": "ended", "cleaned": 2 })]
+        vec![
+            json!({ "state": "ended", "cleaned": 2, "started_at": null }),
+            json!({ "state": "started", "cleaned": 0, "started_at": 1_700_000_000_000u64 }),
+        ]
     );
     assert_eq!(
         *errors.lock().unwrap(),

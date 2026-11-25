@@ -90,6 +90,7 @@ export function createFakeController(patch: Partial<LauncherState> = {}): FakeCo
     forgetStaleSession: action(),
     cleanStaleSession: action(),
     play: action(),
+    stopSession: action(),
     getStorageUsage: vi.fn(() => Promise.resolve(emptyStorage())),
     openDataFolder: action(),
     dismissError: vi.fn(),
