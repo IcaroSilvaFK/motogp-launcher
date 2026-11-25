@@ -554,3 +554,54 @@ fn errors_have_readable_messages() {
     let _: &dyn std::error::Error = &CatalogCacheError("x".into());
     let _: &dyn std::error::Error = &CatalogError::UnsupportedSchema { version: 3 };
 }
+
+#[test]
+fn open_page_uses_a_stale_cache_without_fetching() {
+    let cache = FakeCache::holding(cached_with_page("old", "https://github.com/user/repo"));
+    let mut stale = cache.stored().unwrap();
+    stale.fetched_at_ms = NOW_MS - 48 * HOUR_MS;
+    let cache = FakeCache::holding(stale);
+    let source = FakeSource::failing(offline());
+    let opener = FakeWebOpener::default();
+    let svc = service(&source, &cache, &FakeClock::at(NOW_MS));
+    svc.open_page("old", &opener).unwrap();
+    assert_eq!(source.calls(), 0);
+    assert_eq!(opener.opened(), vec!["https://github.com/user/repo"]);
+}
+
+#[test]
+fn open_page_loads_the_catalog_when_nothing_is_cached() {
+    let mut entry = draft("fresh");
+    entry.page_url = "https://overtake.gg/downloads/fresh.1/".into();
+    let source = FakeSource::serving(vec![RawEntry::Draft(entry)]);
+    let opener = FakeWebOpener::default();
+    let svc = service(&source, &FakeCache::default(), &FakeClock::at(NOW_MS));
+    svc.open_page("fresh", &opener).unwrap();
+    assert_eq!(source.calls(), 1);
+    assert_eq!(opener.opened().len(), 1);
+}
+
+#[test]
+fn open_page_without_cache_and_source_fails_as_unavailable() {
+    let source = FakeSource::failing(offline());
+    let svc = service(&source, &FakeCache::default(), &FakeClock::at(NOW_MS));
+    let error = svc.open_page("x", &FakeWebOpener::default()).unwrap_err();
+    assert!(matches!(error, CatalogError::Unavailable { .. }));
+}
+
+#[test]
+fn open_page_errors_have_readable_messages() {
+    let errors = [
+        CatalogError::EntryNotFound { id: "a".into() },
+        CatalogError::PageNotAllowed {
+            id: "a".into(),
+            reason: "bad host".into(),
+        },
+        CatalogError::OpenFailed {
+            reason: "no browser".into(),
+        },
+    ];
+    let text: Vec<String> = errors.iter().map(|e| e.to_string()).collect();
+    assert!(text[0].contains("not found") && text[1].contains("bad host"));
+    assert!(text[2].contains("no browser"));
+}

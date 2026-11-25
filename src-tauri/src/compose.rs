@@ -4,7 +4,7 @@
 use motogp_application::{
     ArtworkService, BackgroundRunner, CatalogService, CatalogSource, DeployService, FolderOpener,
     GameService, GameSettings, PlayService, ProcessInspector, ProfileModPlanner, ProfileService,
-    SessionPublisher, SessionService, StorageService, UrlOpener,
+    SessionPublisher, SessionService, StorageService, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{
     mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsGameFiles, FsStorageScanner,
@@ -38,6 +38,8 @@ pub struct AppState {
     /// Online catalog (#72). Blocking network I/O: commands run it off the
     /// async runtime and never under `write_lock`.
     pub catalog: Arc<Catalog>,
+    /// Opens catalog pages in the default browser (https, allow-listed hosts).
+    pub web_opener: Arc<dyn WebPageOpener>,
 }
 
 // The composition root receives every injected port, so it is wide on purpose.
@@ -48,6 +50,7 @@ pub fn compose<O, P>(
     artwork: SteamArtwork,
     opener: O,
     folder_opener: Arc<dyn FolderOpener + Send + Sync>,
+    web_opener: Arc<dyn WebPageOpener>,
     inspector: P,
     publisher: Arc<dyn SessionPublisher>,
     runner: Arc<dyn BackgroundRunner>,
@@ -103,5 +106,6 @@ where
             JsonCatalogCache::new(data.catalog_cache_file()),
             SystemClock,
         )),
+        web_opener,
     }
 }

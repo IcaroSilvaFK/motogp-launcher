@@ -136,6 +136,16 @@
   --spinner-size: 14px;
   --spinner-stroke: 2px;
 
+  /* Discover (#73): card grid, category tiles and the entry side sheet (Material 3 modal side
+     sheet: surface-container-low, a modal elevation shadow, scrim at 32%). */
+  --catalog-card-min: 240px;
+  --catalog-cover-height: 72px;
+  --catalog-cover-size-list: 40px;
+  --category-tile-min: 148px;
+  --sheet-width: 400px;
+  --scrim: rgba(0, 0, 0, 0.32);
+  --elevation-sheet: -8px 0 24px rgba(0, 0, 0, 0.4);
+
   font-family: var(--font-body);
   font-size: var(--type-body-large);
   color: var(--text);
@@ -2298,4 +2308,506 @@ button {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* ---------- Discover (#73) ---------- */
+
+/* Category tiles: a wrapping grid of toggle buttons (aria-pressed) with a count chip, styled like
+   the library facets (current tile: one surface step up and the 2px accent bar). */
+.category-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--category-tile-min), 1fr));
+  gap: var(--space-2);
+}
+
+.category-tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  height: var(--control-height);
+  padding: 0 var(--space-2) 0 var(--space-3);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--text-muted);
+  font-size: var(--type-label-large);
+  font-weight: var(--type-label-large-weight);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    border-color var(--transition),
+    color var(--transition),
+    var(--transition-press),
+    var(--transition-focus);
+}
+
+.category-tile:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.category-tile:active {
+  background: var(--surface-3);
+  transform: scale(var(--motion-press-scale));
+}
+
+.category-tile[aria-pressed='true'] {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+
+.category-tile[aria-pressed='true']::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: var(--space-2);
+  bottom: var(--space-2);
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
+}
+
+.category-tile-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skeleton-category {
+  height: var(--control-height);
+  border-radius: var(--radius-md);
+}
+
+/* Toolbar: search grows, then the sort select, the view toggle and the live result count. */
+.catalog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.catalog-search {
+  flex: 1 1 var(--rail-width);
+  max-width: calc(2 * var(--rail-width));
+}
+
+.field-label {
+  color: var(--text-muted);
+  font-size: var(--type-body-small);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.catalog-count {
+  margin-left: auto;
+  font-size: var(--type-body-small);
+}
+
+/* Segmented button (Material 3), two icon options; the selected one is one surface step up. */
+.segmented {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+.segmented-option {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--control-height);
+  height: calc(var(--control-height) - 2px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition:
+    background var(--transition),
+    color var(--transition),
+    var(--transition-focus);
+}
+
+.segmented-option + .segmented-option {
+  border-left: 1px solid var(--border-strong);
+}
+
+.segmented-option:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.segmented-option[aria-pressed='true'] {
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+/* Inset ring: the group clips its overflow. */
+.segmented-option:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* Results: a card grid, or dense rows in the list view (same markup, data-view switches). */
+.catalog-results {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--catalog-card-min), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.catalog-results[data-view='list'] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.catalog-results > li {
+  display: flex;
+  min-width: 0;
+}
+
+/* The whole card is one button: a filled card (surface-container-low) with a state layer. */
+.catalog-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--transition),
+    var(--transition-press),
+    var(--transition-focus);
+}
+
+/* State layer: a currentColor overlay, 8% on hover, 10% on focus and press (Material 3). */
+.catalog-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: var(--state-layer, 0);
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+
+.catalog-card:hover {
+  --state-layer: var(--state-hover-opacity);
+  border-color: var(--border-strong);
+}
+
+.catalog-card:focus-visible {
+  --state-layer: var(--state-focus-opacity);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.catalog-card:active {
+  --state-layer: var(--state-pressed-opacity);
+  transform: scale(var(--motion-press-scale));
+}
+
+/* Placeholder cover (no remote thumbnails): a neutral band with the category. */
+.catalog-cover {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
+  height: var(--catalog-cover-height);
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(135deg, var(--surface-3), var(--surface-2));
+  color: var(--text-muted);
+}
+
+.catalog-cover-icon {
+  order: 2;
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.catalog-cover-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-label-small);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.catalog-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-3);
+}
+
+.catalog-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--type-title-medium);
+  font-weight: 600;
+}
+
+.catalog-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.catalog-card-author {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-size: var(--type-body-medium);
+}
+
+.catalog-card .mod-meta {
+  flex-wrap: wrap;
+}
+
+.catalog-card-badge {
+  margin-top: var(--space-1);
+}
+
+.catalog-card-badge .icon {
+  width: 12px;
+  height: 12px;
+}
+
+/* List view: one dense row per entry (the cover shrinks to a tile, the meta sits on one line). */
+.catalog-results[data-view='list'] > li + li {
+  border-top: 1px solid var(--border);
+}
+
+.catalog-results[data-view='list'] .catalog-card {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 0;
+}
+
+.catalog-results[data-view='list'] .catalog-card:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.catalog-results[data-view='list'] .catalog-card:active {
+  transform: none;
+}
+
+.catalog-results[data-view='list'] .catalog-cover {
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--catalog-cover-size-list);
+  height: var(--catalog-cover-size-list);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+}
+
+.catalog-results[data-view='list'] .catalog-cover-label {
+  display: none;
+}
+
+.catalog-results[data-view='list'] .catalog-cover-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.catalog-results[data-view='list'] .catalog-card-body {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-4);
+  padding: 0;
+}
+
+.catalog-results[data-view='list'] .catalog-card-title {
+  flex: 0 1 30%;
+  font-size: var(--type-body-large);
+}
+
+.catalog-results[data-view='list'] .catalog-card-meta {
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.catalog-results[data-view='list'] .catalog-card-author {
+  flex: 0 1 30%;
+}
+
+.catalog-results[data-view='list'] .catalog-card-badge {
+  margin: 0 0 0 auto;
+}
+
+.catalog-card-skeleton {
+  gap: var(--space-2);
+  padding-bottom: var(--space-3);
+  cursor: default;
+}
+
+.catalog-card-skeleton .skeleton-line,
+.catalog-card-skeleton .skeleton-chip {
+  margin: 0 var(--space-3);
+}
+
+.skeleton-cover {
+  height: var(--catalog-cover-height);
+  border-radius: 0;
+}
+
+/* Empty catalog: the explanation reads as a short block of muted paragraphs, actions side by side. */
+.discover-empty p:not(.empty-title) {
+  color: var(--text-muted);
+}
+
+.empty-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.empty-actions .btn {
+  margin-top: 0;
+}
+
+/* Entry detail: a Material 3 modal side sheet over a scrim, below the custom title bar. */
+.sheet-layer {
+  position: fixed;
+  inset: var(--titlebar-height) 0 0 0;
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  animation: fade-in var(--motion-enter) backwards;
+}
+
+.sheet {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: min(var(--sheet-width), 100%);
+  height: 100%;
+  border-left: 1px solid var(--border);
+  background: var(--surface-1);
+  box-shadow: var(--elevation-sheet);
+  animation: enter-from-end var(--motion-enter) backwards;
+}
+
+@keyframes enter-from-end {
+  from {
+    opacity: 0;
+    transform: translateX(calc(4 * var(--motion-distance-enter)));
+  }
+}
+
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-5) var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.sheet-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sheet-heading h2 {
+  font-size: var(--type-title-large);
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.sheet-overline {
+  color: var(--accent-text);
+  font-size: var(--type-label-small);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.sheet-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-4) var(--space-5);
+  overflow-y: auto;
+}
+
+.sheet-body > .badge {
+  align-self: flex-start;
+}
+
+.sheet-description {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.sheet-facts {
+  font-size: var(--type-body-medium);
+}
+
+.sheet-facts > div {
+  display: contents;
+}
+
+.sheet-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.sheet-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
 }

@@ -20,4 +20,18 @@ describeFeature(feature, ({ Scenario }) => {
       }
     });
   });
+
+  Scenario('Open page error codes are known and translated', ({ Then }) => {
+    Then(
+      '"catalog_entry_not_found", "catalog_page_not_allowed" and "open_page_failed" are error codes with en and pt-BR messages',
+      () => {
+        for (const code of ['catalog_entry_not_found', 'catalog_page_not_allowed', 'open_page_failed'] as const) {
+          expect(ERROR_CODES).toContain(code);
+          expect(en.errors[code]).toBeTruthy();
+          expect(ptBR.errors[code]).toBeTruthy();
+          expect(toCommandError({ code, message: 'backend text' })).toEqual({ code, message: 'backend text' });
+        }
+      },
+    );
+  });
 });

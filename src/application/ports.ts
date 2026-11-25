@@ -54,6 +54,9 @@ export interface LauncherGateway {
   getCatalog(): Promise<Catalog>;
   /** Forces a fetch, still bounded by the backend's backoff after a failure. */
   refreshCatalog(): Promise<Catalog>;
+  // Catalog pages (#73).
+  /** Opens the entry's web page in the default browser. Only the id is sent: the backend owns the URL and its policy. */
+  openCatalogPage(id: string): Promise<void>;
 }
 
 /** `null` means the user cancelled the dialog. */

@@ -309,6 +309,10 @@ export class FakeGateway implements LauncherGateway {
     return this.run('refreshCatalog', [], () => ({ entries: [], fetchedAt: 0, stale: false, skipped: 0 }));
   }
 
+  openCatalogPage(id: string): Promise<void> {
+    return this.run('openCatalogPage', [id], () => undefined);
+  }
+
   openDataFolder(): Promise<void> {
     return this.run('openDataFolder', [], () => undefined);
   }

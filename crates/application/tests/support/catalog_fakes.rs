@@ -212,3 +212,46 @@ pub fn cached(fetched_at_ms: u64, ids: &[&str]) -> CachedCatalog {
         skipped: 0,
     }
 }
+
+/// Records the pages it is asked to open; can be told to fail.
+#[derive(Clone, Default)]
+pub struct FakeWebOpener {
+    opened: Arc<Mutex<Vec<String>>>,
+    fails: Arc<Mutex<bool>>,
+}
+
+impl FakeWebOpener {
+    pub fn failing() -> Self {
+        let opener = Self::default();
+        *opener.fails.lock().unwrap() = true;
+        opener
+    }
+    pub fn opened(&self) -> Vec<String> {
+        self.opened.lock().unwrap().clone()
+    }
+}
+
+impl motogp_application::WebPageOpener for FakeWebOpener {
+    fn open_page(&self, url: &str) -> Result<(), motogp_application::AppError> {
+        if *self.fails.lock().unwrap() {
+            return Err(motogp_application::AppError::Read {
+                location: url.to_string(),
+                detail: "no browser".into(),
+            });
+        }
+        self.opened.lock().unwrap().push(url.to_string());
+        Ok(())
+    }
+}
+
+/// A fresh cache holding one entry with the given id and page URL.
+pub fn cached_with_page(id: &str, page_url: &str) -> CachedCatalog {
+    let mut draft = draft(id);
+    draft.page_url = page_url.to_string();
+    CachedCatalog {
+        fetched_at_ms: NOW_MS,
+        etag: None,
+        entries: vec![CatalogEntry::from_draft(draft).unwrap()],
+        skipped: 0,
+    }
+}

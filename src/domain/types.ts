@@ -124,6 +124,10 @@ export const BACKEND_ERROR_CODES = [
   // Online catalog (#72).
   'catalog_unavailable',
   'catalog_unsupported_schema',
+  // Opening a catalog page (#73).
+  'catalog_entry_not_found',
+  'catalog_page_not_allowed',
+  'open_page_failed',
 ] as const;
 
 export const FRONTEND_ERROR_CODES = [

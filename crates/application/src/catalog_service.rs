@@ -1,8 +1,8 @@
 use crate::{
     CachedCatalog, CatalogCache, CatalogError, CatalogSource, CatalogSourceError, Clock,
-    RawCatalog, RawEntry, SourceFetch,
+    RawCatalog, RawEntry, SourceFetch, WebPageOpener,
 };
-use motogp_domain::{CatalogEntry, SUPPORTED_CATALOG_SCHEMA};
+use motogp_domain::{check_page_url, CatalogEntry, SUPPORTED_CATALOG_SCHEMA};
 use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, MutexGuard, PoisonError};
@@ -157,6 +157,30 @@ impl<S: CatalogSource, C: CatalogCache, K: Clock> CatalogService<S, C, K> {
             }
         }
         self.refresh_single_flight(true)
+    }
+
+    /// Opens the web page of the entry `id` in the browser through `opener`.
+    /// The entry is looked up in the cached catalog, even a stale one, without
+    /// asking the source; only when nothing is cached is the catalog loaded
+    /// like [`Self::get`]. The page URL must pass the domain policy.
+    pub fn open_page(&self, id: &str, opener: &dyn WebPageOpener) -> Result<(), CatalogError> {
+        let entries = match self.load_cache() {
+            Some(cached) => cached.entries,
+            None => self.get()?.entries,
+        };
+        let entry = entries
+            .iter()
+            .find(|entry| entry.id == id)
+            .ok_or_else(|| CatalogError::EntryNotFound { id: id.to_string() })?;
+        check_page_url(&entry.page_url).map_err(|error| CatalogError::PageNotAllowed {
+            id: id.to_string(),
+            reason: error.to_string(),
+        })?;
+        opener
+            .open_page(&entry.page_url)
+            .map_err(|error| CatalogError::OpenFailed {
+                reason: error.to_string(),
+            })
     }
 
     /// Asks the source now, ignoring the TTL but not the backoff.

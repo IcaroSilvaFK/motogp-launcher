@@ -1,10 +1,11 @@
 //! Steps for `tests/features/tauri-interface.feature` (issue #8): the real
 //! commands over the Tauri mock runtime with controlled ports.
-use crate::ipc_support::Harness;
+use crate::ipc_support::{FakeCatalogSource, Harness};
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
 use serde_json::{json, Value};
 use std::fs;
+use std::sync::Arc;
 
 #[derive(Default, World)]
 struct InterfaceWorld {
@@ -337,6 +338,41 @@ fn current_session_idle(w: &mut InterfaceWorld, command: String, phase: String) 
 fn stop_without_session(w: &mut InterfaceWorld, command: String, code: String) {
     let error = w.h().invoke(&command, json!({})).unwrap_err();
     assert_eq!(error["code"], json!(code));
+}
+
+#[given(expr = "a cached catalog with the entry {string}")]
+fn cached_catalog(w: &mut InterfaceWorld, id: String) {
+    let entry = motogp_domain::CatalogEntryDraft {
+        id,
+        title: "Rebalanced AI".to_string(),
+        author: "Someone".to_string(),
+        game: "MotoGP 26".to_string(),
+        category: "AI".to_string(),
+        description: "Fairer riders.".to_string(),
+        version: "1.2".to_string(),
+        updated_at: "2026-11-01".to_string(),
+        page_url: "https://overtake.gg/downloads/rebalanced-ai.69345/".to_string(),
+        ..Default::default()
+    };
+    let source = FakeCatalogSource::serving(vec![entry]);
+    let h = Harness::with_catalog_source(Arc::new(source));
+    h.invoke("get_catalog", json!({})).expect("catalog");
+    w.harness = Some(h);
+}
+
+#[when(expr = "the frontend invokes open_catalog_page with id {string}")]
+fn open_catalog_page(w: &mut InterfaceWorld, id: String) {
+    w.h()
+        .invoke("open_catalog_page", json!({ "id": id }))
+        .expect("open_catalog_page");
+}
+
+#[then("the controlled web opener receives the entry's page URL")]
+fn web_opener_received(w: &mut InterfaceWorld) {
+    assert_eq!(
+        *w.h().pages_opened.lock().unwrap(),
+        vec!["https://overtake.gg/downloads/rebalanced-ai.69345/"]
+    );
 }
 
 /// Runs only `tauri-interface.feature`; returns `true` when every step passed.

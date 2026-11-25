@@ -43,4 +43,16 @@ describeFeature(feature, ({ Scenario }) => {
       expect(results).toEqual([catalog, catalog]);
     });
   });
+
+  Scenario('The gateway opens a catalog page by id', ({ When, Then }) => {
+    const invoke = vi.fn().mockResolvedValue(undefined);
+
+    When('openCatalogPage is called with "rebalanced-ai"', async () => {
+      await createTauriGateway(invoke).openCatalogPage('rebalanced-ai');
+    });
+
+    Then('"open_catalog_page" is invoked with only the id', () => {
+      expect(invoke.mock.calls).toEqual([['open_catalog_page', { id: 'rebalanced-ai' }]]);
+    });
+  });
 });

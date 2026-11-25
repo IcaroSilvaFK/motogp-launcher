@@ -55,6 +55,12 @@ pub enum CatalogError {
     Unavailable { reason: String },
     /// The catalog file uses a newer schema than this launcher understands.
     UnsupportedSchema { version: u32 },
+    /// No catalog entry has this id.
+    EntryNotFound { id: String },
+    /// The entry's page URL is not allowed to be opened (not https or host not allow-listed).
+    PageNotAllowed { id: String, reason: String },
+    /// The system could not open the page in the browser.
+    OpenFailed { reason: String },
 }
 
 impl fmt::Display for CatalogError {
@@ -64,6 +70,11 @@ impl fmt::Display for CatalogError {
             CatalogError::UnsupportedSchema { version } => {
                 write!(f, "unsupported catalog schema version {version}")
             }
+            CatalogError::EntryNotFound { id } => write!(f, "catalog entry {id} not found"),
+            CatalogError::PageNotAllowed { id, reason } => {
+                write!(f, "page of catalog entry {id} not allowed: {reason}")
+            }
+            CatalogError::OpenFailed { reason } => write!(f, "could not open the page: {reason}"),
         }
     }
 }

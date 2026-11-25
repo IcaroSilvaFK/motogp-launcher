@@ -519,3 +519,39 @@ Online catalog source (static catalog on GitHub, cached on disk). Gherkin: `crat
 | Unavailable catalog maps to a stable code | `unavailable_catalog_maps_to_a_stable_code` (`catalog_contract.rs`), `unavailable_maps_to_a_stable_code_without_leaking_the_reason`, `unsupported_schema_maps_to_a_stable_code` (`src-tauri/src/error_catalog.rs`) |
 | The gateway calls the catalog commands | vitest-cucumber `catalog-gateway.feature` bound by `src/infrastructure/__tests__/catalogGateway.feature.test.ts` |
 | Catalog error codes are known and translated | vitest-cucumber `catalog-errors.feature` bound by `src/ui/__tests__/catalog-errors.feature.test.ts`; also the i18n completeness test |
+
+### Issue #73 (backend): scenario traceability
+
+Opening a catalog entry's page in the default browser, by entry id. Gherkin: `crates/domain/tests/features/catalog-page-url.feature`, `crates/application/tests/features/catalog-open-page.feature` (Rust cucumber, steps in each crate's `tests/bdd/`), the "Open a catalog page through IPC" scenario in `src-tauri/tests/features/tauri-interface.feature`, and the new scenarios of `tests/features/frontend/catalog-gateway.feature` and `catalog-errors.feature` (vitest-cucumber). The Discover screen scenarios belong to the UI task of the same issue.
+
+| Scenario | Tests |
+|----------|-------|
+| Accept an https page on an allowed host | `allowed_hosts_and_subdomains_pass` (domain `src/catalog_page.rs`), domain cucumber |
+| Reject a non-https page | `non_https_or_malformed_urls_are_rejected` (domain), domain cucumber |
+| Reject a host outside the allow-list | `hosts_outside_the_allow_list_are_rejected` (domain), domain cucumber |
+| Reject credentials in the URL | `non_https_or_malformed_urls_are_rejected` (domain), domain cucumber |
+| Open the page of a known entry | `open_page_uses_a_stale_cache_without_fetching`, `open_page_loads_the_catalog_when_nothing_is_cached` (application `tests/catalog_service.rs`), application cucumber |
+| Unknown entry / Disallowed host / Opener failure is reported | `open_page_errors_have_readable_messages`, `open_page_without_cache_and_source_fails_as_unavailable` (application), application cucumber |
+| Open a catalog page through IPC | `open_catalog_page_opens_the_entry_page_by_id`, `open_catalog_page_of_an_unknown_id_maps_to_a_stable_code`, `open_catalog_page_refuses_a_host_outside_the_allow_list`, `open_catalog_page_needs_an_available_catalog` (`src-tauri/tests/catalog_contract.rs`), `open_page_errors_map_to_stable_codes_without_leaking_details` (`src-tauri/src/error_catalog.rs`), interface cucumber |
+| The gateway opens a catalog page by id | vitest-cucumber `catalog-gateway.feature` bound by `src/infrastructure/__tests__/catalogGateway.feature.test.ts` |
+| Open page error codes are known and translated | vitest-cucumber `catalog-errors.feature` bound by `src/ui/__tests__/catalog-errors.feature.test.ts`; also the i18n completeness test |
+
+### Issue #73 (UI): scenario traceability
+
+The Discover tab. Gherkin: `tests/features/frontend/discover.feature`, bound strictly by `src/ui/__tests__/discover.feature.test.tsx` (the real `App` and the real catalog controller over a scripted catalog gateway). The controller and the pure selectors are unit-tested in `src/application/__tests__/catalogController.test.ts` and `catalogSelectors.test.ts`; screen details outside the scenarios are in `src/ui/__tests__/DiscoverScreen.test.tsx`.
+
+| Scenario | Tests |
+|----------|-------|
+| Reach Discover from the sidebar | `discover.feature.test.tsx`; controller "loads once on the first visit and notifies listeners" |
+| Loading skeleton | `discover.feature.test.tsx` (`aria-busy`, hidden status, skeleton placeholders) |
+| Empty catalog explains how mods get listed | `discover.feature.test.tsx` (curated catalog, pull request to `catalog/catalog.json`, drag and drop, Refresh, Go to Library, no link) |
+| Browse categories with counts | `discover.feature.test.tsx`; selectors `categoryCounts`, `selectEntries` (category) |
+| Search by title, author or category | `discover.feature.test.tsx` (+ no results and Clear filters); selectors `selectEntries` (query) |
+| Sort by recently updated or name | `discover.feature.test.tsx`; selectors `sortEntries` |
+| Switch grid and list views | `discover.feature.test.tsx` (`data-view`, segmented `aria-pressed`) |
+| Entry detail and Open page | `discover.feature.test.tsx` (side sheet facts, focus on Close, `openCatalogPage(id)`, Esc closes and returns focus); `DiscoverScreen.test.tsx` (focus trap, scrim) |
+| Install stays hidden until downloads exist | `discover.feature.test.tsx`; `DiscoverScreen.test.tsx` ("shows Install only when the entry has a download and a handler is wired") |
+| Stale banner with the saved date | `discover.feature.test.tsx` (warning notice, locale-formatted `fetchedAt`) |
+| Error with retry | `discover.feature.test.tsx`; controller "enters the error state when the first load fails, and retry refreshes" |
+| Already in library badge | `discover.feature.test.tsx`; selectors `inLibrary`, `normalizeTitle` |
+| Open page failure is shown | `discover.feature.test.tsx` (inline alert in the sheet, Dismiss); controller "opens a page by id and reports a failure as a page error" |

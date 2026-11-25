@@ -39,7 +39,7 @@ pub use artwork_ports::{Artwork, GameArtworkSource, ImageMime};
 pub use artwork_service::ArtworkService;
 pub use catalog_error::{CatalogCacheError, CatalogError, CatalogSourceError};
 pub use catalog_ports::{
-    CachedCatalog, CatalogCache, CatalogSource, RawCatalog, RawEntry, SourceFetch,
+    CachedCatalog, CatalogCache, CatalogSource, RawCatalog, RawEntry, SourceFetch, WebPageOpener,
 };
 pub use catalog_service::{
     validate_catalog, validate_catalog_strict, CatalogService, CatalogSnapshot, CatalogWarning,

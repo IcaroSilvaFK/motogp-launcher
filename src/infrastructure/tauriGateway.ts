@@ -58,5 +58,6 @@ export function createTauriGateway(invoke: InvokeFn = tauriInvoke): LauncherGate
     openDataFolder: () => call('open_data_folder'),
     getCatalog: () => call('get_catalog'),
     refreshCatalog: () => call('refresh_catalog'),
+    openCatalogPage: (id) => call('open_catalog_page', { id }),
   };
 }

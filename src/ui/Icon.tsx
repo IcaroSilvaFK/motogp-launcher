@@ -73,6 +73,29 @@ const GLYPHS = {
       <path d="M3 11h14M6.5 13.25h.01M9 13.25h.01" />
     </>
   ),
+  // Discover tab (#73): a compass, the grid/list view toggle, an external page and a close cross.
+  discover: (
+    <>
+      <circle cx="10" cy="10" r="6.5" />
+      <path d="M12.8 7.2l-1.6 4-4 1.6 1.6-4z" />
+    </>
+  ),
+  grid: (
+    <>
+      <rect x="3.5" y="3.5" width="5" height="5" rx="1" />
+      <rect x="11.5" y="3.5" width="5" height="5" rx="1" />
+      <rect x="3.5" y="11.5" width="5" height="5" rx="1" />
+      <rect x="11.5" y="11.5" width="5" height="5" rx="1" />
+    </>
+  ),
+  list: <path d="M7.5 5.5h9M7.5 10h9M7.5 14.5h9M3.5 5.5h.01M3.5 10h.01M3.5 14.5h.01" />,
+  external: (
+    <>
+      <path d="M11 3.5h5.5V9M16.5 3.5L9.5 10.5" />
+      <path d="M14 11.5v4H4.5V6h4" />
+    </>
+  ),
+  close: <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" />,
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof GLYPHS;
