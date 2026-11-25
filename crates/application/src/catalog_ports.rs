@@ -1,4 +1,4 @@
-use crate::{CatalogCacheError, CatalogSourceError};
+use crate::{AppError, CatalogCacheError, CatalogSourceError};
 use motogp_domain::{CatalogEntry, CatalogEntryDraft};
 
 /// One entry of a downloaded catalog, before validation.
@@ -62,6 +62,12 @@ pub trait CatalogCache: Send + Sync {
     fn load(&self) -> Result<Option<CachedCatalog>, CatalogCacheError>;
     /// Replaces the cached catalog.
     fn save(&self, catalog: &CachedCatalog) -> Result<(), CatalogCacheError>;
+}
+
+/// Port: opens a web page in the user's default browser. Kept apart from
+/// `UrlOpener` (steam links) because it carries a different trust policy.
+pub trait WebPageOpener: Send + Sync {
+    fn open_page(&self, url: &str) -> Result<(), AppError>;
 }
 
 #[cfg(test)]

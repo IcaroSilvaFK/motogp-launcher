@@ -9,6 +9,8 @@ use std::pin::Pin;
 
 #[path = "bdd/catalog.rs"]
 mod catalog;
+#[path = "bdd/catalog_open_page.rs"]
+mod catalog_open_page;
 #[path = "bdd/commands_and_recovery.rs"]
 mod commands_and_recovery;
 #[path = "bdd/deploy.rs"]
@@ -63,6 +65,7 @@ const FEATURES: &[(&str, Runner)] = &[
         Box::pin(stale_session_recovery::run())
     }),
     ("catalog", || Box::pin(catalog::run())),
+    ("catalog-open-page", || Box::pin(catalog_open_page::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

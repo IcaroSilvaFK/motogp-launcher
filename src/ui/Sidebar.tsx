@@ -2,9 +2,10 @@ import { useId } from 'react';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
 
-export type ScreenId = 'library' | 'profiles' | 'settings';
+export type ScreenId = 'library' | 'discover' | 'profiles' | 'settings';
 
-const SCREENS: readonly ScreenId[] = ['library', 'profiles', 'settings'];
+/** Every screen, in sidebar order. */
+export const ALL_SCREENS: readonly ScreenId[] = ['library', 'discover', 'profiles', 'settings'];
 
 /**
  * Left sidebar: the main navigation (icon + label, `aria-current="page"` on the current screen)
@@ -14,11 +15,14 @@ const SCREENS: readonly ScreenId[] = ['library', 'profiles', 'settings'];
  * hidden, and each item gets its label as a tooltip.
  */
 export function Sidebar({
+  screens = ALL_SCREENS,
   current,
   onSelect,
   collapsed,
   onToggle,
 }: {
+  /** The screens to list (Discover only when a catalog is wired); defaults to all of them. */
+  screens?: readonly ScreenId[];
   current: ScreenId;
   onSelect: (screen: ScreenId) => void;
   collapsed: boolean;
@@ -33,7 +37,7 @@ export function Sidebar({
     <aside className="sidebar" data-collapsed={String(collapsed)}>
       <h1 className="visually-hidden">{t.appName}</h1>
       <nav id={navId} aria-label={t.nav.label} className="side-nav">
-        {SCREENS.map((screen) => (
+        {screens.map((screen) => (
           <button
             key={screen}
             type="button"

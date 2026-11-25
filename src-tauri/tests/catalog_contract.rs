@@ -58,3 +58,60 @@ fn refresh_catalog_caches_the_catalog_for_offline_use() {
 
     assert!(h.data_dir().join("catalog-cache.json").exists());
 }
+
+fn overtake_draft() -> CatalogEntryDraft {
+    CatalogEntryDraft {
+        page_url: "https://overtake.gg/downloads/rebalanced-ai.69345/".to_string(),
+        ..draft()
+    }
+}
+
+#[test]
+fn open_catalog_page_opens_the_entry_page_by_id() {
+    let h =
+        Harness::with_catalog_source(Arc::new(FakeCatalogSource::serving(vec![overtake_draft()])));
+
+    h.invoke("open_catalog_page", json!({ "id": "rebalanced-ai" }))
+        .unwrap();
+
+    assert_eq!(
+        *h.pages_opened.lock().unwrap(),
+        vec!["https://overtake.gg/downloads/rebalanced-ai.69345/"]
+    );
+}
+
+#[test]
+fn open_catalog_page_of_an_unknown_id_maps_to_a_stable_code() {
+    let h =
+        Harness::with_catalog_source(Arc::new(FakeCatalogSource::serving(vec![overtake_draft()])));
+
+    let error = h
+        .invoke("open_catalog_page", json!({ "id": "missing" }))
+        .unwrap_err();
+
+    assert_eq!(error["code"], "catalog_entry_not_found");
+    assert!(h.pages_opened.lock().unwrap().is_empty());
+}
+
+#[test]
+fn open_catalog_page_refuses_a_host_outside_the_allow_list() {
+    let h = Harness::with_catalog_source(Arc::new(FakeCatalogSource::serving(vec![draft()])));
+
+    let error = h
+        .invoke("open_catalog_page", json!({ "id": "rebalanced-ai" }))
+        .unwrap_err();
+
+    assert_eq!(error["code"], "catalog_page_not_allowed");
+    assert!(h.pages_opened.lock().unwrap().is_empty());
+}
+
+#[test]
+fn open_catalog_page_needs_an_available_catalog() {
+    let h = Harness::new();
+
+    let error = h
+        .invoke("open_catalog_page", json!({ "id": "rebalanced-ai" }))
+        .unwrap_err();
+
+    assert_eq!(error["code"], "catalog_unavailable");
+}

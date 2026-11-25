@@ -275,6 +275,17 @@ pub async fn refresh_catalog(state: State<'_, AppState>) -> CommandResult<Catalo
     read_blocking(state, |state| Ok(state.catalog.refresh()?.into())).await
 }
 
+/// Opens the web page of a catalog entry in the default browser. The frontend
+/// sends only the entry id; the URL comes from the catalog and is checked
+/// against the page policy before it is opened.
+#[tauri::command]
+pub async fn open_catalog_page(state: State<'_, AppState>, id: String) -> CommandResult<()> {
+    read_blocking(state, move |state| {
+        Ok(state.catalog.open_page(&id, state.web_opener.as_ref())?)
+    })
+    .await
+}
+
 /// Registers every command on the builder; shared by the real app and the
 /// contract tests.
 pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
@@ -304,6 +315,7 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         open_data_folder,
         get_game_artwork,
         get_catalog,
-        refresh_catalog
+        refresh_catalog,
+        open_catalog_page
     ])
 }

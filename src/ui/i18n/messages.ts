@@ -9,6 +9,7 @@ export interface Messages {
     library: string;
     profiles: string;
     settings: string;
+    discover: string;
     collapse: string;
     expand: string;
   };
@@ -72,6 +73,58 @@ export interface Messages {
     conflictWinsDetail: (count: number, others: string[]) => string;
     /** Tooltip and accessible text of the "overridden" badge: files lost and the mods that win them. */
     conflictOverriddenDetail: (count: number, winners: string[]) => string;
+  };
+  /** Discover tab (#73): the curated online catalog. */
+  discover: {
+    title: string;
+    /** Subtitle: entry count and the date of the catalog shown. */
+    summary: (count: number, date: string) => string;
+    refresh: string;
+    refreshing: string;
+    loading: string;
+    /** Stale banner: the catalog shown is the one saved on `date`. */
+    stale: (date: string) => string;
+    categories: string;
+    all: string;
+    search: string;
+    searchPlaceholder: string;
+    sortLabel: string;
+    sortUpdated: string;
+    sortName: string;
+    viewLabel: string;
+    gridView: string;
+    listView: string;
+    /** Accessible name of the results list. */
+    results: string;
+    /** Live count of the visible entries. */
+    resultCount: (count: number) => string;
+    noResults: string;
+    clearFilters: string;
+    inLibrary: string;
+    inLibraryDetail: string;
+    byAuthor: (author: string) => string;
+    version: (version: string) => string;
+    updated: (date: string) => string;
+    emptyTitle: string;
+    emptyCurated: string;
+    emptyHowTo: string;
+    emptyMeanwhile: string;
+    goToLibrary: string;
+    retry: string;
+    detail: {
+      close: string;
+      description: string;
+      version: string;
+      author: string;
+      updated: string;
+      game: string;
+      category: string;
+      page: string;
+      openPage: string;
+      /** Hint under Open page: the host the page opens on, in the default browser. */
+      openPageHint: (host: string) => string;
+      install: string;
+    };
   };
   profiles: {
     title: string;

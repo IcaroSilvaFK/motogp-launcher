@@ -77,3 +77,16 @@ export function formatShare(share: number, locale: Locale): string {
 export function formatClockTime(ms: number, locale: Locale): string {
   return new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(ms);
 }
+
+/** Formats a calendar day (`YYYY-MM-DD`, no time zone) as a medium date, e.g. "Nov 10, 2026". */
+export function formatDay(day: string, locale: Locale): string {
+  const [year = 0, month = 1, date = 1] = day.split('-').map(Number);
+  const value = new Date(Date.UTC(year, month - 1, date));
+  if (Number.isNaN(value.getTime())) return day;
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeZone: 'UTC' }).format(value);
+}
+
+/** Formats a unix-millisecond instant as a medium date in the user's time zone. */
+export function formatInstantDate(ms: number, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(ms));
+}

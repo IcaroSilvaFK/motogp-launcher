@@ -45,3 +45,8 @@ Feature: Expose the launcher use cases through Tauri commands
     Then the commands "current_session" and "stop_session" are registered
     And "current_session" answers phase "idle" with no start time on a fresh launch
     And "stop_session" without a session fails with code "no_active_session"
+
+  Scenario: Open a catalog page through IPC
+    Given a cached catalog with the entry "rebalanced-ai"
+    When the frontend invokes open_catalog_page with id "rebalanced-ai"
+    Then the controlled web opener receives the entry's page URL

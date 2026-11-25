@@ -4,6 +4,7 @@
 //! Entities arrive in the next issues, always driven by tests.
 
 mod catalog;
+mod catalog_page;
 mod config;
 mod conflict;
 mod deploy;
@@ -18,6 +19,7 @@ pub use catalog::{
     CatalogDownload, CatalogDownloadDraft, CatalogEntry, CatalogEntryDraft, CatalogEntryError,
     SUPPORTED_CATALOG_SCHEMA,
 };
+pub use catalog_page::{check_page_url, PageUrlError, ALLOWED_PAGE_HOSTS};
 pub use config::Config;
 pub use conflict::{detect_conflicts, FileConflict};
 pub use deploy::{deployed_name, is_mods_dir, is_safe_file_name, Deployed, DeployedFile};

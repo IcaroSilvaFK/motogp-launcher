@@ -14,6 +14,18 @@ impl From<&CatalogError> for CommandError {
                 "catalog_unsupported_schema",
                 "The mod catalog needs a newer version of the launcher. Update the launcher to browse it.",
             ),
+            CatalogError::EntryNotFound { .. } => (
+                "catalog_entry_not_found",
+                "That mod is no longer in the catalog. Refresh the catalog and try again.",
+            ),
+            CatalogError::PageNotAllowed { .. } => (
+                "catalog_page_not_allowed",
+                "The page of this mod cannot be opened because its address is not trusted.",
+            ),
+            CatalogError::OpenFailed { .. } => (
+                "open_page_failed",
+                "The page could not be opened in your browser.",
+            ),
         };
         CommandError {
             code: code.to_string(),
@@ -46,5 +58,38 @@ mod tests {
         let error = CommandError::from(CatalogError::UnsupportedSchema { version: 2 });
         assert_eq!(error.code, "catalog_unsupported_schema");
         assert!(error.message.contains("newer version"));
+    }
+
+    #[test]
+    fn open_page_errors_map_to_stable_codes_without_leaking_details() {
+        let cases = [
+            (
+                CatalogError::EntryNotFound {
+                    id: "secret-id".into(),
+                },
+                "catalog_entry_not_found",
+            ),
+            (
+                CatalogError::PageNotAllowed {
+                    id: "secret-id".into(),
+                    reason: "host evil.com".into(),
+                },
+                "catalog_page_not_allowed",
+            ),
+            (
+                CatalogError::OpenFailed {
+                    reason: "os detail".into(),
+                },
+                "open_page_failed",
+            ),
+        ];
+        for (error, code) in cases {
+            let mapped = CommandError::from(error);
+            assert_eq!(mapped.code, code);
+            assert!(!mapped.message.is_empty());
+            assert!(!mapped.message.contains("secret-id"));
+            assert!(!mapped.message.contains("evil.com"));
+            assert!(!mapped.message.contains("os detail"));
+        }
     }
 }

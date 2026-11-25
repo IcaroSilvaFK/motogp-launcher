@@ -16,7 +16,8 @@ mod error_profiles;
 mod startup;
 
 pub use adapters::{
-    is_steam_url, TauriEvents, TauriFolderOpener, TauriOpener, SESSION_ERROR_EVENT, SESSION_EVENT,
+    is_steam_url, TauriEvents, TauriFolderOpener, TauriOpener, TauriWebOpener, SESSION_ERROR_EVENT,
+    SESSION_EVENT,
 };
 pub use bootstrap::run;
 pub use catalog_fallback::UnavailableCatalogSource;

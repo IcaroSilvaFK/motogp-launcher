@@ -29,3 +29,8 @@ export { selectProfileLocked } from './selectProfileLocked';
 export type { AppInfo } from './ports/AppInfo';
 export type { WindowControls } from './ports/WindowControls';
 export { readAppVersion } from './useCases/readAppVersion';
+export type { CatalogController, CatalogDeps, CatalogGateway, CatalogState } from './catalogController';
+export { createCatalogController } from './useCases/catalog';
+export { useCatalogState } from './useCatalogState';
+export type { CatalogFilter, CatalogSort, CategoryCount } from './catalogSelectors';
+export { categoryCounts, inLibrary, normalizeTitle, pageHost, selectEntries, sortEntries } from './catalogSelectors';

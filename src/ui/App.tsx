@@ -6,8 +6,16 @@ import {
   selectSessionClean,
   useLauncherState,
 } from '../application';
-import type { AppInfo, LauncherController, NavPreferenceStore, UpdateController, WindowControls } from '../application';
+import type {
+  AppInfo,
+  CatalogController,
+  LauncherController,
+  NavPreferenceStore,
+  UpdateController,
+  WindowControls,
+} from '../application';
 import { AppInfoContext } from './AppInfoContext';
+import { DiscoverScreen } from './DiscoverScreen';
 import { I18nProvider, useI18n } from './i18n';
 import type { Locale } from './i18n';
 import { LauncherContext } from './LauncherContext';
@@ -15,7 +23,7 @@ import { LibraryScreen } from './LibraryScreen';
 import { NoticeBar } from './NoticeBar';
 import { ProfilesScreen } from './ProfilesScreen';
 import { SettingsScreen } from './SettingsScreen';
-import { Sidebar } from './Sidebar';
+import { ALL_SCREENS, Sidebar } from './Sidebar';
 import type { ScreenId } from './Sidebar';
 import { ScreenTransition } from './ScreenTransition';
 import { StatusBar } from './StatusBar';
@@ -53,14 +61,17 @@ function Shell({
   appInfo,
   navStore,
   windowControls,
+  catalog,
 }: {
   controller: LauncherController;
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
   windowControls?: WindowControls;
+  catalog?: CatalogController;
 }) {
   const state = useLauncherState(controller);
+  const screens = useMemo(() => (catalog ? ALL_SCREENS : ALL_SCREENS.filter((id) => id !== 'discover')), [catalog]);
   const [screen, setScreen] = useState<ScreenId>('library');
   // Read once on mount; without a store the choice lives in memory and starts expanded.
   const [collapsed, setCollapsed] = useState(() => (navStore ? loadSidebarCollapsed(navStore) : false));
@@ -102,7 +113,13 @@ function Shell({
       <LauncherContext.Provider value={value}>
         <div className="app-shell">
           <TitleBar controls={windowControls} />
-          <Sidebar current={screen} onSelect={setScreen} collapsed={collapsed} onToggle={toggleSidebar} />
+          <Sidebar
+            screens={screens}
+            current={screen}
+            onSelect={setScreen}
+            collapsed={collapsed}
+            onToggle={toggleSidebar}
+          />
           <div className="app-content">
             <div className="app-messages">
               <NoticeBar />
@@ -115,6 +132,10 @@ function Shell({
                 // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
                 <ScreenTransition key={screen}>
                   {screen === 'library' && <LibraryScreen />}
+                  {/* No onInstall yet: the Install slot stays hidden until #74 wires it. */}
+                  {screen === 'discover' && catalog && (
+                    <DiscoverScreen catalog={catalog} onGoToLibrary={() => setScreen('library')} />
+                  )}
                   {screen === 'profiles' && <ProfilesScreen />}
                   {screen === 'settings' && <SettingsScreen />}
                 </ScreenTransition>
@@ -136,6 +157,7 @@ export function App({
   appInfo,
   navStore,
   windowControls,
+  catalog,
 }: {
   controller: LauncherController;
   locale?: Locale;
@@ -144,6 +166,8 @@ export function App({
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
   windowControls?: WindowControls;
+  /** The Discover tab (#73) is listed only when a catalog controller is wired. */
+  catalog?: CatalogController;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
@@ -153,6 +177,7 @@ export function App({
         appInfo={appInfo}
         navStore={navStore}
         windowControls={windowControls}
+        catalog={catalog}
       />
     </I18nProvider>
   );

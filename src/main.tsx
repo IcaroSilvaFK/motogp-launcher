@@ -3,6 +3,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
+  createCatalogController,
   createLauncherController,
   createUpdateController,
   loadLocale,
@@ -27,12 +28,17 @@ if (!container) {
   throw new Error('Root element #root not found');
 }
 
+const gateway = createTauriGateway();
+
 const controller = createLauncherController({
-  gateway: createTauriGateway(),
+  gateway,
   picker: createTauriPicker(),
   session: createTauriSessionEvents(),
   drop: createTauriDropEvents(),
 });
+
+// Discover tab (#73): loads the catalog on the first visit only.
+const catalog = createCatalogController({ gateway });
 
 const localeStore = createLocalStorageLocaleStore();
 
@@ -54,6 +60,7 @@ createRoot(container).render(
       appInfo={createTauriAppInfo()}
       navStore={createLocalStorageNavStore()}
       windowControls={createTauriWindowControls()}
+      catalog={catalog}
     />
   </StrictMode>,
 );

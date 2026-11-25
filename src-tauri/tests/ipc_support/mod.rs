@@ -4,7 +4,7 @@
 #![allow(dead_code)]
 use motogp_application::{
     AppError, BackgroundRunner, CatalogSource, CatalogSourceError, FolderOpener, ProcessInspector,
-    RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch, UrlOpener,
+    RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries};
 use motogp_launcher_lib::{compose, configure, run_recovery, AppState};
@@ -40,6 +40,19 @@ pub struct FakeFolderOpener {
 impl FolderOpener for FakeFolderOpener {
     fn open_folder(&self, path: &Path) -> Result<(), AppError> {
         self.opened.lock().unwrap().push(path.to_path_buf());
+        Ok(())
+    }
+}
+
+/// Records the web pages it was asked to open instead of starting a browser.
+#[derive(Clone, Default)]
+pub struct FakeWebOpener {
+    pub opened: Arc<Mutex<Vec<String>>>,
+}
+
+impl WebPageOpener for FakeWebOpener {
+    fn open_page(&self, url: &str) -> Result<(), AppError> {
+        self.opened.lock().unwrap().push(url.to_string());
         Ok(())
     }
 }
@@ -138,6 +151,7 @@ pub struct Harness {
     pub tmp: TempDir,
     pub opened: Arc<Mutex<Vec<String>>>,
     pub folders_opened: Arc<Mutex<Vec<PathBuf>>>,
+    pub pages_opened: Arc<Mutex<Vec<String>>>,
     pub runner: Arc<ManualRunner>,
     pub recorder: Arc<Recorder>,
     pub app: App<MockRuntime>,
@@ -157,6 +171,8 @@ impl Harness {
         let opened = opener.opened.clone();
         let folder_opener = FakeFolderOpener::default();
         let folders_opened = folder_opener.opened.clone();
+        let web_opener = FakeWebOpener::default();
+        let pages_opened = web_opener.opened.clone();
         let runner = Arc::new(ManualRunner::default());
         let recorder = Arc::new(Recorder::default());
         let state = compose(
@@ -165,6 +181,7 @@ impl Harness {
             SteamArtwork::new(Some(tmp.path().join("steam"))),
             opener,
             Arc::new(folder_opener),
+            Arc::new(web_opener),
             NoProcesses,
             recorder.clone(),
             runner.clone(),
@@ -181,6 +198,7 @@ impl Harness {
             tmp,
             opened,
             folders_opened,
+            pages_opened,
             runner,
             recorder,
             app,
