@@ -57,6 +57,19 @@ describe('Given the launcher controller and the storage commands', () => {
     expect(controller.getState().error).toBeNull();
   });
 
+  it('When the support page is opened Then the gateway is called with no arguments', async () => {
+    const { controller, gateway } = setup();
+    await controller.openSupportPage();
+    expect(gateway.callsOf('openSupportPage')).toEqual([{ method: 'openSupportPage', args: [] }]);
+  });
+
+  it('When opening the support page fails Then the error is rejected to the caller and no global error is set', async () => {
+    const { controller, gateway } = setup();
+    gateway.failNext('openSupportPage', { code: 'open_page_failed', message: 'x' });
+    await expect(controller.openSupportPage()).rejects.toEqual({ code: 'open_page_failed', message: 'x' });
+    expect(controller.getState().error).toBeNull();
+  });
+
   it('When the gateway rejects with a raw value Then it is normalized to a CommandError', async () => {
     const { controller, gateway } = setup();
     gateway.getStorageUsage = () => Promise.reject(new Error('boom'));

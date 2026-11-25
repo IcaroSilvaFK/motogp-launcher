@@ -36,6 +36,8 @@ mod stale_manifest;
 mod stale_session_recovery;
 #[path = "bdd/storage.rs"]
 mod storage;
+#[path = "bdd/support_page.rs"]
+mod support_page;
 
 #[path = "support/catalog_fakes.rs"]
 pub mod catalog_fakes;
@@ -71,6 +73,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("catalog", || Box::pin(catalog::run())),
     ("catalog-open-page", || Box::pin(catalog_open_page::run())),
     ("catalog-install", || Box::pin(catalog_install::run())),
+    ("support-page", || Box::pin(support_page::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

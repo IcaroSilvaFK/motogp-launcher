@@ -21,6 +21,8 @@ mod mod_grouping;
 mod session_state;
 #[path = "bdd/storage_classification.rs"]
 mod storage_classification;
+#[path = "bdd/support_page.rs"]
+mod support_page;
 
 type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
@@ -34,6 +36,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("load-order", || Box::pin(load_order::run())),
     ("catalog", || Box::pin(catalog::run())),
     ("catalog-page-url", || Box::pin(catalog_page_url::run())),
+    ("support-page", || Box::pin(support_page::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

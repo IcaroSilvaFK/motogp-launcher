@@ -149,3 +149,15 @@ fn open_catalog_page_needs_an_available_catalog() {
 
     assert_eq!(error["code"], "catalog_unavailable");
 }
+
+#[test]
+fn open_support_page_opens_the_support_url_without_arguments() {
+    let h = Harness::new();
+
+    h.invoke("open_support_page", json!({})).unwrap();
+
+    assert_eq!(
+        *h.pages_opened.lock().unwrap(),
+        vec![motogp_domain::SUPPORT_PAGE_URL]
+    );
+}

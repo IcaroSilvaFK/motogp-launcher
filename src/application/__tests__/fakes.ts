@@ -361,6 +361,10 @@ export class FakeGateway implements LauncherGateway {
     return this.progressListeners.size;
   }
 
+  openSupportPage(): Promise<void> {
+    return this.run('openSupportPage', [], () => undefined);
+  }
+
   openDataFolder(): Promise<void> {
     return this.run('openDataFolder', [], () => undefined);
   }
