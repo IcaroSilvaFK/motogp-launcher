@@ -8,6 +8,8 @@ mod catalog_http;
 mod data_dir;
 mod deploy_files;
 mod deployed_repository;
+mod download_http;
+mod download_staging;
 mod game_files;
 mod instance_lock;
 mod library_files;
@@ -32,6 +34,8 @@ pub use catalog_http::{parse_catalog, HttpCatalogConfig, HttpCatalogSource, DEFA
 pub use data_dir::DataDir;
 pub use deploy_files::{FsDeployFiles, LinkFn};
 pub use deployed_repository::JsonDeployedRepository;
+pub use download_http::{HttpDownloadConfig, HttpModDownloader};
+pub use download_staging::FsDownloadStaging;
 pub use game_files::FsGameFiles;
 pub use instance_lock::FileInstanceLock;
 pub use library_files::FsLibraryFiles;

@@ -9,6 +9,8 @@ use std::pin::Pin;
 
 #[path = "bdd/catalog.rs"]
 mod catalog;
+#[path = "bdd/catalog_install.rs"]
+mod catalog_install;
 #[path = "bdd/catalog_open_page.rs"]
 mod catalog_open_page;
 #[path = "bdd/commands_and_recovery.rs"]
@@ -41,6 +43,8 @@ pub mod catalog_fakes;
 pub mod config_fakes;
 #[path = "support/deploy_fakes.rs"]
 pub mod deploy_fakes;
+#[path = "support/install_fakes.rs"]
+pub mod install_fakes;
 #[path = "support/fakes.rs"]
 pub mod library_fakes;
 #[path = "support/play_fakes.rs"]
@@ -66,6 +70,7 @@ const FEATURES: &[(&str, Runner)] = &[
     }),
     ("catalog", || Box::pin(catalog::run())),
     ("catalog-open-page", || Box::pin(catalog_open_page::run())),
+    ("catalog-install", || Box::pin(catalog_install::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

@@ -101,3 +101,42 @@ describe('Given the game artwork command', () => {
     await expect(createTauriGateway(invoke).getGameArtwork()).resolves.toBeNull();
   });
 });
+
+describe('Given the catalog install commands', () => {
+  it('When installing and cancelling Then the commands take only the id', async () => {
+    const invoke = vi.fn().mockResolvedValue([]);
+    const gateway = createTauriGateway(invoke);
+    await gateway.installCatalogEntry('rebalanced-ai');
+    await gateway.cancelCatalogInstall('rebalanced-ai');
+    expect(invoke).toHaveBeenNthCalledWith(1, 'install_catalog_entry', { id: 'rebalanced-ai' });
+    expect(invoke).toHaveBeenNthCalledWith(2, 'cancel_catalog_install', { id: 'rebalanced-ai' });
+  });
+
+  it('When the backend rejects Then the code is preserved', async () => {
+    const invoke = vi.fn().mockRejectedValue({ code: 'download_hash_mismatch', message: 'x' });
+    await expect(createTauriGateway(invoke).installCatalogEntry('a')).rejects.toEqual({
+      code: 'download_hash_mismatch',
+      message: 'x',
+    });
+  });
+
+  it('When subscribed to progress Then the event payload is delivered until unsubscribed', async () => {
+    const unlisten = vi.fn();
+    let handler: (event: { payload: unknown }) => void = () => undefined;
+    const listen = vi.fn((_name: string, h: typeof handler) => {
+      handler = h;
+      return Promise.resolve(unlisten);
+    });
+    const received = vi.fn();
+    const off = createTauriGateway(vi.fn(), listen as never).onCatalogInstallProgress(received);
+    const payload = { id: 'a', phase: 'downloading', received: 1, total: 2 };
+    handler({ payload });
+    expect(listen.mock.calls[0]?.[0]).toBe('catalog-install-progress');
+    expect(received).toHaveBeenCalledWith(payload);
+    off();
+    await Promise.resolve();
+    expect(unlisten).toHaveBeenCalledTimes(1);
+    handler({ payload });
+    expect(received).toHaveBeenCalledTimes(1);
+  });
+});

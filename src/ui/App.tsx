@@ -132,7 +132,6 @@ function Shell({
                 // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
                 <ScreenTransition key={screen}>
                   {screen === 'library' && <LibraryScreen />}
-                  {/* No onInstall yet: the Install slot stays hidden until #74 wires it. */}
                   {screen === 'discover' && catalog && (
                     <DiscoverScreen catalog={catalog} onGoToLibrary={() => setScreen('library')} />
                   )}

@@ -4,12 +4,15 @@
 mod adapters;
 mod bootstrap;
 mod catalog_fallback;
+mod catalog_install_support;
 mod commands;
+mod commands_install;
 mod compose;
 mod dto;
 mod error;
 mod error_catalog;
 mod error_game;
+mod error_install;
 mod error_library;
 mod error_play;
 mod error_profiles;
@@ -21,8 +24,12 @@ pub use adapters::{
 };
 pub use bootstrap::run;
 pub use catalog_fallback::UnavailableCatalogSource;
+pub use catalog_install_support::{production_downloader, UnavailableModDownloader};
 pub use commands::configure;
-pub use compose::{compose, AppState, Catalog, Profiles, Settings, Storage};
+pub use commands_install::{CatalogInstallProgressDto, CATALOG_INSTALL_PROGRESS_EVENT};
+pub use compose::{
+    compose, compose_with_downloader, AppState, Catalog, Installer, Profiles, Settings, Storage,
+};
 pub use dto::{
     CatalogDownloadDto, CatalogDto, CatalogEntryDto, ConfigDto, CurrentSessionDto,
     DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto, SessionErrorDto,

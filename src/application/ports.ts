@@ -1,5 +1,6 @@
 import type {
   Catalog,
+  CatalogInstallProgress,
   Config,
   FileConflict,
   CurrentSession,
@@ -57,6 +58,12 @@ export interface LauncherGateway {
   // Catalog pages (#73).
   /** Opens the entry's web page in the default browser. Only the id is sent: the backend owns the URL and its policy. */
   openCatalogPage(id: string): Promise<void>;
+  /** Downloads, verifies and imports a catalog entry; resolves with the imported mods. */
+  installCatalogEntry(id: string): Promise<ModEntry[]>;
+  /** Cancels the in-flight install of the entry; a no-op when nothing is in flight. */
+  cancelCatalogInstall(id: string): Promise<void>;
+  /** Progress of catalog installs. Synchronous: a failed registration only means no progress is shown. */
+  onCatalogInstallProgress(handler: (progress: CatalogInstallProgress) => void): Unsubscribe;
 }
 
 /** `null` means the user cancelled the dialog. */

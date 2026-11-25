@@ -128,6 +128,13 @@ export const BACKEND_ERROR_CODES = [
   'catalog_entry_not_found',
   'catalog_page_not_allowed',
   'open_page_failed',
+  // Catalog downloads (#74).
+  'catalog_entry_not_downloadable',
+  'catalog_install_in_progress',
+  'download_network',
+  'download_size_mismatch',
+  'download_hash_mismatch',
+  'download_cancelled',
 ] as const;
 
 export const FRONTEND_ERROR_CODES = [
@@ -182,3 +189,26 @@ export interface Catalog {
   /** Catalog entries the launcher dropped as invalid or duplicate. */
   skipped: number;
 }
+
+// ---- Catalog installs (#74). ----
+
+export type CatalogInstallPhase = 'downloading' | 'verifying' | 'importing';
+
+/** Payload of the `catalog-install-progress` event (camelCase, as emitted by the backend). */
+export interface CatalogInstallProgress {
+  id: string;
+  phase: CatalogInstallPhase;
+  /** Bytes received so far. */
+  received: number;
+  /** Bytes expected in total. */
+  total: number;
+}
+
+/** Install state of one catalog entry. `percent` is an integer 0-100. */
+export type CatalogInstallState =
+  | { status: 'idle' }
+  | { status: 'downloading'; received: number; total: number; percent: number }
+  | { status: 'verifying' }
+  | { status: 'importing' }
+  | { status: 'installed' }
+  | { status: 'failed'; code: ErrorCode; message: string };

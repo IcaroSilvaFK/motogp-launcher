@@ -1,4 +1,5 @@
 import type {
+  CatalogInstallState,
   CommandError,
   Config,
   FileConflict,
@@ -50,6 +51,8 @@ export interface LauncherState {
   staleSession: { modsDir: string; tracked: number } | null;
   error: CommandError | null;
   notice: Notice | null;
+  /** Install state per catalog entry id; an absent id means idle. */
+  catalogInstalls: Record<string, CatalogInstallState>;
 }
 
 export interface LauncherController {
@@ -98,6 +101,14 @@ export interface LauncherController {
   getStorageUsage(): Promise<StorageUsage>;
   /** Opens the launcher data folder; rejects with a CommandError, no global error. */
   openDataFolder(): Promise<void>;
+  /**
+   * Downloads and installs a catalog entry (also the retry from `failed`). Ignored while the entry is
+   * already installing or while the library is locked by a session (`selectCanInstall`). Failures
+   * stay in `catalogInstalls[id]` (no global error); a cancelled install returns to idle.
+   */
+  installCatalogEntry(id: string): Promise<void>;
+  /** Cancels the entry's in-flight install; no-op otherwise. */
+  cancelCatalogInstall(id: string): Promise<void>;
   dismissError(): void;
   dismissNotice(): void;
 }

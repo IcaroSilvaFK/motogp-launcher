@@ -1,5 +1,6 @@
 import type {
   Catalog,
+  CatalogInstallProgress,
   CommandError,
   Config,
   CurrentSession,
@@ -311,6 +312,41 @@ export class FakeGateway implements LauncherGateway {
 
   openCatalogPage(id: string): Promise<void> {
     return this.run('openCatalogPage', [id], () => undefined);
+  }
+
+  /** Mods the next `installCatalogEntry` imports; defaults to one mod named after the entry. */
+  installResult: ModEntry[] | null = null;
+  /** When set, `installCatalogEntry` waits for it (to test in-flight behaviour). */
+  installGate: Promise<void> | null = null;
+  private readonly progressListeners = new Set<(progress: CatalogInstallProgress) => void>();
+
+  async installCatalogEntry(id: string): Promise<ModEntry[]> {
+    // The call is recorded (and may fail) first; the gate then keeps it "in flight".
+    await this.run('installCatalogEntry', [id], () => undefined);
+    if (this.installGate) await this.installGate;
+    const mods = this.installResult ?? [{ id, name: id, files: [`${id}.pak`], size_bytes: 1024 }];
+    for (const mod of mods) if (!this.mods.some((m) => m.id === mod.id)) this.mods.push(mod);
+    return mods.map((mod) => ({ ...mod }));
+  }
+
+  cancelCatalogInstall(id: string): Promise<void> {
+    return this.run('cancelCatalogInstall', [id], () => undefined);
+  }
+
+  onCatalogInstallProgress(handler: (progress: CatalogInstallProgress) => void): Unsubscribe {
+    this.progressListeners.add(handler);
+    return () => {
+      this.progressListeners.delete(handler);
+    };
+  }
+
+  /** Delivers a progress event to the subscribed controller. */
+  emitProgress(progress: CatalogInstallProgress): void {
+    for (const listener of [...this.progressListeners]) listener(progress);
+  }
+
+  get progressSubscribers(): number {
+    return this.progressListeners.size;
   }
 
   openDataFolder(): Promise<void> {

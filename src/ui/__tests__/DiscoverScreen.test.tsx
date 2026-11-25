@@ -7,7 +7,6 @@ import { createCatalogController } from '../../application';
 import type { CatalogGateway } from '../../application';
 import type { Catalog, CatalogEntry, CommandError } from '../../domain';
 import { DiscoverScreen } from '../DiscoverScreen';
-import type { InstallHandler } from '../DiscoverScreen';
 import { I18nProvider } from '../i18n';
 import type { Locale } from '../i18n';
 import { LauncherContext } from '../LauncherContext';
@@ -29,9 +28,12 @@ const entry: CatalogEntry = {
 
 const catalogOf = (entries: CatalogEntry[]): Catalog => ({ entries, fetchedAt: 0, stale: false, skipped: 0 });
 
-function setup(options: { locale?: Locale; onInstall?: InstallHandler; refresh?: () => Promise<Catalog> } = {}) {
+function setup(
+  options: { locale?: Locale; download?: CatalogEntry['download']; refresh?: () => Promise<Catalog> } = {},
+) {
+  const shown = options.download === undefined ? entry : { ...entry, download: options.download };
   const gateway: CatalogGateway = {
-    getCatalog: () => Promise.resolve(catalogOf([entry])),
+    getCatalog: () => Promise.resolve(catalogOf([shown])),
     refreshCatalog: options.refresh ?? (() => Promise.resolve(catalogOf([entry]))),
     openCatalogPage: () => Promise.resolve(),
   };
@@ -41,29 +43,34 @@ function setup(options: { locale?: Locale; onInstall?: InstallHandler; refresh?:
   render(
     <I18nProvider locale={options.locale ?? 'en'}>
       <LauncherContext.Provider value={{ controller: launcher, state: launcher.getState() }}>
-        <DiscoverScreen catalog={catalog} onGoToLibrary={onGoToLibrary} onInstall={options.onInstall} />
+        <DiscoverScreen catalog={catalog} onGoToLibrary={onGoToLibrary} />
       </LauncherContext.Provider>
     </I18nProvider>,
   );
-  return { catalog, user: userEvent.setup() };
+  return { catalog, launcher, user: userEvent.setup() };
 }
 
 afterEach(cleanup);
 
 describe('DiscoverScreen', () => {
-  it('shows Install only when the entry has a download and a handler is wired (#74 slot)', async () => {
-    const onInstall = vi.fn();
-    const { user } = setup({ onInstall });
+  it('shows the connected install button for a downloadable entry', async () => {
+    const { user, launcher } = setup();
     await user.click(await screen.findByRole('button', { name: 'Rebalanced AI' }));
     const dialog = screen.getByRole('dialog');
     // An unparsable page URL hides the host line but keeps Open page.
     expect(within(dialog).queryByText(/default browser/)).not.toBeInTheDocument();
     await user.click(within(dialog).getByRole('button', { name: 'Install' }));
-    expect(onInstall).toHaveBeenCalledWith(entry);
+    expect(launcher.installCatalogEntry).toHaveBeenCalledWith(entry.id);
+  });
+
+  it('shows no install button for an entry without a download', async () => {
+    const { user } = setup({ download: null });
+    await user.click(await screen.findByRole('button', { name: 'Rebalanced AI' }));
+    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
   });
 
   it('keeps focus inside the sheet and closes from the scrim', async () => {
-    const { user } = setup({ onInstall: vi.fn() });
+    const { user } = setup();
     await user.click(await screen.findByRole('button', { name: 'Rebalanced AI' }));
     const dialog = screen.getByRole('dialog');
     const close = within(dialog).getByRole('button', { name: 'Close' });

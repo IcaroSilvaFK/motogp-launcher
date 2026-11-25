@@ -18,6 +18,8 @@ mod catalog_source;
 mod file_deploy;
 #[path = "bdd/file_import.rs"]
 mod file_import;
+#[path = "bdd/mod_download.rs"]
+mod mod_download;
 #[path = "bdd/processes.rs"]
 mod processes;
 #[path = "bdd/stale_manifest.rs"]
@@ -34,6 +36,7 @@ type Runner = fn() -> Pin<Box<dyn Future<Output = bool>>>;
 
 const FEATURES: &[(&str, Runner)] = &[
     ("catalog-source", || Box::pin(catalog_source::run())),
+    ("mod-download", || Box::pin(mod_download::run())),
     ("persistence", || Box::pin(persistence::run())),
     ("profile-persistence", || {
         Box::pin(profile_persistence::run())

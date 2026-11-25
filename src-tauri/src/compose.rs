@@ -1,22 +1,27 @@
 //! Composition of the use cases with the real adapters. Everything that
 //! varies between production and tests (Steam, opener, process table,
 //! background execution, events) is injected.
+use crate::catalog_install_support::production_downloader;
 use motogp_application::{
-    ArtworkService, BackgroundRunner, CatalogService, CatalogSource, DeployService, FolderOpener,
-    GameService, GameSettings, PlayService, ProcessInspector, ProfileModPlanner, ProfileService,
-    SessionPublisher, SessionService, StorageService, UrlOpener, WebPageOpener,
+    ArtworkService, BackgroundRunner, CancelFlag, CatalogInstaller, CatalogService, CatalogSource,
+    DeployService, FolderOpener, GameService, GameSettings, ModDownloader, PlayService,
+    ProcessInspector, ProfileModPlanner, ProfileService, SessionPublisher, SessionService,
+    StorageService, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{
-    mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsGameFiles, FsStorageScanner,
-    JsonCatalogCache, JsonConfigStore, JsonDeployedRepository, JsonModRepository, JsonProfileStore,
-    ModLibrary, MonotonicClock, SteamArtwork, SteamLibraries, SystemClock,
+    mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsDownloadStaging, FsGameFiles,
+    FsStorageScanner, JsonCatalogCache, JsonConfigStore, JsonDeployedRepository, JsonModRepository,
+    JsonProfileStore, ModLibrary, MonotonicClock, Sha256Hasher, SteamArtwork, SteamLibraries,
+    SystemClock,
 };
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub type Profiles = ProfileService<JsonProfileStore, SystemClock>;
 pub type Settings = GameSettings<JsonConfigStore, SteamLibraries, FsGameFiles>;
 pub type Storage = StorageService<FsStorageScanner, Arc<dyn FolderOpener + Send + Sync>>;
 pub type Catalog = CatalogService<Arc<dyn CatalogSource>, JsonCatalogCache, SystemClock>;
+pub type Installer = CatalogInstaller<Arc<dyn ModDownloader>, FsDownloadStaging, Sha256Hasher>;
 
 /// Everything the commands need. Managed as Tauri state; cheap to clone so
 /// blocking use cases can run off the main thread.
@@ -40,6 +45,10 @@ pub struct AppState {
     pub catalog: Arc<Catalog>,
     /// Opens catalog pages in the default browser (https, allow-listed hosts).
     pub web_opener: Arc<dyn WebPageOpener>,
+    /// Catalog installs (#74): downloads run off the runtime without `write_lock`.
+    pub installer: Arc<Installer>,
+    /// Cancel flags of the installs in flight, by catalog entry id.
+    pub install_cancels: Arc<Mutex<HashMap<String, CancelFlag>>>,
 }
 
 // The composition root receives every injected port, so it is wide on purpose.
@@ -55,6 +64,41 @@ pub fn compose<O, P>(
     publisher: Arc<dyn SessionPublisher>,
     runner: Arc<dyn BackgroundRunner>,
     catalog_source: Arc<dyn CatalogSource>,
+) -> AppState
+where
+    O: UrlOpener + Send + Sync + 'static,
+    P: ProcessInspector + Send + Sync + 'static,
+{
+    compose_with_downloader(
+        data,
+        steam,
+        artwork,
+        opener,
+        folder_opener,
+        web_opener,
+        inspector,
+        publisher,
+        runner,
+        catalog_source,
+        production_downloader(),
+    )
+}
+
+/// Like [`compose`], with the mod downloader injected (tests use a fake).
+// Same wide composition root as `compose`.
+#[allow(clippy::too_many_arguments)]
+pub fn compose_with_downloader<O, P>(
+    data: &DataDir,
+    steam: SteamLibraries,
+    artwork: SteamArtwork,
+    opener: O,
+    folder_opener: Arc<dyn FolderOpener + Send + Sync>,
+    web_opener: Arc<dyn WebPageOpener>,
+    inspector: P,
+    publisher: Arc<dyn SessionPublisher>,
+    runner: Arc<dyn BackgroundRunner>,
+    catalog_source: Arc<dyn CatalogSource>,
+    downloader: Arc<dyn ModDownloader>,
 ) -> AppState
 where
     O: UrlOpener + Send + Sync + 'static,
@@ -101,6 +145,12 @@ where
             FsStorageScanner,
             folder_opener,
         )),
+        installer: Arc::new(CatalogInstaller::new(
+            downloader,
+            FsDownloadStaging::new(data.downloads_dir()),
+            Sha256Hasher,
+        )),
+        install_cancels: Arc::default(),
         catalog: Arc::new(CatalogService::new(
             catalog_source,
             JsonCatalogCache::new(data.catalog_cache_file()),

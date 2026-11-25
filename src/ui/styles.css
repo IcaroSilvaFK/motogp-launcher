@@ -54,6 +54,15 @@
   --meter-fill: #9aa2ad;
   --meter-height: 6px;
 
+  /* Linear progress (catalog install, #74): Material 3 4dp track; the fill is the info tone,
+     not the accent, so Play stays the only accented filled element */
+  --progress-track: var(--meter-track);
+  --progress-fill: var(--info-fg);
+  --progress-height: 4px;
+  --progress-indeterminate-width: 40%;
+  --install-control-width: 240px;
+  --icon-size-sm: 14px;
+
   /* Spacing scale (4/8px grid) */
   --space-1: 4px;
   --space-2: 8px;
@@ -130,6 +139,7 @@
   --pulse: 1.2s ease-in-out infinite alternate;
   --shimmer: 1.4s var(--motion-easing-standard) infinite;
   --spin: var(--motion-duration-extra-long2) linear infinite;
+  --progress-indeterminate: 1.4s var(--motion-easing-standard) infinite;
 
   /* Loading feedback: the skeleton shine and the Play spinner */
   --skeleton-shine: rgba(255, 255, 255, 0.06);
@@ -1505,6 +1515,80 @@ button {
   color: var(--text-muted);
   font-size: var(--type-body-small);
   letter-spacing: 0.04em;
+}
+
+/* ---------- Catalog install control (#74, InstallButton.tsx) ---------- */
+
+.install-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  max-width: 100%;
+}
+
+/* In progress: label + Cancel on one line, the bar below; a fixed width so the bar does not jump. */
+.install-control[aria-busy='true'] {
+  display: grid;
+  gap: var(--space-1);
+  width: var(--install-control-width);
+}
+
+.install-progress-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  min-height: var(--control-height-sm);
+}
+
+.install-progress-label {
+  color: var(--text-muted);
+  font-size: var(--type-body-small);
+}
+
+.install-progress {
+  position: relative;
+  height: var(--progress-height);
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--progress-track);
+}
+
+.install-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--progress-fill);
+  transition: width var(--transition);
+}
+
+/* Indeterminate (verifying / installing): a segment slides across. Under reduced motion it rests
+   at the start and the "Verifying…" / "Installing…" label carries the meaning. */
+.install-progress[data-indeterminate] .install-progress-fill {
+  width: var(--progress-indeterminate-width);
+  animation: indeterminate var(--progress-indeterminate);
+}
+
+@keyframes indeterminate {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.install-done .icon {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+
+.install-error {
+  margin: 0;
+  color: var(--error-fg);
+  font-size: var(--type-body-small);
 }
 
 /* ---------- Switch (library row: mod in the active profile) ---------- */
