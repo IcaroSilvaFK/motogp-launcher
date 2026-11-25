@@ -17,6 +17,7 @@ import { ProfilesScreen } from './ProfilesScreen';
 import { SettingsScreen } from './SettingsScreen';
 import { Sidebar } from './Sidebar';
 import type { ScreenId } from './Sidebar';
+import { ScreenTransition } from './ScreenTransition';
 import { StatusBar } from './StatusBar';
 import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
@@ -111,11 +112,12 @@ function Shell({
               {loading ? (
                 <LoadingState />
               ) : (
-                <>
+                // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
+                <ScreenTransition key={screen}>
                   {screen === 'library' && <LibraryScreen />}
                   {screen === 'profiles' && <ProfilesScreen />}
                   {screen === 'settings' && <SettingsScreen />}
-                </>
+                </ScreenTransition>
               )}
             </main>
           </div>

@@ -6,6 +6,7 @@ import type { IconName } from './Icon';
 import { LOCALES, useI18n } from './i18n';
 import type { Locale } from './i18n';
 import { useLauncher } from './LauncherContext';
+import { stagger } from './motion';
 import { StorageSection } from './StorageSection';
 
 type SectionId = 'game' | 'preferences' | 'storage' | 'about';
@@ -61,7 +62,12 @@ export function SettingsScreen() {
         </nav>
 
         <div className="split-main settings-sections">
-          <section id="settings-game" aria-labelledby="settings-game-title" className="settings-section">
+          <section
+            id="settings-game"
+            aria-labelledby="settings-game-title"
+            className="settings-section stagger-item"
+            style={stagger(0)}
+          >
             <h3 id="settings-game-title" className="group-title">
               {t.settings.game}
             </h3>
@@ -126,7 +132,12 @@ export function SettingsScreen() {
             </div>
           </section>
 
-          <section id="settings-preferences" aria-labelledby="settings-preferences-title" className="settings-section">
+          <section
+            id="settings-preferences"
+            aria-labelledby="settings-preferences-title"
+            className="settings-section stagger-item"
+            style={stagger(1)}
+          >
             <h3 id="settings-preferences-title" className="group-title">
               {t.settings.preferences}
             </h3>

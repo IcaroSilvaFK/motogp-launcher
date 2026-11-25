@@ -6,6 +6,7 @@ import { Icon } from './Icon';
 import type { Messages } from './i18n';
 import { formatSize, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
+import { stagger } from './motion';
 
 type Facet = 'all' | 'in' | 'out';
 
@@ -200,10 +201,10 @@ export function LibraryScreen() {
                 </p>
               )}
               <ul className="mod-list" aria-labelledby="library-title">
-                {visible.map((mod) => {
+                {visible.map((mod, index) => {
                   const enabled = activeModIds.has(mod.id);
                   return (
-                    <li key={mod.id} className="mod-row">
+                    <li key={mod.id} className="mod-row stagger-item" style={stagger(index)}>
                       <span className="mod-tile" aria-hidden="true">
                         {mod.name.trim().charAt(0).toLocaleUpperCase()}
                       </span>

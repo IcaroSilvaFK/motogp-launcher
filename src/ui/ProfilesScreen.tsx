@@ -5,6 +5,7 @@ import { isVanilla, moveItem, toggleMod } from '../domain';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
+import { stagger } from './motion';
 
 type Direction = 'up' | 'down';
 
@@ -279,10 +280,10 @@ export function ProfilesScreen() {
               {t.profiles.listTitle}
             </h3>
             <ul className="plain profile-list" aria-labelledby="profiles-list-title">
-              {state.profiles.map((profile) => {
+              {state.profiles.map((profile, index) => {
                 const count = profile.mod_ids.filter((id) => modIds.has(id)).length;
                 return (
-                  <li key={profile.id} className="profile-item">
+                  <li key={profile.id} className="profile-item stagger-item" style={stagger(index)}>
                     <button
                       type="button"
                       className="profile-select"

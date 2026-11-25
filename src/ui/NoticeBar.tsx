@@ -4,6 +4,7 @@ import { useI18n } from './i18n';
 import type { Messages } from './i18n';
 import { useLauncher } from './LauncherContext';
 import { StaleSessionNotice } from './StaleSessionNotice';
+import { usePresence } from './usePresence';
 
 function noticeText(t: Messages, notice: Notice): string {
   switch (notice.kind) {
@@ -29,13 +30,23 @@ function noticeText(t: Messages, notice: Notice): string {
 export function NoticeBar() {
   const { t } = useI18n();
   const { controller, state } = useLauncher();
-  const { error, notice } = state;
+  // Each message stays mounted for its exit animation; an exiting one is inert (no focus, no clicks).
+  const shownError = usePresence(state.error);
+  const shownNotice = usePresence(state.error === null ? state.notice : null);
+  const error = shownError.item;
+  const notice = shownNotice.item;
 
   return (
     <div className="notices">
       <StaleSessionNotice />
       {error !== null && (
-        <div role="alert" className="notice notice-error">
+        <div
+          role="alert"
+          className="notice notice-error"
+          data-state={shownError.state}
+          inert={shownError.state === 'exiting'}
+          aria-hidden={shownError.state === 'exiting' || undefined}
+        >
           <BannerIcon variant="error" />
           <p>
             {t.errors[error.code]}
@@ -46,8 +57,14 @@ export function NoticeBar() {
           </button>
         </div>
       )}
-      {error === null && notice !== null && (
-        <div role="status" className="notice notice-success">
+      {notice !== null && (
+        <div
+          role="status"
+          className="notice notice-success"
+          data-state={shownNotice.state}
+          inert={shownNotice.state === 'exiting'}
+          aria-hidden={shownNotice.state === 'exiting' || undefined}
+        >
           <BannerIcon variant="success" />
           <p>{noticeText(t, notice)}</p>
           <button type="button" className="btn btn-ghost" onClick={() => controller.dismissNotice()}>

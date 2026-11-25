@@ -5,6 +5,7 @@ import { useAppInfo } from './AppInfoContext';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
+import { stagger } from './motion';
 
 /** Settings > About: the launcher version and, when the updater exists, a manual update check. */
 export function AboutSection() {
@@ -12,7 +13,12 @@ export function AboutSection() {
   const { version, updater } = useAppInfo();
 
   return (
-    <section id="settings-about" aria-labelledby="settings-about-title" className="settings-section">
+    <section
+      id="settings-about"
+      aria-labelledby="settings-about-title"
+      className="settings-section stagger-item"
+      style={stagger(3)}
+    >
       <h3 id="settings-about-title" className="group-title">
         {t.about.title}
       </h3>

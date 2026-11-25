@@ -1,6 +1,7 @@
 import type { UpdateState } from '../application';
 import { BannerIcon } from './BannerIcon';
 import { useI18n } from './i18n';
+import { usePresence } from './usePresence';
 
 export interface UpdateBannerProps {
   state: UpdateState;
@@ -8,13 +9,23 @@ export interface UpdateBannerProps {
   onUpdate: () => void;
 }
 
-export function UpdateBanner({ state, installBlocked, onUpdate }: UpdateBannerProps) {
+type VisibleUpdateState = Exclude<UpdateState, { kind: 'idle' } | { kind: 'none' }>;
+
+function visible(state: UpdateState): VisibleUpdateState | null {
+  return state.kind === 'idle' || state.kind === 'none' ? null : state;
+}
+
+export function UpdateBanner({ state: current, installBlocked, onUpdate }: UpdateBannerProps) {
   const { t } = useI18n();
-  if (state.kind === 'idle' || state.kind === 'none') return null;
+  // The banner keeps its last visible state while it plays its exit animation.
+  const presence = usePresence(visible(current));
+  const state = presence.item;
+  if (state === null) return null;
 
   const info = state.info;
   const busy = state.kind === 'downloading' || state.kind === 'installed';
   const canUpdate = !busy && !installBlocked;
+  const exiting = presence.state === 'exiting';
 
   return (
     <section
@@ -24,6 +35,9 @@ export function UpdateBanner({ state, installBlocked, onUpdate }: UpdateBannerPr
           : 'update-banner banner banner-info'
       }
       aria-labelledby={info ? 'update-title' : undefined}
+      data-state={presence.state}
+      inert={exiting}
+      aria-hidden={exiting || undefined}
     >
       <BannerIcon variant={state.kind === 'error' ? 'error' : 'info'} />
       {info && (
