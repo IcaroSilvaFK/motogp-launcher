@@ -134,6 +134,13 @@ export const ptBR: Messages = {
     measureFailed: 'Não foi possível medir a pasta de dados.',
     retry: 'Tentar de novo',
   },
+  titleBar: {
+    controls: 'Controles da janela',
+    minimize: 'Minimizar',
+    maximize: 'Maximizar',
+    restore: 'Restaurar',
+    close: 'Fechar',
+  },
   statusBar: {
     steam: 'Steam',
     noGame: 'Nenhum jogo selecionado',

@@ -127,7 +127,9 @@ fn load_capability(w: &mut UpdaterWorld) {
         .expect("capabilities/default.json is valid JSON");
 }
 
-#[then("it grants exactly the updater check and the process restart permissions")]
+#[then(
+    "it grants exactly the updater check, the process restart and the title bar window permissions"
+)]
 fn capabilities_minimal(w: &mut UpdaterWorld) {
     let permissions = w.capability["permissions"].as_array().expect("permissions");
     let mut plain: Vec<&str> = permissions.iter().filter_map(Value::as_str).collect();
@@ -136,6 +138,12 @@ fn capabilities_minimal(w: &mut UpdaterWorld) {
         plain,
         [
             "core:default",
+            // The custom title bar (issue #69): caption buttons, drag and double-click to maximize.
+            "core:window:allow-close",
+            "core:window:allow-internal-toggle-maximize",
+            "core:window:allow-minimize",
+            "core:window:allow-start-dragging",
+            "core:window:allow-toggle-maximize",
             "dialog:allow-open",
             "process:allow-restart",
             "updater:default"

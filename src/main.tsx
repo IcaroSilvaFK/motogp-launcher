@@ -18,6 +18,7 @@ import {
   createTauriPicker,
   createTauriSessionEvents,
   createTauriUpdateService,
+  createTauriWindowControls,
 } from './infrastructure';
 import { App } from './ui/App';
 
@@ -52,6 +53,7 @@ createRoot(container).render(
       updater={updater}
       appInfo={createTauriAppInfo()}
       navStore={createLocalStorageNavStore()}
+      windowControls={createTauriWindowControls()}
     />
   </StrictMode>,
 );

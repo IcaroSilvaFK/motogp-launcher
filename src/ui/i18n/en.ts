@@ -133,6 +133,13 @@ export const en: Messages = {
     measureFailed: 'Could not measure the data folder.',
     retry: 'Retry',
   },
+  titleBar: {
+    controls: 'Window controls',
+    minimize: 'Minimize',
+    maximize: 'Maximize',
+    restore: 'Restore',
+    close: 'Close',
+  },
   statusBar: {
     steam: 'Steam',
     noGame: 'No game selected',

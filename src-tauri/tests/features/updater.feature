@@ -12,7 +12,7 @@ Feature: Publish and verify in-app updates only through the production flow
   # updater_capabilities_are_minimal
   Scenario: Grant the window only the updater permissions it needs
     Given the main window capability file
-    Then it grants exactly the updater check and the process restart permissions
+    Then it grants exactly the updater check, the process restart and the title bar window permissions
 
   # unsigned_or_tampered_update_is_rejected
   Scenario: Reject an unsigned or tampered update package

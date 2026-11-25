@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { Icon } from './Icon';
+import { BrandMark, Icon } from './Icon';
 import { useI18n } from './i18n';
 
 export type ScreenId = 'library' | 'profiles' | 'settings';
@@ -30,10 +30,7 @@ export function Sidebar({
   return (
     <aside className="sidebar" data-collapsed={String(collapsed)}>
       <div className="brand">
-        <svg className="brand-mark" viewBox="0 0 20 20" aria-hidden="true" focusable="false">
-          <rect x="2" y="2" width="16" height="16" rx="4" />
-          <path d="M6 13.5l2.6-7 1.4 3.6 1.4-3.6 2.6 7" />
-        </svg>
+        <BrandMark />
         <h1 className={hidden}>{t.appName}</h1>
       </div>
       <nav id={navId} aria-label={t.nav.label} className="side-nav">

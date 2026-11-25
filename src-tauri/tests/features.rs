@@ -156,6 +156,9 @@ fn window_dimensions(_w: &mut ScaffoldWorld) {
     assert_eq!(window["height"], 700);
     assert_eq!(window["minWidth"], 900);
     assert_eq!(window["minHeight"], 600);
+    // The launcher draws its own title bar (issue #69); the shadow stays on for the border and resize.
+    assert_eq!(window["decorations"], false);
+    assert_ne!(window["shadow"], false);
     assert_eq!(conf["identifier"], "dev.motogplauncher.app");
 }
 

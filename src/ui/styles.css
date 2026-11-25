@@ -44,6 +44,11 @@
   --error-border: #64292c;
   --running: #3ddc84;
 
+  /* Title bar close button (Windows 11 caption red), only on hover and press */
+  --titlebar-close-bg: #c42b1c;
+  --titlebar-close-bg-pressed: #a32315;
+  --on-titlebar-close: #ffffff;
+
   /* Usage meters (Storage): neutral on purpose, the accent stays reserved for Play */
   --meter-track: #232830;
   --meter-fill: #9aa2ad;
@@ -58,36 +63,56 @@
   --space-6: 32px;
 
   /* Layout */
-  --sidebar-width: 200px;
+  --titlebar-height: 36px;
+  --titlebar-button-width: 46px;
+  --sidebar-width: 216px;
   --sidebar-width-collapsed: 56px;
-  --sidebar-item-height: 36px;
-  --statusbar-height: 60px;
+  --sidebar-item-height: 40px;
+  --statusbar-height: 64px;
   --rail-width: 208px;
   --content-max: 1180px;
-  --control-height: 32px;
-  --control-height-sm: 28px;
-  --play-height: 40px;
+  --control-height: 36px;
+  --control-height-sm: 32px;
+  --play-height: 44px;
 
   /* Radii */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
 
-  /* Type scale */
+  /* Type scale: Material 3 roles (issue #69). body-small, label-medium and label-small are one step
+     above Material (13 / 13 / 12px instead of 12 / 12 / 11px) so nothing renders below 12px. */
   --font-body: 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
   --font-mono: ui-monospace, 'Cascadia Mono', Consolas, monospace;
-  --fs-title: 1.25rem;
-  --fs-section: 0.9375rem;
-  --fs-body: 0.875rem;
-  --fs-small: 0.8125rem;
-  --fs-caption: 0.75rem;
+  --type-headline-medium: 1.75rem;
+  --type-headline-small: 1.5rem;
+  --type-title-large: 1.375rem;
+  --type-title-medium: 1rem;
+  --type-title-small: 0.875rem;
+  --type-body-large: 1rem;
+  --type-body-medium: 0.875rem;
+  --type-body-small: 0.8125rem;
+  --type-label-large: 0.875rem;
+  --type-label-large-weight: 500;
+  --type-label-medium: 0.8125rem;
+  --type-label-small: 0.75rem;
 
-  /* Motion */
-  --transition: 120ms ease;
+  /* State layers (Material 3): a currentColor overlay at these opacities */
+  --state-hover-opacity: 0.08;
+  --state-focus-opacity: 0.1;
+  --state-pressed-opacity: 0.1;
+
+  /* Motion (Material 3 easing and durations) */
+  --motion-easing-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-easing-emphasized-decelerate: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --motion-duration-short2: 100ms;
+  --motion-duration-short3: 150ms;
+  --motion-duration-medium2: 300ms;
+  --transition: var(--motion-duration-short3) var(--motion-easing-standard);
   --pulse: 1.2s ease-in-out infinite alternate;
 
   font-family: var(--font-body);
-  font-size: var(--fs-body);
+  font-size: var(--type-body-large);
   color: var(--text);
   background: var(--bg);
 }
@@ -139,19 +164,19 @@ p {
 
 h3,
 .section-title {
-  font-size: var(--fs-section);
+  font-size: var(--type-title-medium);
   font-weight: 600;
 }
 
 h4 {
-  font-size: var(--fs-body);
+  font-size: var(--type-body-large);
   font-weight: 600;
 }
 
 code {
   overflow-wrap: anywhere;
   font-family: var(--font-mono);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   color: var(--text);
 }
 
@@ -161,7 +186,7 @@ code {
 
 .hint {
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
 }
 
 .muted {
@@ -172,7 +197,8 @@ code {
 .icon,
 .nav-icon,
 .search-icon,
-.brand-mark {
+.brand-mark,
+.titlebar-mark {
   flex: none;
   width: 16px;
   height: 16px;
@@ -185,14 +211,15 @@ code {
 
 /* ---------- App shell ---------- */
 
-/* Sidebar (full height above the status bar) | content column; the status bar spans both. */
+/* Title bar on top and status bar at the bottom span both columns: sidebar | content column. */
 .app-shell {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr) var(--statusbar-height);
+  grid-template-rows: var(--titlebar-height) minmax(0, 1fr) var(--statusbar-height);
   height: 100vh;
 }
 
+.app-shell > .titlebar,
 .app-shell > .statusbar {
   grid-column: 1 / -1;
 }
@@ -202,6 +229,138 @@ code {
   grid-template-rows: auto minmax(0, 1fr);
   min-width: 0;
   min-height: 0;
+}
+
+/* ---------- Title bar (native decorations are off, issue #69) ---------- */
+
+.titlebar {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  height: var(--titlebar-height);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+/* The drag region: Tauri drags the window from here and maximizes it on a double-click. */
+.titlebar-drag {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: 0 var(--space-3);
+}
+
+/* Children let the pointer through, so the event target is always the drag region. */
+.titlebar-drag > * {
+  pointer-events: none;
+}
+
+.titlebar-mark {
+  stroke: var(--accent-text);
+}
+
+.titlebar-title {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--type-title-small);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.titlebar-controls {
+  display: flex;
+  flex: none;
+}
+
+/* Material icon buttons, shaped like the Windows caption buttons (full height, square corners). */
+.titlebar-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: var(--titlebar-button-width);
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: default;
+  transition:
+    color var(--transition),
+    background var(--transition);
+}
+
+/* State layer: a currentColor overlay at --state-layer, set to 8% on hover and 10% on focus. */
+.titlebar-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: var(--state-layer, 0);
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+
+/* Press feedback: a CSS-only ripple growing from the center while the button is held. */
+.titlebar-button::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle, currentColor 0 50%, transparent 51%) center / 0 0 no-repeat;
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity var(--motion-duration-medium2) var(--motion-easing-standard),
+    background-size 0s var(--motion-duration-medium2);
+}
+
+.titlebar-glyph {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.titlebar-button:hover {
+  --state-layer: var(--state-hover-opacity);
+  color: var(--text);
+}
+
+/* Inset: the buttons touch the window edge, where an outer ring would be cut. */
+.titlebar-button:focus-visible {
+  --state-layer: var(--state-focus-opacity);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+  color: var(--text);
+}
+
+.titlebar-button:active::after {
+  background-size: 250% 250%;
+  opacity: var(--state-pressed-opacity);
+  transition:
+    background-size var(--motion-duration-medium2) var(--motion-easing-emphasized-decelerate),
+    opacity var(--motion-duration-short2) linear;
+}
+
+/* Close keeps the Windows red on hover and press, with a white glyph (contrast checked); the red
+   already marks the state, so the overlay would only wash it out. */
+.titlebar-close:hover {
+  --state-layer: 0;
+  background: var(--titlebar-close-bg);
+  color: var(--on-titlebar-close);
+}
+
+.titlebar-close:active {
+  background: var(--titlebar-close-bg-pressed);
+  color: var(--on-titlebar-close);
 }
 
 /* ---------- Sidebar ---------- */
@@ -243,7 +402,7 @@ code {
 
 .brand h1 {
   overflow: hidden;
-  font-size: var(--fs-body);
+  font-size: var(--type-body-large);
   font-weight: 600;
   letter-spacing: 0.01em;
   text-overflow: ellipsis;
@@ -324,7 +483,7 @@ code {
 /* Pinned to the bottom of the sidebar, quieter than the navigation. */
 .sidebar-toggle {
   margin-top: auto;
-  font-size: var(--fs-small);
+  font-size: var(--type-body-medium);
 }
 
 .app-messages {
@@ -364,14 +523,14 @@ main {
 }
 
 .page-heading h2 {
-  font-size: var(--fs-title);
+  font-size: var(--type-headline-small);
   font-weight: 600;
   line-height: 1.3;
 }
 
 .page-subtitle {
   color: var(--text-muted);
-  font-size: var(--fs-small);
+  font-size: var(--type-body-medium);
 }
 
 .page-actions {
@@ -405,7 +564,7 @@ main {
   align-items: center;
   gap: var(--space-2);
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -499,7 +658,7 @@ main {
   padding-left: var(--space-3);
   border-left: 1px solid var(--border);
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   white-space: nowrap;
 }
 
@@ -514,7 +673,7 @@ main {
   align-items: center;
   gap: var(--space-2);
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
 }
 
 .statusbar-idle::before {
@@ -546,7 +705,7 @@ main {
   background: none;
   color: var(--accent-text);
   font: inherit;
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   font-weight: 500;
   cursor: pointer;
 }
@@ -576,7 +735,7 @@ main {
 .field label,
 .form-field label {
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   font-weight: 500;
   white-space: nowrap;
 }
@@ -642,7 +801,8 @@ button {
   border-radius: var(--radius-md);
   background: transparent;
   color: var(--text);
-  font-weight: 500;
+  font-size: var(--type-label-large);
+  font-weight: var(--type-label-large-weight);
   white-space: nowrap;
   cursor: pointer;
   transition:
@@ -658,7 +818,7 @@ button {
 .btn-sm {
   height: var(--control-height-sm);
   padding: 0 var(--space-2);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
 }
 
 .btn-sm .icon {
@@ -724,7 +884,7 @@ button {
   height: var(--play-height);
   min-width: 120px;
   padding: 0 var(--space-5);
-  font-size: var(--fs-section);
+  font-size: var(--type-title-medium);
   font-weight: 600;
 }
 
@@ -740,7 +900,7 @@ button {
   gap: var(--space-2);
   min-width: 0;
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   line-height: 1.3;
 }
 
@@ -806,7 +966,7 @@ button {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  font-size: var(--fs-body);
+  font-size: var(--type-body-large);
 }
 
 .banner-icon {
@@ -861,7 +1021,7 @@ button {
   color: inherit;
   height: 24px;
   padding: 0 var(--space-2);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
 }
 
 .notice .btn-ghost:hover:not(:disabled) {
@@ -901,7 +1061,7 @@ button {
 }
 
 .banner h2 {
-  font-size: var(--fs-body);
+  font-size: var(--type-body-large);
   font-weight: 600;
 }
 
@@ -1014,7 +1174,7 @@ button {
   border-radius: var(--radius-sm);
   background: var(--surface-3);
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   text-align: center;
 }
 
@@ -1093,7 +1253,7 @@ button {
   align-items: center;
   gap: var(--space-2);
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
 }
 
 .dot {
@@ -1115,7 +1275,7 @@ button {
   white-space: nowrap;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   font-weight: 500;
 }
 
@@ -1158,7 +1318,7 @@ button {
   padding: 0 var(--space-1);
   border-color: var(--border-strong);
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   letter-spacing: 0.04em;
 }
 
@@ -1243,7 +1403,7 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
 }
 
 .toggle-label-on {
@@ -1405,7 +1565,7 @@ button {
   justify-content: space-between;
   gap: var(--space-2);
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
   line-height: 1.2;
   pointer-events: none;
 }
@@ -1473,7 +1633,7 @@ button {
 }
 
 .group-title {
-  font-size: var(--fs-section);
+  font-size: var(--type-title-medium);
   font-weight: 600;
 }
 
@@ -1509,7 +1669,7 @@ button {
 
 .setting-label {
   color: var(--text);
-  font-size: var(--fs-body);
+  font-size: var(--type-body-large);
   font-weight: 600;
 }
 
@@ -1555,7 +1715,7 @@ button {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  font-size: var(--fs-small);
+  font-size: var(--type-body-medium);
 }
 
 .update-result-ok {
@@ -1599,7 +1759,7 @@ button {
 
 .storage-inline-error {
   color: var(--error-fg);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
 }
 
 .storage-card .setting-text {
@@ -1634,13 +1794,13 @@ button {
 
 .storage-stat dt {
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
 }
 
 .storage-stat dd {
   margin: 0;
   color: var(--text);
-  font-size: var(--fs-section);
+  font-size: var(--type-title-medium);
   font-weight: 600;
 }
 
@@ -1701,7 +1861,7 @@ button {
 .storage-size,
 .storage-share {
   color: var(--text-muted);
-  font-size: var(--fs-small);
+  font-size: var(--type-body-medium);
   text-align: right;
   white-space: nowrap;
 }
@@ -1815,7 +1975,7 @@ button {
   flex: none;
   width: 20px;
   color: var(--text-muted);
-  font-size: var(--fs-caption);
+  font-size: var(--type-body-small);
 }
 
 /* ---------- Conflicts panel (profile editor, #55) ---------- */
@@ -1885,7 +2045,7 @@ button {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family: var(--font-mono);
-  font-size: var(--fs-small);
+  font-size: var(--type-body-medium);
 }
 
 /* Involved mods in load order, left to right, separated by a chevron. */
@@ -1898,7 +2058,7 @@ button {
   padding: 0;
   list-style: none;
   color: var(--text-muted);
-  font-size: var(--fs-small);
+  font-size: var(--type-body-medium);
 }
 
 .conflict-mod {

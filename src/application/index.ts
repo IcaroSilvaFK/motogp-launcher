@@ -26,4 +26,5 @@ export { createUpdateController } from './useCases/checkForUpdate';
 export { selectSessionClean } from './selectSessionClean';
 export { selectProfileLocked } from './selectProfileLocked';
 export type { AppInfo } from './ports/AppInfo';
+export type { WindowControls } from './ports/WindowControls';
 export { readAppVersion } from './useCases/readAppVersion';

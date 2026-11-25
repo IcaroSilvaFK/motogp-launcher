@@ -1,10 +1,15 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Main window permissions: core defaults, the file/folder picker and opening steam:// URLs, checking/installing updates and restarting after one.",
+  "description": "Main window permissions: core defaults, the file/folder picker and opening steam:// URLs, checking/installing updates and restarting after one, and the custom title bar (minimize, maximize/restore, close, drag and double-click to maximize).",
   "windows": ["main"],
   "permissions": [
     "core:default",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:window:allow-internal-toggle-maximize",
     "dialog:allow-open",
     "updater:default",
     "process:allow-restart",

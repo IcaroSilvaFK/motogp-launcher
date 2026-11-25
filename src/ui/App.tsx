@@ -6,7 +6,7 @@ import {
   selectSessionClean,
   useLauncherState,
 } from '../application';
-import type { AppInfo, LauncherController, NavPreferenceStore, UpdateController } from '../application';
+import type { AppInfo, LauncherController, NavPreferenceStore, UpdateController, WindowControls } from '../application';
 import { AppInfoContext } from './AppInfoContext';
 import { I18nProvider, useI18n } from './i18n';
 import type { Locale } from './i18n';
@@ -18,6 +18,7 @@ import { SettingsScreen } from './SettingsScreen';
 import { Sidebar } from './Sidebar';
 import type { ScreenId } from './Sidebar';
 import { StatusBar } from './StatusBar';
+import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
 import './styles.css';
 
@@ -50,11 +51,13 @@ function Shell({
   updater,
   appInfo,
   navStore,
+  windowControls,
 }: {
   controller: LauncherController;
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
+  windowControls?: WindowControls;
 }) {
   const state = useLauncherState(controller);
   const [screen, setScreen] = useState<ScreenId>('library');
@@ -97,6 +100,7 @@ function Shell({
     <AppInfoContext.Provider value={info}>
       <LauncherContext.Provider value={value}>
         <div className="app-shell">
+          <TitleBar controls={windowControls} />
           <Sidebar current={screen} onSelect={setScreen} collapsed={collapsed} onToggle={toggleSidebar} />
           <div className="app-content">
             <div className="app-messages">
@@ -129,6 +133,7 @@ export function App({
   updater,
   appInfo,
   navStore,
+  windowControls,
 }: {
   controller: LauncherController;
   locale?: Locale;
@@ -136,10 +141,17 @@ export function App({
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
+  windowControls?: WindowControls;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
-      <Shell controller={controller} updater={updater} appInfo={appInfo} navStore={navStore} />
+      <Shell
+        controller={controller}
+        updater={updater}
+        appInfo={appInfo}
+        navStore={navStore}
+        windowControls={windowControls}
+      />
     </I18nProvider>
   );
 }

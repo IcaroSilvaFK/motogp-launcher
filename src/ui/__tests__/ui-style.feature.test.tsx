@@ -42,6 +42,13 @@ function contrast(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/** A px or rem length in px (1rem = 16px); NaN for anything else, so the assertion fails. */
+function toPx(value: string): number {
+  const match = /^(\d*\.?\d+)(px|rem)$/.exec(value.trim());
+  if (!match) return Number.NaN;
+  return Number(match[1]) * (match[2] === 'rem' ? 16 : 1);
+}
+
 const token = (name: string): string => {
   const value = rootTokens(css).get(name);
   expect(value, `token ${name}`).toMatch(/^#[0-9a-fA-F]{6}$/);
@@ -563,6 +570,87 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
         expect(px, name).toBeGreaterThanOrEqual(4);
         expect(px, name).toBeLessThanOrEqual(8);
       }
+    });
+  });
+
+  Scenario('The type scale is readable', ({ Given, Then, And }) => {
+    Given('the stylesheet', () => {
+      expect(css.length).toBeGreaterThan(0);
+    });
+    Then('the body-large text token is at least 16px and the page text uses it', () => {
+      expect(toPx(rootTokens(css).get('--type-body-large') ?? '')).toBeGreaterThanOrEqual(16);
+      const root = /:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+      expect(root).toMatch(/(^|\n)\s*font-size:\s*var\(--type-body-large\);/);
+    });
+    And('every type token is at least 12px', () => {
+      const sizes = [...rootTokens(css)].filter(([name]) => /^--type-[a-z]+-(small|medium|large)$/.test(name));
+      // headline-small/medium, title-small/medium/large, body-small/medium/large, label-small/medium/large.
+      expect(sizes.length).toBeGreaterThanOrEqual(11);
+      for (const [name, value] of sizes) expect(toPx(value), name).toBeGreaterThanOrEqual(12);
+    });
+    And('the caption token is at least 13px', () => {
+      expect(toPx(rootTokens(css).get('--type-body-small') ?? '')).toBeGreaterThanOrEqual(13);
+    });
+    And('no rule sets a font size outside the type tokens', () => {
+      const outsideRoot = css.replace(/:root\s*\{[^}]*\}/, '');
+      const sizes = [...outsideRoot.matchAll(/font-size\s*:\s*([^;}]+)/g)].map(([, value = '']) => value.trim());
+      expect(sizes.length).toBeGreaterThan(0);
+      const tokens = rootTokens(css);
+      for (const value of sizes) {
+        const name = /^var\((--type-[\w-]+)\)$/.exec(value)?.[1];
+        if (value === 'inherit') continue;
+        expect(name, value).toBeDefined();
+        expect(tokens.has(name ?? ''), value).toBe(true);
+      }
+      // No font shorthand with a raw size either.
+      expect(outsideRoot).not.toMatch(/(^|[\s;{])font:\s*(?!inherit)[^;]*\d+(px|rem)/);
+    });
+    And('buttons use the label-large token', () => {
+      const btn = /\n\.btn\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+      expect(btn).toMatch(/font-size:\s*var\(--type-label-large\)/);
+      expect(btn).toMatch(/font-weight:\s*var\(--type-label-large-weight\)/);
+      expect(rootTokens(css).get('--type-label-large-weight')).toBe('500');
+      expect(toPx(rootTokens(css).get('--type-label-large') ?? '')).toBe(14);
+    });
+  });
+
+  Scenario('The title bar close hover is readable', ({ Given, Then }) => {
+    Given('the stylesheet', () => {
+      expect(css.length).toBeGreaterThan(0);
+    });
+    Then('the close button glyph on its hover background has a contrast of at least 4.5', () => {
+      expect(contrast(token('--on-titlebar-close'), token('--titlebar-close-bg'))).toBeGreaterThanOrEqual(4.5);
+      expect(contrast(token('--on-titlebar-close'), token('--titlebar-close-bg-pressed'))).toBeGreaterThanOrEqual(4.5);
+    });
+  });
+
+  Scenario('The title bar buttons use Material state layers and motion', ({ Given, Then, And }) => {
+    Given('the stylesheet', () => {
+      expect(css.length).toBeGreaterThan(0);
+    });
+    Then('the state layer opacities are 8% for hover and 10% for focus and pressed', () => {
+      const tokens = rootTokens(css);
+      expect(tokens.get('--state-hover-opacity')).toBe('0.08');
+      expect(tokens.get('--state-focus-opacity')).toBe('0.1');
+      expect(tokens.get('--state-pressed-opacity')).toBe('0.1');
+    });
+    And('the title bar buttons draw their hover, focus and pressed states with those opacities', () => {
+      const rule = (selector: string) => {
+        const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        return new RegExp(`(^|\\n)${escaped}\\s*\\{([^}]*)\\}`).exec(css)?.[2] ?? '';
+      };
+      // The state layer is a currentColor overlay, so it works on the neutral and the red close button.
+      expect(rule('.titlebar-button::before')).toMatch(/background:\s*currentColor/);
+      expect(rule('.titlebar-button::before')).toMatch(/opacity:\s*var\(--state-layer,\s*0\)/);
+      expect(rule('.titlebar-button:hover')).toMatch(/--state-layer:\s*var\(--state-hover-opacity\)/);
+      expect(rule('.titlebar-button:focus-visible')).toMatch(/--state-layer:\s*var\(--state-focus-opacity\)/);
+      expect(rule('.titlebar-button:focus-visible')).toMatch(/outline:[^;]*var\(--focus-ring\)/);
+      expect(rule('.titlebar-button:active::after')).toMatch(/opacity:\s*var\(--state-pressed-opacity\)/);
+    });
+    And('the motion tokens use the Material standard easing', () => {
+      const tokens = rootTokens(css);
+      expect(tokens.get('--motion-easing-standard')).toBe('cubic-bezier(0.2, 0, 0, 1)');
+      expect(tokens.get('--transition')).toContain('var(--motion-easing-standard)');
     });
   });
 });

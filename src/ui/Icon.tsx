@@ -83,3 +83,42 @@ export function Icon({ name, className = 'icon' }: { name: IconName; className?:
     </svg>
   );
 }
+
+/** The launcher mark (sidebar brand and title bar), on the same 20x20 grid as the icons. */
+export function BrandMark({
+  className = 'brand-mark',
+  ...rest
+}: {
+  className?: string;
+  'data-tauri-drag-region'?: string;
+}) {
+  return (
+    <svg className={className} viewBox="0 0 20 20" aria-hidden="true" focusable="false" {...rest}>
+      <rect x="2" y="2" width="16" height="16" rx="4" />
+      <path d="M6 13.5l2.6-7 1.4 3.6 1.4-3.6 2.6 7" />
+    </svg>
+  );
+}
+
+// Window-control glyphs drawn like the Windows 11 caption buttons: a 10x10 grid, 1px square strokes.
+const WINDOW_GLYPHS = {
+  minimize: <path d="M0 5.5h10" />,
+  maximize: <rect x="0.5" y="0.5" width="9" height="9" />,
+  restore: (
+    <>
+      <path d="M2.5 2.5V0.5h7v7h-2" />
+      <rect x="0.5" y="2.5" width="7" height="7" />
+    </>
+  ),
+  close: <path d="M0.5 0.5l9 9M9.5 0.5l-9 9" />,
+} satisfies Record<string, ReactNode>;
+
+export type WindowGlyphName = keyof typeof WINDOW_GLYPHS;
+
+export function WindowGlyph({ name }: { name: WindowGlyphName }) {
+  return (
+    <svg className="titlebar-glyph" viewBox="0 0 10 10" aria-hidden="true" focusable="false">
+      {WINDOW_GLYPHS[name]}
+    </svg>
+  );
+}
