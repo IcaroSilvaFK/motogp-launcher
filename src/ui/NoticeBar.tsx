@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import type { Notice } from '../application';
 import { BannerIcon } from './BannerIcon';
 import { useI18n } from './i18n';
@@ -27,6 +28,12 @@ function noticeText(t: Messages, notice: Notice): string {
   }
 }
 
+/** Translated text for an error code; an unexpected code (newer backend) falls back to the generic text. */
+function errorText(t: Messages, code: string): string {
+  const known: Partial<Record<string, string>> = t.errors;
+  return known[code] ?? t.errors.unknown;
+}
+
 export function NoticeBar() {
   const { t } = useI18n();
   const { controller, state } = useLauncher();
@@ -35,6 +42,11 @@ export function NoticeBar() {
   const shownNotice = usePresence(state.error === null ? state.notice : null);
   const error = shownError.item;
   const notice = shownNotice.item;
+
+  // The technical detail is for developers: it goes to the console once per shown error, never to the UI.
+  useEffect(() => {
+    if (error !== null) console.warn(`Launcher error ${error.code}: ${error.message}`);
+  }, [error]);
 
   return (
     <div className="notices">
@@ -48,10 +60,7 @@ export function NoticeBar() {
           aria-hidden={shownError.state === 'exiting' || undefined}
         >
           <BannerIcon variant="error" />
-          <p>
-            {t.errors[error.code]}
-            {error.message !== '' && <span className="notice-detail"> {error.message}</span>}
-          </p>
+          <p>{errorText(t, error.code)}</p>
           <button type="button" className="btn btn-ghost" onClick={() => controller.dismissError()}>
             {t.dismiss}
           </button>
