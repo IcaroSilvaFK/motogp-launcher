@@ -9,6 +9,24 @@
       "image": "catalog/ads/house-support.png",
       "click_url": "https://apoia.se/",
       "sponsor_label": "House ad"
+    },
+    {
+      "id": "house-publish-mod",
+      "slot": "discover",
+      "title": "Made a mod? Publish it here",
+      "body": "Add your mod to the catalog and let players install it in one click.",
+      "image": "catalog/ads/house-support.png",
+      "click_url": "https://github.com/IcaroSilvaFK/motogp-launcher/blob/dev/docs/publishing-mods.md",
+      "sponsor_label": "House ad"
+    },
+    {
+      "id": "house-support-sidebar",
+      "slot": "sidebar",
+      "title": "Enjoying the launcher?",
+      "body": "Support its development on Apoia.se.",
+      "image": "catalog/ads/house-support.png",
+      "click_url": "https://apoia.se/",
+      "sponsor_label": "House ad"
     }
   ]
 }
