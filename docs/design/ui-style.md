@@ -191,3 +191,4 @@ Not implemented in #48, suggested as separate issues:
 - Notifications history (a popover of past notices).
 - Interface scale setting (#69 follow-up): a Settings > Preferences choice (for example 90% / 100% / 115%) that scales the `--type-*` and dimension tokens. Kept out of #69 because Settings was being changed by #61.
 - Snap layouts flyout on hovering Maximize (#69 follow-up): an undecorated Tauri window cannot show it without a native plugin. Win+Z, Win+arrow keys and dragging to the screen edges still snap the window.
+- 2026-11-26 (issue #105): **sponsored-content consent bar** (`AdConsentBar`, in `.app-messages` next to `NoticeBar`). Reuses the `.notice notice-info` look with ghost buttons only (Keep, Turn off ads, a Dismiss icon button); no accent fill (accent stays for Play), no dialog role, no backdrop, no focus trap. Shown only for an unset preference, a clean session and a loaded launcher.

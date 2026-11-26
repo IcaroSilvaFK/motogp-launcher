@@ -4,6 +4,12 @@ export interface Messages {
   appName: string;
   loading: string;
   dismiss: string;
+  ads: {
+    consentLabel: string;
+    consentText: string;
+    keep: string;
+    turnOff: string;
+  };
   nav: {
     label: string;
     library: string;
@@ -175,6 +181,10 @@ export interface Messages {
     chooseFolder: string;
     gameHint: string;
     preferences: string;
+    adPreference: string;
+    adPreferenceHint: string;
+    adShow: string;
+    adOff: string;
     languageHint: string;
     language: string;
     languageNames: Record<Locale, string>;
