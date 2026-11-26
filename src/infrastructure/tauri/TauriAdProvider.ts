@@ -20,9 +20,10 @@ const nothing = () => undefined;
  * Sponsored creatives over IPC (`get_ad`, `ad_clicked`, `ad_shown`). Any failure, a missing
  * command or a malformed answer means "no ad"; click and shown never reject.
  */
-export function createTauriAdProvider(): AdProvider {
+/** `getLocale` returns the active UI locale (e.g. `pt-BR`), read at each request. */
+export function createTauriAdProvider(getLocale?: () => string): AdProvider {
   return {
-    get: (slot: AdSlotId) => safely('get_ad', { slot }, null, toAdViewModel),
+    get: (slot: AdSlotId) => safely('get_ad', { slot, locale: getLocale?.() }, null, toAdViewModel),
     click: (slot, creativeId) => safely('ad_clicked', { slot, creativeId }, undefined, nothing),
     reportShown: (slot, creativeId) => safely('ad_shown', { slot, creativeId }, undefined, nothing),
   };

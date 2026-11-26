@@ -60,7 +60,7 @@ impl AdsWorld {
         let enabled = self.enabled;
         let view = self
             .svc()
-            .get_ad(slot, enabled)
+            .get_ad(slot, enabled, None)
             .expect("get_ad never fails");
         self.views.push(view);
     }

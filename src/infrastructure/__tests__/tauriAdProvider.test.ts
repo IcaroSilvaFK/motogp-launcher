@@ -25,7 +25,13 @@ describe('createTauriAdProvider', () => {
   it('asks get_ad for the slot and returns the creative', async () => {
     invokeMock.mockResolvedValueOnce(creative);
     expect(await createTauriAdProvider().get('discover')).toEqual(creative);
-    expect(invokeMock).toHaveBeenCalledWith('get_ad', { slot: 'discover' });
+    expect(invokeMock).toHaveBeenCalledWith('get_ad', { slot: 'discover', locale: undefined });
+  });
+
+  it('passes the active UI locale to get_ad', async () => {
+    invokeMock.mockResolvedValueOnce(creative);
+    await createTauriAdProvider(() => 'pt-BR').get('sidebar');
+    expect(invokeMock).toHaveBeenCalledWith('get_ad', { slot: 'sidebar', locale: 'pt-BR' });
   });
 
   it('maps a null answer to no ad', async () => {

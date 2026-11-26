@@ -33,6 +33,7 @@ pub fn creative_draft(id: &str, slot: &str) -> AdCreativeDraft {
         sponsor_label: SPONSOR_LABEL.into(),
         impression_url: Some(impression_url(id)),
         expires_at_ms: None,
+        ..Default::default()
     }
 }
 

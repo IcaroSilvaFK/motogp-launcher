@@ -3,8 +3,9 @@
 //! Freshness is not decided here: `AdService` applies its TTL to `fetched_at_ms`.
 use crate::store::{load_json, save_json};
 use motogp_application::{AdCache, AdCacheError, CachedAds};
-use motogp_domain::{AdCreative, AdCreativeDraft};
+use motogp_domain::{AdCreative, AdCreativeDraft, AdLocaleText};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 /// Format version of the cache file.
@@ -30,6 +31,36 @@ struct CreativeFile {
     sponsor_label: String,
     impression_url: Option<String>,
     expires_at_ms: Option<u64>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    locales: BTreeMap<String, LocaleFile>,
+}
+
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct LocaleFile {
+    title: Option<String>,
+    body: Option<String>,
+    sponsor_label: Option<String>,
+}
+
+impl From<&AdLocaleText> for LocaleFile {
+    fn from(text: &AdLocaleText) -> Self {
+        LocaleFile {
+            title: text.title.clone(),
+            body: text.body.clone(),
+            sponsor_label: text.sponsor_label.clone(),
+        }
+    }
+}
+
+impl From<LocaleFile> for AdLocaleText {
+    fn from(file: LocaleFile) -> Self {
+        AdLocaleText {
+            title: file.title,
+            body: file.body,
+            sponsor_label: file.sponsor_label,
+        }
+    }
 }
 
 impl From<&AdCreative> for CreativeFile {
@@ -44,6 +75,11 @@ impl From<&AdCreative> for CreativeFile {
             sponsor_label: creative.sponsor_label().to_string(),
             impression_url: creative.impression_url().map(String::from),
             expires_at_ms: creative.expires_at_ms(),
+            locales: creative
+                .locales()
+                .iter()
+                .map(|(k, v)| (k.clone(), LocaleFile::from(v)))
+                .collect(),
         }
     }
 }
@@ -61,6 +97,11 @@ impl CreativeFile {
             sponsor_label: self.sponsor_label,
             impression_url: self.impression_url,
             expires_at_ms: self.expires_at_ms,
+            locales: self
+                .locales
+                .into_iter()
+                .map(|(k, v)| (k, AdLocaleText::from(v)))
+                .collect(),
         })
         .ok()
     }
@@ -131,6 +172,7 @@ mod tests {
             sponsor_label: "Sponsor".into(),
             impression_url: full.then(|| "https://example.com/pixel".to_string()),
             expires_at_ms: full.then_some(1_900_000_000_000),
+            ..Default::default()
         })
         .unwrap()
     }
