@@ -22,6 +22,7 @@ The #37 spike found no usable public API, so the launcher reads **its own static
 2. Fill every required field: `id` (unique lowercase slug such as `rebalanced-ai`), `title`, `author`, `game` (for example `MotoGP 26`), `category`, `description`, `version`, `updatedAt` (`YYYY-MM-DD`) and `pageUrl`.
 3. Rules: every URL must be `https`; the id must be unique; `thumbnailUrl` is optional.
 4. Add a `download` block **only with the mod author's permission to redistribute**. It needs the direct `url`, the file `size` in bytes and the `sha256` of that exact file. Compute the hash on Windows with `certutil -hashfile <file> SHA256` (lowercase the result, no spaces) or on Linux/macOS with `sha256sum <file>`. Without the author's permission, leave `download` out: the launcher then only links to `pageUrl`.
+   - Step-by-step guide, entry generator script and mirroring process: [docs/publishing-mods.md](../publishing-mods.md).
 5. Run `cargo test -p motogp-infrastructure --test catalog_file`. It validates the shipped catalog strictly (every entry valid, ids unique, supported schema version) and fails on the first problem.
 6. Open a PR. Once it reaches `main`, launchers see the change after their cache expires (6 h) or when the user refreshes the catalog.
 
