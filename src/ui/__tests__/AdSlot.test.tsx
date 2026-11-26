@@ -105,6 +105,42 @@ describe('AdSlot', () => {
     },
   );
 
+  it.each<AdSlotId>(['discover', 'sidebar'])('shows the %s image as a fixed-ratio media thumb', async (slot) => {
+    mount(slot);
+    const card = await sponsored();
+    expect(card).not.toHaveClass('ad-text-first');
+    expect(card.querySelector('img')).toHaveClass('ad-media');
+    expect(card.querySelector('.ad-tile')).toBeNull();
+  });
+
+  it.each<AdSlotId>(['discover', 'sidebar'])('shows an icon tile on the %s card without an image', async (slot) => {
+    mount(slot, { provider: fakeProvider(() => Promise.resolve({ ...creative, imageDataUri: null })) });
+    const card = await sponsored();
+    expect(card).toHaveClass('ad-text-first');
+    expect(card.querySelector('img')).toBeNull();
+    expect(card.querySelector('.ad-tile svg')).not.toBeNull();
+  });
+
+  it.each<AdSlotId>(['discover', 'sidebar', 'about'])(
+    'shows "Sponsored" once and the sponsor as a byline in the %s slot',
+    async (slot) => {
+      mount(slot);
+      const card = await sponsored();
+      expect(within(card).getAllByText(/sponsored/i)).toHaveLength(1);
+      expect(within(card).getByText('Acme Racing')).toHaveClass('ad-byline');
+      expect(card.querySelector('.ad-label')).toHaveTextContent(/^Sponsored$/);
+    },
+  );
+
+  it.each(['House ad', 'Patrocinado', 'SPONSORED'])(
+    'hides a sponsor label that only says "%s"',
+    async (sponsorLabel) => {
+      mount('sidebar', { provider: fakeProvider(() => Promise.resolve({ ...creative, sponsorLabel })) });
+      const card = await sponsored();
+      expect(card.querySelector('.ad-byline')).toBeNull();
+    },
+  );
+
   it('shows the About slot as a quiet setting row without an image', async () => {
     mount('about');
     const row = await sponsored();
@@ -186,5 +222,24 @@ describe('AdSlot styles', () => {
   it('never makes the sidebar card wider than the sidebar', () => {
     const sidebar = adRules.find(({ selector }) => selector === '.ad-slot-sidebar');
     expect(sidebar?.body).toMatch(/max-width:\s*100%/);
+  });
+
+  it('gives the media a fixed aspect ratio and object-fit: cover, so images are never stretched', () => {
+    const media = adRules.find(({ selector }) => selector === '.ad-media');
+    expect(media?.body).toMatch(/object-fit:\s*cover/);
+    expect(media?.body).toMatch(/aspect-ratio:/);
+  });
+
+  it('caps the Discover banner width', () => {
+    const banner = adRules.find(({ selector }) => selector === '.ad-slot-discover');
+    expect(banner?.body).toMatch(/max-width:\s*var\(--ad-banner-max-width\)/);
+  });
+
+  it('clamps the sidebar title and body to two lines', () => {
+    const clamp = adRules.find(
+      ({ selector, body }) => /\.ad-slot-sidebar \.ad-title/.test(selector) && /line-clamp/.test(body),
+    );
+    expect(clamp?.body).toMatch(/-webkit-line-clamp:\s*2/);
+    expect(clamp?.selector).toMatch(/\.ad-slot-sidebar \.ad-text/);
   });
 });

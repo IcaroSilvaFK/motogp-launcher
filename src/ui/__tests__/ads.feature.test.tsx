@@ -386,6 +386,52 @@ describeFeature(feature, ({ Scenario, ScenarioOutline, BeforeEachScenario, After
     });
   });
 
+  Scenario('A creative without an image', ({ Given, When, Then }) => {
+    let card: HTMLElement;
+
+    Given('a house ad has no image', () => {
+      provider = fakeProvider(() =>
+        Promise.resolve({ ...creative, imageDataUri: null, sponsorLabel: 'MotoGP Launcher' }),
+      );
+    });
+
+    When('it is shown in the sidebar', async () => {
+      launch();
+      card = await within(sidebar()).findByRole('region', { name: 'Sponsored' });
+    });
+
+    Then('a compact card shows an icon tile, the title and the body', () => {
+      expect(card).toHaveClass('ad-slot-sidebar', 'ad-text-first');
+      expect(card.querySelector('img')).toBeNull();
+      const tile = card.querySelector('.ad-tile');
+      expect(tile).not.toBeNull();
+      expect(tile).toHaveAttribute('aria-hidden', 'true');
+      expect(within(card).getByText('Track day tyres')).toHaveClass('ad-title');
+      expect(within(card).getByText('Grip for every lap.')).toHaveClass('ad-text');
+      expect(within(card).getAllByRole('button')).toHaveLength(1);
+    });
+  });
+
+  Scenario('One label only', ({ Given, When, Then }) => {
+    Given('an ad from "Acme Racing" is available', () => {
+      launch();
+    });
+
+    When('the user opens Discover', async () => {
+      await openDiscover();
+    });
+
+    Then('the card shows "Sponsored" once and the sponsor name as a byline', async () => {
+      const card = await discoverAd();
+      expect(within(card).getAllByText(/sponsored/i)).toHaveLength(1);
+      const sponsor = within(card).getByText('Acme Racing');
+      expect(sponsor).toHaveClass('ad-byline');
+      // Never an equal label next to "Sponsored".
+      expect(sponsor.closest('.ad-label')).toBeNull();
+      expect(card.querySelector('.ad-label .dot')).toBeNull();
+    });
+  });
+
   Scenario('Turning sponsored content off in Settings removes the slots', ({ Given, When, Then }) => {
     Given('an ad is shown in the sidebar', async () => {
       launch();
