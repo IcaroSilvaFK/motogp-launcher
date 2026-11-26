@@ -11,7 +11,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const MAX_IMAGE_BYTES: u64 = 200 * 1024;
 const SLOTS: [&str; 3] = ["discover", "sidebar", "about"];
 const FEED_FIELDS: [&str; 2] = ["version", "creatives"];
-const CREATIVE_FIELDS: [&str; 10] = [
+const LOCALES: [&str; 2] = ["pt-BR", "en"];
+const LOCALE_FIELDS: [&str; 3] = ["title", "body", "sponsor_label"];
+const CREATIVE_FIELDS: [&str; 11] = [
     "id",
     "slot",
     "title",
@@ -19,6 +21,7 @@ const CREATIVE_FIELDS: [&str; 10] = [
     "image",
     "click_url",
     "sponsor_label",
+    "locales",
     "impression_url",
     "starts_at",
     "expires_at",
@@ -175,7 +178,8 @@ fn check_url_field(c: &Value, id: &str, field: &str, required: bool) -> Vec<Stri
 
 fn check_image(c: &Value, id: &str, base: &Path) -> Vec<String> {
     let Some(image) = string_field(c, "image") else {
-        return vec![format!("{id}: image is required")];
+        // The image is optional: a creative without one renders as a text-only card.
+        return vec![];
     };
     let ext_ok = image
         .rsplit('.')
@@ -214,6 +218,35 @@ fn check_image(c: &Value, id: &str, base: &Path) -> Vec<String> {
             }
         }
         _ => problems.push(format!("{id}: image file {image} does not exist")),
+    }
+    problems
+}
+
+/// `locales` is optional: only known locale keys, each with optional text under the same limits.
+fn check_locales(c: &Value, id: &str) -> Vec<String> {
+    let Some(locales) = c.get("locales") else {
+        return vec![];
+    };
+    let Some(map) = locales.as_object() else {
+        return vec![format!("{id}: locales must be an object")];
+    };
+    let mut problems = vec![];
+    for (locale, text) in map {
+        let scope = format!("{id}: locales.{locale}");
+        if !LOCALES.contains(&locale.as_str()) {
+            problems.push(format!("{id}: locales has unknown locale {locale}"));
+            continue;
+        }
+        problems.extend(check_unknown_fields(text, &LOCALE_FIELDS, &scope));
+        for (field, max) in [("title", 60), ("body", 140), ("sponsor_label", 40)] {
+            match text.get(field) {
+                None => {}
+                Some(Value::String(s)) if !s.trim().is_empty() && s.chars().count() <= max => {}
+                Some(_) => problems.push(format!(
+                    "{scope}: {field} must be 1 to {max} characters and not blank"
+                )),
+            }
+        }
     }
     problems
 }
@@ -296,6 +329,7 @@ fn check_feed(text: &str, base: &Path) -> Vec<String> {
         problems.extend(check_url_field(c, &id, "click_url", true));
         problems.extend(check_url_field(c, &id, "impression_url", false));
         problems.extend(check_image(c, &id, base));
+        problems.extend(check_locales(c, &id));
         problems.extend(check_dates(c, &id));
     }
     problems
@@ -309,7 +343,6 @@ fn good() -> Value {
         "slot": "sidebar",
         "title": "Acme",
         "body": "Racing parts",
-        "image": "catalog/ads/house-support.png",
         "click_url": "https://example.com/acme",
         "sponsor_label": "Sponsored"
     })
@@ -582,18 +615,16 @@ fn the_schema_matches_the_check_rules() {
         .iter()
         .map(|v| v.as_str().unwrap())
         .collect();
-    for field in [
-        "id",
-        "slot",
-        "title",
-        "body",
-        "image",
-        "click_url",
-        "sponsor_label",
-    ] {
+    for field in ["id", "slot", "title", "body", "click_url", "sponsor_label"] {
         assert!(required.contains(&field), "{field} must be required");
     }
-    for optional in ["starts_at", "expires_at", "impression_url"] {
+    for optional in [
+        "image",
+        "locales",
+        "starts_at",
+        "expires_at",
+        "impression_url",
+    ] {
         assert!(!required.contains(&optional), "{optional} is optional");
         assert!(creative["properties"].get(optional).is_some());
     }
@@ -647,5 +678,31 @@ fn schema_patterns_are_ecma_262_without_inline_flags() {
                 "{name}: inline flag syntax in pattern {p}"
             );
         }
+    }
+}
+
+#[test]
+fn image_is_optional() {
+    assert!(problems_with("image", None).is_empty());
+}
+
+#[test]
+fn locales_accept_known_locales_with_partial_text() {
+    let ok = serde_json::json!({ "pt-BR": { "title": "Oi" }, "en": { "body": "Hi" } });
+    assert!(problems_with("locales", Some(ok)).is_empty());
+}
+
+#[test]
+fn locales_reject_unknown_locales_fields_and_bad_text() {
+    for bad in [
+        serde_json::json!({ "fr": { "title": "Salut" } }),
+        serde_json::json!({ "en": { "price": "1" } }),
+        serde_json::json!({ "en": { "title": "  " } }),
+        serde_json::json!({ "en": { "title": "x".repeat(61) } }),
+        serde_json::json!({ "en": { "body": "x".repeat(141) } }),
+        serde_json::json!({ "en": { "sponsor_label": "x".repeat(41) } }),
+        serde_json::json!("pt-BR"),
+    ] {
+        assert_names(&problems_with("locales", Some(bad)), "locales");
     }
 }

@@ -53,6 +53,7 @@ fn creative(id: &str, expires_at_ms: Option<u64>) -> AdCreative {
         sponsor_label: "Sponsor".into(),
         impression_url: None,
         expires_at_ms,
+        ..Default::default()
     })
     .expect("valid creative")
 }
@@ -111,7 +112,7 @@ impl AdFeedWorld {
         };
         self.shown = Some(
             service
-                .get_ad(AdSlot::About, true)
+                .get_ad(AdSlot::About, true, None)
                 .map_err(|e| e.to_string()),
         );
     }

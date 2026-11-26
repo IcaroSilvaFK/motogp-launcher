@@ -44,6 +44,8 @@ const controller = createLauncherController({
 const catalog = createCatalogController({ gateway });
 
 const localeStore = createLocalStorageLocaleStore();
+// The active UI locale, also sent to `get_ad` so sponsored copy is localized (#123).
+let activeLocale = loadLocale(localeStore);
 
 const updater = createUpdateController({
   service: createTauriUpdateService(),
@@ -57,8 +59,11 @@ createRoot(container).render(
   <StrictMode>
     <App
       controller={controller}
-      locale={loadLocale(localeStore)}
-      onLocaleChange={(locale) => saveLocale(localeStore, locale)}
+      locale={activeLocale}
+      onLocaleChange={(locale) => {
+        activeLocale = locale;
+        saveLocale(localeStore, locale);
+      }}
       updater={updater}
       appInfo={createTauriAppInfo()}
       navStore={createLocalStorageNavStore()}
@@ -67,7 +72,7 @@ createRoot(container).render(
       discoverViewStore={createLocalStorageDiscoverViewStore()}
       adPreferenceStore={createLocalStorageAdPreferenceStore()}
       // Sponsored placements (#104): slots render only while the preference above allows them.
-      adProvider={createTauriAdProvider()}
+      adProvider={createTauriAdProvider(() => activeLocale)}
     />
   </StrictMode>,
 );

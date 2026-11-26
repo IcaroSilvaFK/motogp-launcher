@@ -10,13 +10,13 @@
 use motogp_application::{
     AdBeaconError, AdBeaconSink, AdPayload, AdSource, AdSourceError, Clock, RawAd,
 };
-use motogp_domain::AdCreativeDraft;
+use motogp_domain::{AdCreativeDraft, AdLocaleText};
 use reqwest::blocking::Client;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::StatusCode;
 use serde::Deserialize;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::io::Read;
 use std::time::Duration;
 
@@ -242,6 +242,16 @@ struct CreativeWire {
     impression_url: Option<String>,
     starts_at: Option<String>,
     expires_at: Option<String>,
+    #[serde(default)]
+    locales: BTreeMap<String, LocaleWire>,
+}
+
+/// Localized text of one creative; unknown fields are ignored like in [`CreativeWire`].
+#[derive(Debug, Deserialize)]
+struct LocaleWire {
+    title: Option<String>,
+    body: Option<String>,
+    sponsor_label: Option<String>,
 }
 
 /// Parses the feed document. The top level must be an object with `version` 1
@@ -316,6 +326,20 @@ fn convert(
             sponsor_label: wire.sponsor_label,
             impression_url: wire.impression_url,
             expires_at_ms,
+            locales: wire
+                .locales
+                .into_iter()
+                .map(|(locale, text)| {
+                    (
+                        locale,
+                        AdLocaleText {
+                            title: text.title,
+                            body: text.body,
+                            sponsor_label: text.sponsor_label,
+                        },
+                    )
+                })
+                .collect(),
         }),
         image_url,
     }))
@@ -608,10 +632,21 @@ mod tests {
     }
 
     #[test]
+    fn a_creative_keeps_its_localized_text() {
+        let extra = r#","locales":{"pt-BR":{"title":"Titulo","sponsor_label":"Patrocinio"}}"#;
+        let body = feed(&[creative_json("one", extra)]);
+        let (base, _) = serve(vec![json(&body), png(b"foobar")]);
+        let drafts = drafts(source(config(&base)).fetch().unwrap());
+        let pt = &drafts[0].locales["pt-BR"];
+        assert_eq!(pt.title.as_deref(), Some("Titulo"));
+        assert_eq!(pt.body, None);
+        assert_eq!(pt.sponsor_label.as_deref(), Some("Patrocinio"));
+    }
+
+    #[test]
     fn a_creative_without_an_image_stays_a_draft_without_one() {
         let body = feed(&[creative_json("one", "").replace(r#""image":"ads/one.png","#, "")]);
         let (base, _) = serve(vec![json(&body)]);
-        // `image` is optional on the wire here; the schema file requires it.
         let drafts = drafts(source(config(&base)).fetch().unwrap());
         assert_eq!(drafts[0].image_data_uri, None);
     }

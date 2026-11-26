@@ -20,6 +20,7 @@ fn base() -> AdCreativeDraft {
         sponsor_label: "Acme Racing".into(),
         impression_url: None,
         expires_at_ms: None,
+        ..Default::default()
     }
 }
 
