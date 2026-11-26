@@ -2959,3 +2959,9 @@ button {
   justify-content: flex-end;
   gap: var(--space-2);
 }
+
+/* First-launch sponsored-content prompt: the notice look, quiet buttons, never an accent fill. */
+.ad-consent .btn-icon {
+  width: 24px;
+  padding: 0;
+}

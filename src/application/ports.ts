@@ -104,3 +104,9 @@ export interface DiscoverViewStore {
   load(): DiscoverView | null;
   save(view: DiscoverView): void;
 }
+
+/** The sponsored-content choice. `null` means the user never chose; `load` may throw (blocked storage). */
+export interface AdPreferenceStore {
+  load(): 'on' | 'off' | null;
+  save(value: 'on' | 'off'): void;
+}

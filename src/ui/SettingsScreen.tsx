@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { MouseEvent } from 'react';
 import { AboutSection } from './AboutSection';
+import { useAdPreference } from './AdPreferenceContext';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { LOCALES, useI18n } from './i18n';
@@ -21,6 +22,7 @@ const SECTIONS: readonly { id: SectionId; icon: IconName }[] = [
 export function SettingsScreen() {
   const { t, locale, setLocale } = useI18n();
   const { controller, state } = useLauncher();
+  const { preference: adPreference, setPreference: setAdPreference } = useAdPreference();
   const { game, detected } = state;
   const [current, setCurrent] = useState<SectionId>('game');
   const sectionTitle: Record<SectionId, string> = {
@@ -161,6 +163,44 @@ export function SettingsScreen() {
                         {t.settings.languageNames[option]}
                       </option>
                     ))}
+                  </select>
+                </div>
+              </div>
+              <div className="setting-row">
+                <div className="setting-text">
+                  <label htmlFor="ad-preference-select" className="setting-label">
+                    {t.settings.adPreference}
+                  </label>
+                  <p className="hint">{t.settings.adPreferenceHint}</p>
+                </div>
+                <div className="setting-control">
+                  <select
+                    id="ad-preference-select"
+                    className="input"
+                    value={adPreference === 'off' ? 'off' : 'on'}
+                    onChange={(event) => setAdPreference(event.target.value === 'off' ? 'off' : 'on')}
+                  >
+                    <option value="on">{t.settings.adShow}</option>
+                    <option value="off">{t.settings.adOff}</option>
+                  </select>
+                </div>
+              </div>
+              <div className="setting-row">
+                <div className="setting-text">
+                  <label htmlFor="ad-preference-select" className="setting-label">
+                    {t.settings.adPreference}
+                  </label>
+                  <p className="hint">{t.settings.adPreferenceHint}</p>
+                </div>
+                <div className="setting-control">
+                  <select
+                    id="ad-preference-select"
+                    className="input"
+                    value={adPreference === 'off' ? 'off' : 'on'}
+                    onChange={(event) => setAdPreference(event.target.value === 'off' ? 'off' : 'on')}
+                  >
+                    <option value="on">{t.settings.adShow}</option>
+                    <option value="off">{t.settings.adOff}</option>
                   </select>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 export { createLocalStorageLocaleStore } from './localStorageLocaleStore';
 export { createLocalStorageNavStore } from './localStorageNavStore';
 export { createLocalStorageDiscoverViewStore } from './localStorageDiscoverViewStore';
+export { createLocalStorageAdPreferenceStore } from './localStorageAdPreferenceStore';
 export { createTauriGateway } from './tauriGateway';
 export { createTauriPicker } from './tauriPicker';
 export { createTauriSessionEvents } from './tauriSessionEvents';
