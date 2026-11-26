@@ -158,6 +158,13 @@
   --scrim: rgba(0, 0, 0, 0.32);
   --elevation-sheet: -8px 0 24px rgba(0, 0, 0, 0.4);
 
+  /* Sponsored cards (#123): the Discover banner's max width, its 16:9 media height, and the
+     square thumb / icon tile sizes (Discover 48dp, sidebar 40dp). */
+  --ad-banner-max-width: 640px;
+  --ad-media-height: 64px;
+  --ad-tile-size: 48px;
+  --ad-tile-size-compact: 40px;
+
   font-family: var(--font-body);
   font-size: var(--type-body-large);
   color: var(--text);
@@ -2249,10 +2256,14 @@ button {
   animation: fade-in var(--motion-enter) backwards;
 }
 
+/* Both cards share one markup on a grid: media (or the icon tile), the text column, the action. */
 .ad-slot-discover,
 .ad-slot-sidebar {
-  display: flex;
-  gap: var(--space-3);
+  display: grid;
+  grid-template-areas: 'media content actions';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: var(--space-3);
   padding: var(--space-3);
   background: var(--surface-1);
   border: 1px solid var(--border);
@@ -2260,38 +2271,42 @@ button {
   color: var(--text);
 }
 
-.ad-image {
+/* A fixed ratio and `cover`: a creative is cropped to the frame, never stretched or enlarged. */
+.ad-media {
   display: block;
-  flex: none;
-  aspect-ratio: 2 / 1;
+  grid-area: media;
+  height: var(--ad-media-height);
+  aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
 
+/* Text-first variant: a quiet tonal tile (the info tokens, never the accent) instead of an image. */
+.ad-tile {
+  display: grid;
+  grid-area: media;
+  place-items: center;
+  width: var(--ad-tile-size);
+  height: var(--ad-tile-size);
+  color: var(--info-fg);
+  background: var(--info-bg);
+  border: 1px solid var(--info-border);
+  border-radius: var(--radius-lg);
+}
+
 .ad-content {
   display: flex;
-  flex: 1 1 auto;
+  grid-area: content;
   flex-direction: column;
   gap: var(--space-1);
   min-width: 0;
 }
 
 .ad-label {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
   color: var(--text-muted);
   font-size: var(--type-label-small);
   font-weight: 500;
-}
-
-.ad-sponsor {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .ad-slot-discover .ad-title,
@@ -2299,6 +2314,7 @@ button {
   color: var(--text);
   font-size: var(--type-body-medium);
   font-weight: 500;
+  line-height: 1.3;
 }
 
 .ad-slot-discover .ad-text,
@@ -2307,43 +2323,75 @@ button {
   font-size: var(--type-body-small);
 }
 
+/* The sponsor's name: a small muted byline under the text, never a second label. */
+.ad-byline {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: var(--type-label-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .ad-actions {
   display: flex;
-  flex: none;
+  grid-area: actions;
   align-items: center;
 }
 
-/* Discover: one slim banner after the results (64dp image), the body kept to one line. */
+/* Discover: one banner after the results, capped and centered so it never stretches into a bar:
+   16:9 media (or the 48dp tile) on the left, the text, the outlined action on the right. */
 .ad-slot-discover {
-  align-items: center;
-  margin-top: var(--space-5);
+  column-gap: var(--space-4);
+  width: 100%;
+  max-width: var(--ad-banner-max-width);
+  margin: var(--space-5) auto 0;
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3);
 }
 
-.ad-slot-discover .ad-image {
-  height: calc(2 * var(--space-6));
-}
-
-.ad-slot-discover .ad-title,
-.ad-slot-discover .ad-text {
+.ad-slot-discover .ad-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Sidebar footer: stacked and never wider than the sidebar; the body is kept to two lines. */
+.ad-slot-discover .ad-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* Sidebar footer: compact and never wider than the sidebar. A small square thumb (or a 40dp tile)
+   beside the text, title and body clamped to two lines, a text action under them on the right. */
 .ad-slot-sidebar {
-  flex-direction: column;
-  gap: var(--space-2);
+  grid-template-areas:
+    'media content'
+    'actions actions';
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  row-gap: var(--space-1);
+  column-gap: var(--space-2);
   max-width: 100%;
   margin-bottom: var(--space-2);
-  padding: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-1);
   white-space: normal;
 }
 
-.ad-slot-sidebar .ad-image {
-  width: 100%;
+.ad-slot-sidebar .ad-media,
+.ad-slot-sidebar .ad-tile {
+  width: var(--ad-tile-size-compact);
+  height: var(--ad-tile-size-compact);
 }
 
+.ad-slot-sidebar .ad-media {
+  aspect-ratio: 1;
+}
+
+.ad-slot-sidebar .ad-content {
+  gap: 0;
+}
+
+.ad-slot-sidebar .ad-title,
 .ad-slot-sidebar .ad-text {
   display: -webkit-box;
   overflow: hidden;
@@ -2351,9 +2399,8 @@ button {
   -webkit-line-clamp: 2;
 }
 
-.ad-slot-sidebar .ad-action {
-  width: 100%;
-  justify-content: center;
+.ad-slot-sidebar .ad-actions {
+  justify-content: flex-end;
 }
 
 /* Short windows keep the navigation and the footer actions: the sidebar card steps aside. */

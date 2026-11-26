@@ -54,6 +54,16 @@ Feature: Sponsored placements
     When the user opens Discover and Settings > About
     Then no slot renders and no ad request is made
 
+  Scenario: A creative without an image
+    Given a house ad has no image
+    When it is shown in the sidebar
+    Then a compact card shows an icon tile, the title and the body
+
+  Scenario: One label only
+    Given an ad from "Acme Racing" is available
+    When the user opens Discover
+    Then the card shows "Sponsored" once and the sponsor name as a byline
+
   Scenario: Turning sponsored content off in Settings removes the slots
     Given an ad is shown in the sidebar
     When the user selects "Off" in Settings > Preferences

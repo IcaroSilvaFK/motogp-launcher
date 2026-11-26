@@ -42,6 +42,15 @@ describe('toAdViewModel', () => {
     expect(toAdViewModel({ ...valid, body: '', sponsorLabel: '' })).toEqual({ ...valid, body: '', sponsorLabel: '' });
   });
 
+  // #123: a creative may have no image; the UI then shows a text-first card with an icon tile.
+  it.each([
+    ['missing', undefined],
+    ['null', null],
+    ['empty', ''],
+  ])('keeps a creative whose image is %s, without an image', (_name, imageDataUri) => {
+    expect(toAdViewModel({ ...valid, imageDataUri })).toEqual({ ...valid, imageDataUri: null });
+  });
+
   it.each([
     ['null', null],
     ['a string', 'ad'],
@@ -51,7 +60,7 @@ describe('toAdViewModel', () => {
     ['a blank title', { ...valid, title: '' }],
     ['a non-string body', { ...valid, body: 3 }],
     ['a missing sponsor label', { ...valid, sponsorLabel: null }],
-    ['a missing image', { ...valid, imageDataUri: undefined }],
+    ['a non-string image', { ...valid, imageDataUri: 7 }],
     ['a remote image URL', { ...valid, imageDataUri: 'https://ads.example.com/a.png' }],
     ['an SVG data URI', { ...valid, imageDataUri: 'data:image/svg+xml;base64,PHN2Zz4=' }],
     ['a non-base64 data URI', { ...valid, imageDataUri: 'data:image/png,<script>' }],

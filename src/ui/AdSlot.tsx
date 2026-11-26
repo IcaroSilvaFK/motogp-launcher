@@ -8,11 +8,14 @@ import { Icon } from './Icon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 
-/** The sponsor's own label, unless it only repeats "Sponsored" (in any language shown). */
+/** Sponsor labels that only repeat the "Sponsored" disclosure (any shipped language, #123). */
+const GENERIC_SPONSOR_LABELS = ['sponsored', 'patrocinado', 'house ad', 'anúncio da casa', 'anúncio'];
+
+/** The sponsor's own name for the byline, unless it only repeats "Sponsored" in some way. */
 function sponsorOf(ad: AdViewModel, label: string): string | null {
   const sponsor = ad.sponsorLabel.trim();
   const lower = sponsor.toLowerCase();
-  if (sponsor === '' || lower === label.toLowerCase() || lower === 'sponsored') return null;
+  if (sponsor === '' || lower === label.toLowerCase() || GENERIC_SPONSOR_LABELS.includes(lower)) return null;
   return sponsor;
 }
 
@@ -24,23 +27,19 @@ function AdCard({ slot, ad, onClick }: { slot: AdSlotId; ad: AdViewModel; onClic
   const opensId = `${id}-opens`;
   const sponsor = sponsorOf(ad, t.ads.sponsored);
 
+  // One disclosure label; the sponsor's name is a quieter byline, never a second equal label.
   const label = (
-    <p className="ad-label">
-      <span id={labelId}>{t.ads.sponsored}</span>
-      {sponsor !== null && (
-        <>
-          <span className="dot" aria-hidden="true" />
-          <span className="ad-sponsor">{sponsor}</span>
-        </>
-      )}
+    <p id={labelId} className="ad-label">
+      {t.ads.sponsored}
     </p>
   );
+  const byline = sponsor !== null && <p className="ad-byline">{sponsor}</p>;
 
   const action = (
     <>
       <button
         type="button"
-        className="btn btn-sm ad-action"
+        className={`btn btn-sm ad-action${slot === 'sidebar' ? ' btn-ghost' : ''}`}
         aria-describedby={`${titleId} ${opensId}`}
         onClick={onClick}
       >
@@ -70,21 +69,35 @@ function AdCard({ slot, ad, onClick }: { slot: AdSlotId; ad: AdViewModel; onClic
               </>
             )}
           </p>
+          {byline}
         </div>
         <div className="setting-control">{action}</div>
       </section>
     );
   }
 
+  // Discover and sidebar cards: a fixed-ratio media thumb, or a text-first card with an icon tile.
+  const image = ad.imageDataUri;
   return (
-    <section aria-labelledby={labelId} className={`ad-slot ad-slot-${slot}`} data-slot={slot}>
-      <img className="ad-image" src={ad.imageDataUri} alt="" draggable={false} />
+    <section
+      aria-labelledby={labelId}
+      className={`ad-slot ad-slot-${slot}${image === null ? ' ad-text-first' : ''}`}
+      data-slot={slot}
+    >
+      {image === null ? (
+        <span className="ad-tile" aria-hidden="true">
+          <Icon name="megaphone" />
+        </span>
+      ) : (
+        <img className="ad-media" src={image} alt="" draggable={false} />
+      )}
       <div className="ad-content">
         {label}
         <p id={titleId} className="ad-title">
           {ad.title}
         </p>
         {ad.body !== '' && <p className="ad-text">{ad.body}</p>}
+        {byline}
       </div>
       <div className="ad-actions">{action}</div>
     </section>
@@ -109,7 +122,8 @@ function ConnectedAdSlot({ slot, provider }: { slot: AdSlotId; provider: AdProvi
  * A sponsored placement (#104). Renders nothing (no placeholder, no spinner) until a creative has
  * loaded, when ads are off, without a provider, while the launcher loads and during a game
  * session; the fetch runs in an effect, so it never delays Play or a screen. A card is a labeled
- * region ("Sponsored") with the creative image (`alt=""`), title, body and one action; the click
+ * region ("Sponsored") with the creative image (`alt=""`) or, without one, an icon tile (#123), the
+ * title, body, the sponsor's name as a byline and one action; the click
  * sends only the slot and the creative id, and the creative is reported as shown once per mount.
  */
 export function AdSlot({ slot }: { slot: AdSlotId }) {

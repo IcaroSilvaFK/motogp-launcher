@@ -24,8 +24,11 @@ export interface AdViewModel {
   id: string;
   title: string;
   body: string;
-  /** A raster `data:image/...;base64,` URI; SVG and remote URLs are refused. */
-  imageDataUri: string;
+  /**
+   * A raster `data:image/...;base64,` URI (SVG and remote URLs are refused), or `null` when the
+   * creative has no image: the UI then shows a text-first card with an icon tile (#123).
+   */
+  imageDataUri: string | null;
   /** The sponsor's own label, shown next to the launcher's "Sponsored" label. */
   sponsorLabel: string;
 }
@@ -36,14 +39,23 @@ function text(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
 }
 
+/** No image (absent, `null` or empty) is fine; anything else must be a raster `data:` URI. */
+function imageOf(value: unknown): string | null | undefined {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'string' && RASTER_DATA_URI.test(value)) return value;
+  return undefined;
+}
+
 /**
- * Validates an untrusted `get_ad` payload: `null` for anything that is not a complete creative with
- * a raster `data:` image, so a malformed answer behaves exactly like "no ad".
+ * Validates an untrusted `get_ad` payload: `null` for anything that is not a complete creative or
+ * whose image is not a raster `data:` URI (SVG, remote URLs), so a malformed answer behaves exactly
+ * like "no ad". A creative without an image is kept, with `imageDataUri: null`.
  */
 export function toAdViewModel(value: unknown): AdViewModel | null {
   if (typeof value !== 'object' || value === null) return null;
   const { id, title, body, imageDataUri, sponsorLabel } = value as Record<string, unknown>;
   if (!text(id) || !text(title) || typeof body !== 'string' || typeof sponsorLabel !== 'string') return null;
-  if (typeof imageDataUri !== 'string' || !RASTER_DATA_URI.test(imageDataUri)) return null;
-  return { id, title, body, imageDataUri, sponsorLabel };
+  const image = imageOf(imageDataUri);
+  if (image === undefined) return null;
+  return { id, title, body, imageDataUri: image, sponsorLabel };
 }

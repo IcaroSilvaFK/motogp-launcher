@@ -100,6 +100,14 @@ const GLYPHS = {
   heart: (
     <path d="M10 16c-3.8-2.6-6.5-5.1-6.5-8 0-2 1.5-3.5 3.4-3.5 1.3 0 2.4.7 3.1 1.8.7-1.1 1.8-1.8 3.1-1.8 1.9 0 3.4 1.5 3.4 3.5 0 2.9-2.7 5.4-6.5 8z" />
   ),
+  // Sponsored card without an image (#123): a generic megaphone on the icon tile.
+  megaphone: (
+    <>
+      <path d="M3.5 8v4h2.5l7 3.5v-11l-7 3.5z" />
+      <path d="M6 12l1 3.5h2l-.7-2.6" />
+      <path d="M15.5 8.2a2.2 2.2 0 010 3.6" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof GLYPHS;
