@@ -185,25 +185,6 @@ export function SettingsScreen() {
                   </select>
                 </div>
               </div>
-              <div className="setting-row">
-                <div className="setting-text">
-                  <label htmlFor="ad-preference-select" className="setting-label">
-                    {t.settings.adPreference}
-                  </label>
-                  <p className="hint">{t.settings.adPreferenceHint}</p>
-                </div>
-                <div className="setting-control">
-                  <select
-                    id="ad-preference-select"
-                    className="input"
-                    value={adPreference === 'off' ? 'off' : 'on'}
-                    onChange={(event) => setAdPreference(event.target.value === 'off' ? 'off' : 'on')}
-                  >
-                    <option value="on">{t.settings.adShow}</option>
-                    <option value="off">{t.settings.adOff}</option>
-                  </select>
-                </div>
-              </div>
             </div>
           </section>
 
