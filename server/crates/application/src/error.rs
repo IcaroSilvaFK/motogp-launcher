@@ -32,6 +32,8 @@ pub enum AppError {
     ChecksumMismatch,
     /// Mod hosting: completing before all bytes were received.
     UploadIncomplete,
+    /// The user is banned from community writes.
+    Banned,
     /// Internal detail: logged, never returned to the client.
     Internal(String),
 }
@@ -56,6 +58,7 @@ impl AppError {
             Self::UnsupportedFile(_) => "unsupported_file",
             Self::ChecksumMismatch => "checksum_mismatch",
             Self::UploadIncomplete => "upload_incomplete",
+            Self::Banned => "banned",
             Self::Internal(_) => "internal",
         }
     }
@@ -81,6 +84,7 @@ impl AppError {
             Self::UnsupportedFile(message) => message.clone(),
             Self::ChecksumMismatch => "The SHA-256 of the uploaded file does not match.".into(),
             Self::UploadIncomplete => "Not all bytes of the file were received yet.".into(),
+            Self::Banned => "Your account is banned from community writes.".into(),
             Self::Internal(_) => "An internal error occurred.".into(),
         }
     }
@@ -122,6 +126,7 @@ mod tests {
             (AppError::UnsupportedFile("x".into()), "unsupported_file"),
             (AppError::ChecksumMismatch, "checksum_mismatch"),
             (AppError::UploadIncomplete, "upload_incomplete"),
+            (AppError::Banned, "banned"),
         ];
         for (error, code) in hosting {
             assert_eq!(error.code(), code);

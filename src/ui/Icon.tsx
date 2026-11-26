@@ -131,6 +131,13 @@ const GLYPHS = {
       <path d="M5.5 6l.8 9.5h7.4l.8-9.5" />
     </>
   ),
+  // Moderation (#121): a flag on a pole, the usual "report" glyph.
+  flag: (
+    <>
+      <path d="M5 17V3.5" />
+      <path d="M5 4h9.5l-2 3.5 2 3.5H5" />
+    </>
+  ),
   // Mod hosting (#130): the import arrow turned upward (publish), a file and a picture.
   upload: (
     <>

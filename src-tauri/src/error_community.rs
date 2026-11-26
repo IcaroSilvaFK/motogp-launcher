@@ -1,6 +1,7 @@
 //! Tauri-boundary mapping for the community account errors: stable codes plus
 //! a user-facing English message. The token, codes and server details never
 //! leak into the message.
+use crate::error_comments::{BANNED_CODE, BANNED_MESSAGE};
 use crate::CommandError;
 use motogp_application::CommunityError;
 
@@ -31,6 +32,7 @@ impl From<&CommunityError> for CommandError {
                 "community_signed_out",
                 "Sign in to the community to do this.",
             ),
+            CommunityError::Banned => (BANNED_CODE, BANNED_MESSAGE),
             CommunityError::RequestFailed => (
                 "community_request_failed",
                 "The community request failed. Try again.",
@@ -86,6 +88,11 @@ mod tests {
             code(CommunityError::RequestFailed),
             "community_request_failed"
         );
+    }
+
+    #[test]
+    fn a_ban_has_its_own_code() {
+        assert_eq!(code(CommunityError::Banned), "community_banned");
     }
 
     #[test]

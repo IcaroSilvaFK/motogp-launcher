@@ -30,6 +30,7 @@ function port(overrides: Partial<ModComments> = {}) {
       Promise.resolve(comment(id, { body, edited: true, own: true })),
     ),
     remove: vi.fn(() => Promise.resolve()),
+    report: vi.fn<ModComments['report']>(() => Promise.resolve()),
     ...overrides,
   };
 }
@@ -300,6 +301,53 @@ describe('useModComments', () => {
       await result.current.edit('c2', 'x');
     });
     expect(result.current.comments).toEqual([]);
+  });
+
+  it('reports a comment with its reason and details and leaves the list alone', async () => {
+    const p = port({ list: vi.fn(() => Promise.resolve(page(['c1', 'c2']))) });
+    const { result } = await ready(p);
+    await act(async () => {
+      expect(await result.current.report('c2', 'off_topic', 'not a livery')).toBe(true);
+    });
+    expect(p.report).toHaveBeenCalledWith('red-livery', 'c2', 'off_topic', 'not a livery');
+    expect(result.current.comments.map((c) => c.id)).toEqual(['c1', 'c2']);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('rejects over-long report details locally without calling the port', async () => {
+    const p = port({ list: vi.fn(() => Promise.resolve(page(['c1']))) });
+    const { result } = await ready(p);
+    await act(async () => {
+      expect(await result.current.report('c1', 'other', 'a'.repeat(501))).toBe(false);
+    });
+    expect(result.current.error?.code).toBe('invalid');
+    expect(p.report).not.toHaveBeenCalled();
+  });
+
+  it('exposes banned from a refused report and keeps the comment', async () => {
+    const p = port({
+      list: vi.fn(() => Promise.resolve(page(['c1']))),
+      report: vi.fn(() => Promise.reject({ code: 'community_banned', message: 'x' })),
+    });
+    const { result } = await ready(p);
+    await act(async () => {
+      expect(await result.current.report('c1', 'spam')).toBe(false);
+    });
+    expect(result.current.error?.code).toBe('banned');
+    expect(result.current.comments.map((c) => c.id)).toEqual(['c1']);
+  });
+
+  it('drops a reported comment the server no longer has', async () => {
+    const p = port({
+      list: vi.fn(() => Promise.resolve(page(['c1', 'c2']))),
+      report: vi.fn(() => Promise.reject(new ModCommentsError('not_found'))),
+    });
+    const { result } = await ready(p);
+    await act(async () => {
+      expect(await result.current.report('c1', 'abuse')).toBe(false);
+    });
+    expect(result.current.error?.code).toBe('not_found');
+    expect(result.current.comments.map((c) => c.id)).toEqual(['c2']);
   });
 
   it('does not write before the first page is ready', async () => {

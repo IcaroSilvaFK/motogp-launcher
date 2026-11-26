@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { commentDraftProblem, ModCommentsError, toModCommentsError } from '../domain';
-import type { ModComment } from '../domain';
+import { commentDraftProblem, MAX_REPORT_DETAILS_LENGTH, ModCommentsError, toModCommentsError } from '../domain';
+import type { ModComment, ReportReason } from '../domain';
 import type { ModComments } from './ports/ModComments';
 
 /** `loading`: first page in flight; `ready`: the list is usable (maybe empty); `offline`: the first page failed. */
@@ -14,7 +14,8 @@ export type ModCommentsStatus = 'loading' | 'ready' | 'offline';
  * (disabled while `loadingMore`), and a composer that calls `post` (disabled while `busy`).
  * `error` is the last failed action and stays until the next action starts or `clearError()`:
  * `signed_out` (offer sign-in; refresh the account status), `rate_limited` (show `retryAfterSecs`),
- * `invalid`, `not_found` (the comment is already dropped from the list), `offline` or `failed`.
+ * `invalid`, `not_found` (the comment is already dropped from the list), `banned` (the account is
+ * suspended: show the suspension message), `offline` or `failed`.
  */
 export interface ModCommentsHandle {
   /** False without a port or a mod id (tests, builds without the community): render nothing. */
@@ -37,6 +38,11 @@ export interface ModCommentsHandle {
   post(body: string): Promise<boolean>;
   /** Resolves `true` when saved; the comment is replaced in place (`edited: true`). */
   edit(commentId: string, body: string): Promise<boolean>;
+  /**
+   * Reports someone else's comment (the list is unchanged). Resolves `true` when the server took it;
+   * show a "Reported" confirmation. Details over 500 characters resolve `false` with `invalid`, no call.
+   */
+  report(commentId: string, reason: ReportReason, details?: string): Promise<boolean>;
   /** Resolves `true` when deleted. Confirm with the user before calling. */
   remove(commentId: string): Promise<boolean>;
   clearError(): void;
@@ -240,6 +246,22 @@ export function useModComments(port: ModComments | undefined, modId: string | un
     [port, modId, data.status, write],
   );
 
+  const report = useCallback(
+    (commentId: string, reason: ReportReason, details?: string) => {
+      if (!port || !modId || data.status !== 'ready') return Promise.resolve(false);
+      if ([...(details ?? '').trim()].length > MAX_REPORT_DETAILS_LENGTH) {
+        setError(new ModCommentsError('invalid'));
+        return Promise.resolve(false);
+      }
+      return write(
+        () => port.report(modId, commentId, reason, details),
+        () => undefined,
+        commentId,
+      );
+    },
+    [port, modId, data.status, write],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   return {
@@ -255,6 +277,7 @@ export function useModComments(port: ModComments | undefined, modId: string | un
     post,
     edit,
     remove,
+    report,
     clearError,
   };
 }

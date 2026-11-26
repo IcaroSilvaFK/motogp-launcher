@@ -1,6 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ModCommentsError } from '../../domain';
 import type { CommunityStatus } from '../../domain';
 import { CommunityContext } from '../CommunityContext';
 import type { CommunityContextValue } from '../CommunityContext';
@@ -190,6 +191,86 @@ describe('ModComments', () => {
     expect(area().getByText('Mine')).toBeInTheDocument();
   });
 
+  it('closes the report picker with Escape and returns focus to Report', async () => {
+    const { account, comments, user } = setUp();
+    comments.add('Ana', 'Theirs');
+    const { onKeyDown } = renderComments({ account, comments });
+    await area().findByText('Theirs');
+    await user.click(area().getByRole('button', { name: 'Report' }));
+    await user.click(area().getByRole('radio', { name: 'Other' }));
+    await user.keyboard('{Escape}');
+    expect(area().queryByRole('form', { name: 'Report this comment' })).not.toBeInTheDocument();
+    expect(onKeyDown.mock.calls.at(-1)?.[0].defaultPrevented).toBe(true);
+    expect(area().getByRole('button', { name: 'Report' })).toHaveFocus();
+    expect(comments.report).not.toHaveBeenCalled();
+  });
+
+  it('cancels a report and opens only one picker at a time', async () => {
+    const { account, comments, user } = setUp();
+    comments.add('Ana', 'First');
+    comments.add('Bruno', 'Second');
+    renderComments({ account, comments });
+    await area().findByText('Second');
+    const [first, second] = area().getAllByRole('button', { name: 'Report' });
+    await user.click(first!);
+    await user.click(second!);
+    expect(area().getAllByRole('form', { name: 'Report this comment' })).toHaveLength(1);
+    expect(first).toHaveAttribute('aria-expanded', 'false');
+    await user.click(within(area().getByRole('form')).getByRole('button', { name: 'Cancel' }));
+    expect(area().queryByRole('form')).not.toBeInTheDocument();
+    expect(second).toHaveFocus();
+  });
+
+  it('sends the optional details and counts them against the 500 cap', async () => {
+    const { account, comments, user } = setUp();
+    comments.add('Ana', 'Theirs');
+    renderComments({ account, comments });
+    await area().findByText('Theirs');
+    await user.click(area().getByRole('button', { name: 'Report' }));
+    const picker = within(area().getByRole('form', { name: 'Report this comment' }));
+    await user.click(picker.getByRole('radio', { name: 'Other' }));
+    const details = picker.getByRole('textbox', { name: 'Details (optional)' });
+    expect(picker.getByText('0 / 500')).toBeInTheDocument();
+    fireEvent.change(details, { target: { value: 'x'.repeat(501) } });
+    expect(picker.getByText('501 / 500')).toBeInTheDocument();
+    expect(details).toHaveAttribute('aria-invalid', 'true');
+    expect(picker.getByRole('button', { name: 'Send report' })).toBeDisabled();
+    await user.clear(details);
+    await user.type(details, 'Wrong game');
+    await user.click(picker.getByRole('button', { name: 'Send report' }));
+    await area().findByRole('button', { name: 'Reported' });
+    expect(comments.report).toHaveBeenCalledWith('classic-livery', 'c1', 'other', 'Wrong game');
+  });
+
+  it('drops a comment that is gone when reporting it', async () => {
+    const { account, comments, user } = setUp();
+    const stored = comments.add('Ana', 'Theirs');
+    renderComments({ account, comments });
+    await area().findByText('Theirs');
+    await user.click(area().getByRole('button', { name: 'Report' }));
+    await user.click(area().getByRole('radio', { name: 'Spam' }));
+    // An admin hid it meanwhile: the server answers 404.
+    stored.id = 'hidden';
+    await user.click(area().getByRole('button', { name: 'Send report' }));
+    expect(await area().findByRole('alert')).toHaveTextContent('That comment no longer exists.');
+    expect(area().queryByText('Theirs')).not.toBeInTheDocument();
+    expect(area().getByRole('heading', { name: /Comments/ })).toHaveFocus();
+  });
+
+  it('says a comment cannot be reported when the server refuses it as invalid', async () => {
+    const { account, comments, user } = setUp();
+    comments.add('Ana', 'Theirs');
+    comments.report.mockImplementationOnce(() => Promise.reject(new ModCommentsError('invalid')));
+    renderComments({ account, comments });
+    await area().findByText('Theirs');
+    await user.click(area().getByRole('button', { name: 'Report' }));
+    await user.click(area().getByRole('radio', { name: 'Spam' }));
+    await user.click(area().getByRole('button', { name: 'Send report' }));
+    expect(await within(area().getByRole('form')).findByRole('alert')).toHaveTextContent(
+      'This comment cannot be reported.',
+    );
+  });
+
   it('is translated to Brazilian Portuguese', async () => {
     const { account, comments } = setUp(signedOut());
     comments.add('Ana', 'Oi');
@@ -197,6 +278,22 @@ describe('ModComments', () => {
     await area('Comentários').findByText('Oi');
     expect(area('Comentários').getByText('há 2 horas')).toBeInTheDocument();
     expect(area('Comentários').getByRole('button', { name: 'Entre com o Discord para comentar' })).toBeInTheDocument();
+  });
+
+  it('translates the report picker to Brazilian Portuguese', async () => {
+    const { account, comments, user } = setUp();
+    comments.add('Ana', 'Oi');
+    renderComments({ account, comments }, 'pt-BR');
+    await area('Comentários').findByText('Oi');
+    await user.click(area('Comentários').getByRole('button', { name: 'Denunciar' }));
+    const picker = within(area('Comentários').getByRole('form', { name: 'Denunciar este comentário' }));
+    expect(picker.getAllByRole('radio').map((r) => r.closest('label')?.textContent)).toEqual([
+      'Spam',
+      'Abuso ou assédio',
+      'Fora do assunto',
+      'Outro',
+    ]);
+    expect(picker.getByRole('button', { name: 'Enviar denúncia' })).toBeDisabled();
   });
 });
 

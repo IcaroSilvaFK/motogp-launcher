@@ -8,6 +8,11 @@
 use crate::CommandError;
 use motogp_application::CommentsError;
 
+/// Shown for every refused write of a banned account (comments, stars, publish).
+pub(crate) const BANNED_CODE: &str = "community_banned";
+pub(crate) const BANNED_MESSAGE: &str =
+    "Your community account is suspended, so you can't post, star or publish.";
+
 impl From<&CommentsError> for CommandError {
     fn from(error: &CommentsError) -> Self {
         let (code, message) = match error {
@@ -31,6 +36,7 @@ impl From<&CommentsError> for CommandError {
                 "comment_not_found",
                 "That comment no longer exists or is not yours.".to_string(),
             ),
+            CommentsError::Banned => (BANNED_CODE, BANNED_MESSAGE.to_string()),
             CommentsError::Credential(_) => (
                 "community_signed_out",
                 "The saved community sign-in could not be accessed.".to_string(),
@@ -74,6 +80,12 @@ mod tests {
         );
         assert_eq!(mapped(CommentsError::Invalid).code, "comment_invalid");
         assert_eq!(mapped(CommentsError::NotFound).code, "comment_not_found");
+        let banned = mapped(CommentsError::Banned);
+        assert_eq!(banned.code, "community_banned");
+        assert_eq!(
+            banned.message,
+            "Your community account is suspended, so you can't post, star or publish."
+        );
         assert_eq!(
             mapped(CommentsError::Credential(CredentialError("x".into()))).code,
             "community_signed_out"

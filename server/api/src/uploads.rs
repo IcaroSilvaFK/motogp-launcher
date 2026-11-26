@@ -13,7 +13,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::mods::version_json;
-use crate::{ApiError, AppState, AuthenticatedUser};
+use crate::{ApiError, AppState, AuthenticatedUser, WritingUser};
 
 pub fn routes() -> Router<AppState> {
     // The default 2 MB body limit is raised only where bytes are expected.
@@ -61,7 +61,7 @@ struct CreateBody {
 /// `POST /mods/uploads`: starts an upload; refused here when too large, over quota or rate-limited.
 async fn create(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     body: Result<Json<CreateBody>, JsonRejection>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     let Json(body) = body.map_err(|_| AppError::BadRequest("The JSON body is invalid.".into()))?;
@@ -112,7 +112,7 @@ fn body_error(rejection: &BytesRejection) -> AppError {
 /// `PUT /mods/uploads/{id}/chunks?offset=N`: raw bytes, `offset` must equal the bytes received.
 async fn chunk(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     Path(id): Path<String>,
     query: Result<Query<ChunkQuery>, QueryRejection>,
     body: Result<Bytes, BytesRejection>,
@@ -145,7 +145,7 @@ async fn status(
 /// `POST /mods/uploads/{id}/screenshots`: a raw PNG, JPEG or WebP image.
 async fn screenshot(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     Path(id): Path<String>,
     body: Result<Bytes, BytesRejection>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
@@ -161,7 +161,7 @@ async fn screenshot(
 /// `POST /mods/uploads/{id}/complete`: verifies the bytes and creates the pending version.
 async fn complete(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     Path(id): Path<String>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
     let version = app.mods.service.complete(&auth.user, &id).await?;
@@ -171,7 +171,7 @@ async fn complete(
 /// `DELETE /mods/uploads/{id}`: aborts and deletes the bytes.
 async fn abort(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     Path(id): Path<String>,
 ) -> Result<StatusCode, ApiError> {
     app.mods.service.abort(&auth.user, &id).await?;

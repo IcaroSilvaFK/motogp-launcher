@@ -98,6 +98,17 @@ impl ModStorage for FakeStorage {
         self.incoming.lock().unwrap().remove(id);
         Ok(())
     }
+    async fn locate(&self, key: &StorageKey) -> PortResult<Option<std::path::PathBuf>> {
+        for (area, map) in [("pending", &self.pending), ("public", &self.public)] {
+            if map.lock().unwrap().contains_key(key.as_str()) {
+                return Ok(Some(std::path::PathBuf::from(format!(
+                    "{area}/{}",
+                    key.as_str()
+                ))));
+            }
+        }
+        Ok(None)
+    }
 }
 
 #[derive(Default)]
@@ -312,11 +323,25 @@ impl ModRepository for FakeRepo {
     }
 }
 
+#[derive(Default)]
+struct FakeAudit {
+    entries: Mutex<Vec<community_domain::moderation::AuditEntry>>,
+}
+
+#[async_trait::async_trait]
+impl AuditLog for FakeAudit {
+    async fn record(&self, entry: &community_domain::moderation::AuditEntry) -> PortResult<()> {
+        self.entries.lock().unwrap().push(entry.clone());
+        Ok(())
+    }
+}
+
 struct Fixture {
     service: ModHostingService,
     clock: Arc<FakeClock>,
     storage: Arc<FakeStorage>,
     repo: Arc<FakeRepo>,
+    audit: Arc<FakeAudit>,
 }
 
 fn user(id: &str, discord: &str) -> User {
@@ -344,18 +369,21 @@ fn fixture_with(limits: ModLimits) -> Fixture {
     )));
     let storage = Arc::new(FakeStorage::default());
     let repo = Arc::new(FakeRepo::default());
+    let audit = Arc::new(FakeAudit::default());
     Fixture {
         service: ModHostingService {
             clock: clock.clone(),
             tokens: Arc::new(CountingTokens(Mutex::new(0))),
             repo: repo.clone(),
             storage: storage.clone(),
+            audit: audit.clone(),
             admin_discord_ids: vec![DiscordId::parse("999").unwrap()],
             limits,
         },
         clock,
         storage,
         repo,
+        audit,
     }
 }
 
@@ -941,6 +969,13 @@ async fn approve_publishes_and_adds_the_mod_to_the_catalog() {
     let catalog = f.service.public_catalog().await.unwrap();
     assert_eq!(catalog.len(), 1);
     assert!(f.service.list_pending(&admin()).await.unwrap().is_empty());
+
+    let entries = f.audit.entries.lock().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].action, ModerationAction::ApproveVersion);
+    assert_eq!(entries[0].target, "brazil-livery@1.0");
+    assert_eq!(entries[0].admin_id, Some(admin().id));
+    assert_eq!(entries[0].reason, None);
 }
 
 #[tokio::test]
@@ -957,6 +992,31 @@ async fn reject_deletes_the_files_and_keeps_the_row_with_the_reason() {
     let version = &mine[0].versions[0];
     assert_eq!(version.status, VersionStatus::Rejected);
     assert_eq!(version.rejection_reason.as_deref(), Some("Not allowed"));
+
+    let entries = f.audit.entries.lock().unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].action, ModerationAction::RejectVersion);
+    assert_eq!(entries[0].target, "brazil-livery@1.0");
+    assert_eq!(entries[0].reason.as_deref(), Some("Not allowed"));
+}
+
+#[tokio::test]
+async fn a_refused_review_writes_no_audit_row() {
+    let f = fixture();
+    publish(&f, &creator(), "1.0").await;
+    assert_eq!(
+        f.service
+            .approve(&creator(), "brazil-livery", "1.0")
+            .await
+            .unwrap_err(),
+        AppError::Forbidden
+    );
+    assert!(f
+        .service
+        .reject(&admin(), "brazil-livery", "1.0", " ")
+        .await
+        .is_err());
+    assert!(f.audit.entries.lock().unwrap().is_empty());
 }
 
 #[tokio::test]
@@ -1029,4 +1089,117 @@ async fn every_user_sees_only_their_mods() {
         .await
         .unwrap()
         .is_empty());
+}
+
+#[tokio::test]
+async fn admins_locate_pending_and_approved_files() {
+    let f = fixture();
+    publish(&f, &creator(), "1.0").await;
+    let (version, path) = f
+        .service
+        .review_file(&admin(), "brazil-livery", "1.0")
+        .await
+        .unwrap();
+    assert_eq!(version.file_name, "brazil.zip");
+    assert_eq!(
+        path,
+        std::path::PathBuf::from("pending/brazil-livery/1.0/brazil.zip")
+    );
+    f.service
+        .approve(&admin(), "brazil-livery", "1.0")
+        .await
+        .unwrap();
+    let (_, path) = f
+        .service
+        .review_file(&admin(), "brazil-livery", "1.0")
+        .await
+        .unwrap();
+    assert_eq!(
+        path,
+        std::path::PathBuf::from("public/brazil-livery/1.0/brazil.zip")
+    );
+}
+
+#[tokio::test]
+async fn review_file_is_admin_only_and_not_found_when_gone() {
+    let f = fixture();
+    publish(&f, &creator(), "1.0").await;
+    assert_eq!(
+        f.service
+            .review_file(&creator(), "brazil-livery", "1.0")
+            .await
+            .unwrap_err(),
+        AppError::Forbidden
+    );
+    assert_eq!(
+        f.service
+            .review_file(&admin(), "brazil-livery", "9.9")
+            .await
+            .unwrap_err(),
+        AppError::NotFound
+    );
+    assert_eq!(
+        f.service
+            .review_file(&admin(), "Not A Slug!", "1.0")
+            .await
+            .unwrap_err(),
+        AppError::NotFound
+    );
+    f.service
+        .reject(&admin(), "brazil-livery", "1.0", "no")
+        .await
+        .unwrap();
+    // A rejected version's files were deleted.
+    assert_eq!(
+        f.service
+            .review_file(&admin(), "brazil-livery", "1.0")
+            .await
+            .unwrap_err(),
+        AppError::NotFound
+    );
+}
+
+#[tokio::test]
+async fn review_screenshot_finds_the_image_by_index() {
+    let f = fixture();
+    publish(&f, &creator(), "1.0").await;
+    let version = f.repo.0.lock().unwrap().versions[0].clone();
+    // The fixture publishes no screenshot: add one directly.
+    let key = StorageKey::from_stored("brazil-livery/1.0/screenshot-0.png".into());
+    f.storage
+        .pending
+        .lock()
+        .unwrap()
+        .insert(key.as_str().to_owned(), vec![1]);
+    f.repo.0.lock().unwrap().versions[0]
+        .screenshots
+        .push(community_domain::mods::Screenshot {
+            index: 0,
+            storage_key: key,
+            content_type: "image/png".into(),
+        });
+    let (shot, path) = f
+        .service
+        .review_screenshot(&admin(), "brazil-livery", &version.version, 0)
+        .await
+        .unwrap();
+    assert_eq!(shot.content_type, "image/png");
+    assert_eq!(
+        path,
+        std::path::PathBuf::from("pending/brazil-livery/1.0/screenshot-0.png")
+    );
+    assert_eq!(
+        f.service
+            .review_screenshot(&admin(), "brazil-livery", "1.0", 5)
+            .await
+            .unwrap_err(),
+        AppError::NotFound
+    );
+    assert_eq!(
+        f.service
+            .review_screenshot(&creator(), "brazil-livery", "1.0", 0)
+            .await
+            .unwrap_err(),
+        AppError::Forbidden
+    );
 }

@@ -225,6 +225,7 @@ fn classify(
 ) -> PublishApiError {
     match (status, code) {
         (401, _) => PublishApiError::Unauthorized,
+        (403, "banned") => PublishApiError::Banned,
         (403, _) => PublishApiError::Forbidden,
         (_, "file_too_large") => PublishApiError::FileTooLarge,
         (_, "quota_exceeded") => PublishApiError::QuotaExceeded,
@@ -646,6 +647,12 @@ mod tests {
                 "",
                 error_body("forbidden", ""),
                 PublishApiError::Forbidden,
+            ),
+            (
+                "403 Forbidden",
+                "",
+                error_body("banned", ""),
+                PublishApiError::Banned,
             ),
             (
                 "413 Payload Too Large",

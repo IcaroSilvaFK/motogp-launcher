@@ -5,7 +5,7 @@ use motogp_application::{
     ApiComment, ApiCommentsPage, AvatarFetcher, CommentsApiError, CommunityCommentsApi,
     CommunityCommentsService,
 };
-use motogp_domain::SessionToken;
+use motogp_domain::{ReportReason, SessionToken};
 use std::sync::Arc;
 
 impl UnavailableCommunityApi {
@@ -47,6 +47,17 @@ impl CommunityCommentsApi for UnavailableCommunityApi {
         &self,
         _mod_id: &str,
         _comment_id: &str,
+        _token: &SessionToken,
+    ) -> Result<(), CommentsApiError> {
+        Err(self.comments_error())
+    }
+
+    fn report(
+        &self,
+        _mod_id: &str,
+        _comment_id: &str,
+        _reason: ReportReason,
+        _details: Option<&str>,
         _token: &SessionToken,
     ) -> Result<(), CommentsApiError> {
         Err(self.comments_error())
@@ -95,6 +106,10 @@ mod tests {
         ));
         assert!(matches!(
             api.delete("m", "c", &token),
+            Err(CommentsApiError::Unreachable(_))
+        ));
+        assert!(matches!(
+            api.report("m", "c", ReportReason::Spam, None, &token),
             Err(CommentsApiError::Unreachable(_))
         ));
     }

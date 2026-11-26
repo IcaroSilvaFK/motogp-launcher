@@ -6,7 +6,9 @@ use community_api::downloads::DownloadsState;
 use community_api::{build_router, AppState, RateLimits};
 use community_application::comments::CommentsService;
 use community_application::mods::ModLimits;
-use community_application::{AuthService, DownloadService, ModHostingService, StarService};
+use community_application::{
+    AuthService, DownloadService, ModHostingService, ModerationService, StarService,
+};
 use community_infrastructure::{
     Config, DiscordHttp, LocalModStorage, OsTokenGenerator, Sha256Hasher, SqliteStore, SystemClock,
 };
@@ -65,12 +67,22 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         tokens: Arc::new(OsTokenGenerator),
         repo: store.clone(),
         storage: Arc::new(mod_storage),
+        audit: store.clone(),
         admin_discord_ids: config.admin_discord_ids.clone(),
         limits: ModLimits {
             max_upload_bytes: config.mod_max_upload_bytes,
             user_quota_bytes: config.mod_user_quota_bytes,
             uploads_per_day: config.mod_uploads_per_day,
         },
+    };
+    let moderation = ModerationService {
+        clock: clock.clone(),
+        tokens: Arc::new(OsTokenGenerator),
+        repo: store.clone(),
+        audit: store.clone(),
+        comments: store.clone(),
+        users: store.clone(),
+        admin_discord_ids: config.admin_discord_ids.clone(),
     };
     let state = AppState {
         clock: clock.clone(),
@@ -87,6 +99,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         ),
         limits: RateLimits::new(clock),
         comments,
+        moderation: Arc::new(moderation),
         trust_proxy_headers: config.trust_proxy_headers,
         mods: community_api::mods::ModHosting {
             service: Arc::new(mods),

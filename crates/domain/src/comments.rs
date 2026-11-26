@@ -86,6 +86,60 @@ impl CommentDraft {
     }
 }
 
+/// Longest optional detail text of a report, counted in characters.
+pub const MAX_REPORT_DETAILS_CHARS: usize = 500;
+
+/// Why a member reports a comment (the server's wire values).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportReason {
+    Spam,
+    Abuse,
+    OffTopic,
+    Other,
+}
+
+impl ReportReason {
+    /// Parses the wire value (`spam`, `abuse`, `off_topic`, `other`).
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "spam" => Some(Self::Spam),
+            "abuse" => Some(Self::Abuse),
+            "off_topic" => Some(Self::OffTopic),
+            "other" => Some(Self::Other),
+            _ => None,
+        }
+    }
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Spam => "spam",
+            Self::Abuse => "abuse",
+            Self::OffTopic => "off_topic",
+            Self::Other => "other",
+        }
+    }
+}
+
+/// Report details longer than [`MAX_REPORT_DETAILS_CHARS`] or with control
+/// characters other than `\n` and `\t`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InvalidReportDetails;
+
+/// Trims the optional report details; blank becomes `None`.
+pub fn parse_report_details(raw: Option<&str>) -> Result<Option<String>, InvalidReportDetails> {
+    let Some(raw) = raw.map(str::trim).filter(|d| !d.is_empty()) else {
+        return Ok(None);
+    };
+    if raw.chars().count() > MAX_REPORT_DETAILS_CHARS
+        || raw
+            .chars()
+            .any(|c| c.is_control() && c != '\n' && c != '\t')
+    {
+        return Err(InvalidReportDetails);
+    }
+    Ok(Some(raw.to_string()))
+}
+
 /// Whether `value` is a catalog slug the server accepts as a mod id: 1 to 100
 /// characters of `a-z`, `0-9` and `-`.
 pub fn is_valid_catalog_slug(value: &str) -> bool {
@@ -98,6 +152,39 @@ pub fn is_valid_catalog_slug(value: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn report_reasons_round_trip_their_wire_values() {
+        for (wire, reason) in [
+            ("spam", ReportReason::Spam),
+            ("abuse", ReportReason::Abuse),
+            ("off_topic", ReportReason::OffTopic),
+            ("other", ReportReason::Other),
+        ] {
+            assert_eq!(ReportReason::parse(wire), Some(reason));
+            assert_eq!(reason.as_str(), wire);
+        }
+        assert_eq!(ReportReason::parse("Spam"), None);
+        assert_eq!(ReportReason::parse(""), None);
+    }
+
+    #[test]
+    fn report_details_are_trimmed_and_bounded() {
+        assert_eq!(parse_report_details(None), Ok(None));
+        assert_eq!(parse_report_details(Some("  \n ")), Ok(None));
+        assert_eq!(
+            parse_report_details(Some("  rude  ")),
+            Ok(Some("rude".to_string()))
+        );
+        let max = "a".repeat(MAX_REPORT_DETAILS_CHARS);
+        assert!(parse_report_details(Some(&max)).is_ok());
+        let over = "a".repeat(MAX_REPORT_DETAILS_CHARS + 1);
+        assert_eq!(parse_report_details(Some(&over)), Err(InvalidReportDetails));
+        assert_eq!(
+            parse_report_details(Some("bad\u{7}")),
+            Err(InvalidReportDetails)
+        );
+    }
 
     #[test]
     fn a_draft_is_trimmed_and_line_endings_are_normalized() {

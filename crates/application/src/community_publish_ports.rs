@@ -102,6 +102,8 @@ pub enum PublishApiError {
     Network(String),
     /// A 5xx answer: worth retrying.
     Server(String),
+    /// 403 `banned`: the account is suspended from community writes.
+    Banned,
     /// 403: not the owner of the mod id or of the upload.
     Forbidden,
     /// 413 `file_too_large`.
@@ -141,6 +143,7 @@ impl fmt::Display for PublishApiError {
             PublishApiError::Network(detail) => write!(f, "network error: {detail}"),
             PublishApiError::Server(detail) => write!(f, "server error: {detail}"),
             PublishApiError::Forbidden => write!(f, "forbidden"),
+            PublishApiError::Banned => write!(f, "banned"),
             PublishApiError::FileTooLarge => write!(f, "file too large"),
             PublishApiError::QuotaExceeded => write!(f, "storage quota exceeded"),
             PublishApiError::RateLimited {

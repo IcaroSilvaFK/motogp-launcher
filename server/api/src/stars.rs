@@ -9,7 +9,7 @@ use community_domain::User;
 use serde::Serialize;
 
 use crate::auth::bearer_token;
-use crate::{ApiError, AppState, AuthenticatedUser};
+use crate::{ApiError, AppState, WritingUser};
 
 pub fn routes() -> Router<AppState> {
     Router::new()
@@ -73,7 +73,7 @@ pub struct StatsResponse {
 /// `PUT /mods/{id}/star`
 async fn star(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     Path(id): Path<String>,
 ) -> Result<Json<ModStatsDto>, ApiError> {
     Ok(Json(app.stars.star(&auth.user.id, &id).await?.into()))
@@ -82,7 +82,7 @@ async fn star(
 /// `DELETE /mods/{id}/star`
 async fn unstar(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     Path(id): Path<String>,
 ) -> Result<Json<ModStatsDto>, ApiError> {
     Ok(Json(app.stars.unstar(&auth.user.id, &id).await?.into()))

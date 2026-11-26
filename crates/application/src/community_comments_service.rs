@@ -5,7 +5,10 @@ use crate::{
     ApiComment, AvatarFetcher, CommentsApiError, CommentsError, CommunityCommentsApi,
     CredentialStore,
 };
-use motogp_domain::{is_valid_catalog_slug, CommentDraft, CommentsPage, ModComment, SessionToken};
+use motogp_domain::{
+    is_valid_catalog_slug, parse_report_details, CommentDraft, CommentsPage, ModComment,
+    ReportReason, SessionToken,
+};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
 
@@ -105,6 +108,23 @@ impl CommunityCommentsService {
             .map_err(|e| self.write_error(e))
     }
 
+    /// Reports another member's comment. `details` is trimmed (blank is
+    /// dropped) and capped at 500 characters before anything is sent.
+    pub fn report(
+        &self,
+        mod_id: &str,
+        comment_id: &str,
+        reason: ReportReason,
+        details: Option<&str>,
+    ) -> Result<(), CommentsError> {
+        check_mod_id(mod_id)?;
+        let details = parse_report_details(details).map_err(|_| CommentsError::Invalid)?;
+        let token = self.require_token()?;
+        self.api
+            .report(mod_id, comment_id, reason, details.as_deref(), &token)
+            .map_err(|e| self.write_error(e))
+    }
+
     fn require_token(&self) -> Result<SessionToken, CommentsError> {
         self.store.load()?.ok_or(CommentsError::SignedOut)
     }
@@ -170,6 +190,7 @@ fn read_error(error: CommentsApiError) -> CommentsError {
         }
         CommentsApiError::Invalid => CommentsError::Invalid,
         CommentsApiError::NotFound => CommentsError::NotFound,
+        CommentsApiError::Banned => CommentsError::Banned,
     }
 }
 
@@ -197,6 +218,9 @@ mod tests {
         page: Mutex<Option<Result<ApiCommentsPage, CommentsApiError>>>,
         write: Mutex<Option<Result<ApiComment, CommentsApiError>>>,
         delete: Mutex<Option<Result<(), CommentsApiError>>>,
+        report: Mutex<Option<Result<(), CommentsApiError>>>,
+        /// (comment id, reason, details) per report call.
+        reports: Mutex<Vec<(String, String, Option<String>)>>,
         /// (operation, token seen) per call.
         calls: Mutex<Vec<(String, Option<String>)>>,
         sent: Mutex<Vec<String>>,
@@ -265,6 +289,22 @@ mod tests {
         ) -> Result<(), CommentsApiError> {
             self.record(&format!("delete:{comment_id}"), Some(token));
             self.delete.lock().unwrap().take().unwrap_or(Ok(()))
+        }
+        fn report(
+            &self,
+            _mod_id: &str,
+            comment_id: &str,
+            reason: ReportReason,
+            details: Option<&str>,
+            token: &SessionToken,
+        ) -> Result<(), CommentsApiError> {
+            self.record(&format!("report:{comment_id}"), Some(token));
+            self.reports.lock().unwrap().push((
+                comment_id.into(),
+                reason.as_str().into(),
+                details.map(Into::into),
+            ));
+            self.report.lock().unwrap().take().unwrap_or(Ok(()))
         }
     }
 
@@ -456,6 +496,81 @@ mod tests {
     }
 
     #[test]
+    fn reporting_sends_the_reason_and_trimmed_details_with_the_token() {
+        let (api, store, avatars) = setup();
+        let svc = service(&api, &store, &avatars);
+        svc.report(
+            "livery",
+            "c9",
+            ReportReason::OffTopic,
+            Some("  not a livery  "),
+        )
+        .unwrap();
+        svc.report("livery", "c9", ReportReason::Spam, Some("   "))
+            .unwrap();
+        assert_eq!(
+            *api.reports.lock().unwrap(),
+            vec![
+                (
+                    "c9".to_string(),
+                    "off_topic".to_string(),
+                    Some("not a livery".to_string())
+                ),
+                ("c9".to_string(), "spam".to_string(), None),
+            ]
+        );
+        assert_eq!(
+            api.calls.lock().unwrap()[0],
+            ("report:c9".to_string(), Some(TOKEN.to_string()))
+        );
+    }
+
+    #[test]
+    fn reporting_rejects_bad_input_before_any_request() {
+        let (api, store, avatars) = setup();
+        let svc = service(&api, &store, &avatars);
+        let long = "a".repeat(501);
+        assert_eq!(
+            svc.report("livery", "c", ReportReason::Other, Some(&long)),
+            Err(CommentsError::Invalid)
+        );
+        assert_eq!(
+            svc.report("Bad Id", "c", ReportReason::Other, None),
+            Err(CommentsError::Invalid)
+        );
+        assert!(api.calls.lock().unwrap().is_empty());
+    }
+
+    #[test]
+    fn reporting_signed_out_fails_without_a_request_and_a_401_forgets_the_session() {
+        let (api, _, avatars) = setup();
+        let empty = Arc::new(FakeStore::default());
+        assert_eq!(
+            service(&api, &empty, &avatars).report("livery", "c", ReportReason::Spam, None),
+            Err(CommentsError::SignedOut)
+        );
+        assert!(api.calls.lock().unwrap().is_empty());
+        let (api, store, avatars) = setup();
+        *api.report.lock().unwrap() = Some(Err(CommentsApiError::Unauthorized));
+        assert_eq!(
+            service(&api, &store, &avatars).report("livery", "c", ReportReason::Spam, None),
+            Err(CommentsError::SignedOut)
+        );
+        assert!(!store.has_token());
+    }
+
+    #[test]
+    fn a_banned_report_surfaces_as_banned_and_keeps_the_session() {
+        let (api, store, avatars) = setup();
+        *api.report.lock().unwrap() = Some(Err(CommentsApiError::Banned));
+        assert_eq!(
+            service(&api, &store, &avatars).report("livery", "c", ReportReason::Abuse, None),
+            Err(CommentsError::Banned)
+        );
+        assert!(store.has_token());
+    }
+
+    #[test]
     fn server_failures_map_to_the_use_case_errors() {
         let cases = [
             (
@@ -467,6 +582,7 @@ mod tests {
                 },
             ),
             (CommentsApiError::NotFound, CommentsError::NotFound),
+            (CommentsApiError::Banned, CommentsError::Banned),
             (CommentsApiError::Invalid, CommentsError::Invalid),
             (
                 CommentsApiError::Unreachable("x".into()),

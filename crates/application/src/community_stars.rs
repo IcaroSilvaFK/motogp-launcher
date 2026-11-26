@@ -62,6 +62,7 @@ fn map_error(error: CommunityApiError) -> CommunityError {
         CommunityApiError::Unauthorized => CommunityError::SignedOut,
         CommunityApiError::Unreachable(_) => CommunityError::Offline,
         CommunityApiError::Protocol(_) => CommunityError::RequestFailed,
+        CommunityApiError::Banned => CommunityError::Banned,
     }
 }
 
@@ -209,6 +210,7 @@ mod tests {
     fn server_errors_map_to_community_errors() {
         let cases = [
             (CommunityApiError::Unauthorized, CommunityError::SignedOut),
+            (CommunityApiError::Banned, CommunityError::Banned),
             (
                 CommunityApiError::Unreachable("x".into()),
                 CommunityError::Offline,

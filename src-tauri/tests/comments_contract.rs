@@ -8,7 +8,7 @@ use motogp_application::{
     ApiComment, ApiCommentsPage, CommentsApiError, CommunityCommentsApi, CredentialError,
     CredentialStore,
 };
-use motogp_domain::SessionToken;
+use motogp_domain::{ReportReason, SessionToken};
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex};
 
@@ -31,6 +31,9 @@ struct ScriptedApi {
     page: Mutex<Option<Result<ApiCommentsPage, CommentsApiError>>>,
     write: Mutex<Option<Result<ApiComment, CommentsApiError>>>,
     delete: Mutex<Option<Result<(), CommentsApiError>>>,
+    report: Mutex<Option<Result<(), CommentsApiError>>>,
+    /// (comment id, reason, details) of each report.
+    reports: Mutex<Vec<(String, String, Option<String>)>>,
     /// The token each call carried (`None` when the call had none).
     tokens: Mutex<Vec<Option<String>>>,
     bodies: Mutex<Vec<String>>,
@@ -103,6 +106,22 @@ impl CommunityCommentsApi for ScriptedApi {
     ) -> Result<(), CommentsApiError> {
         self.see(Some(token));
         self.delete.lock().unwrap().take().unwrap_or(Ok(()))
+    }
+    fn report(
+        &self,
+        _mod_id: &str,
+        comment_id: &str,
+        reason: ReportReason,
+        details: Option<&str>,
+        token: &SessionToken,
+    ) -> Result<(), CommentsApiError> {
+        self.see(Some(token));
+        self.reports.lock().unwrap().push((
+            comment_id.to_string(),
+            reason.as_str().to_string(),
+            details.map(str::to_string),
+        ));
+        self.report.lock().unwrap().take().unwrap_or(Ok(()))
     }
 }
 
@@ -401,4 +420,78 @@ fn the_default_composition_reads_offline() {
     let h = Harness::new();
     let error = invoke(&h, "community_comments_list", json!({ "modId": "m" })).unwrap_err();
     assert_eq!(error["code"], json!("community_offline"));
+}
+
+#[test]
+fn reporting_sends_the_reason_and_details_and_answers_null() {
+    let api = Arc::new(ScriptedApi::default());
+    let h = harness(&api, &MemoryStore::holding(TOKEN));
+    let answer = invoke(
+        &h,
+        "community_report_comment",
+        json!({ "modId": "m", "commentId": "c1", "reason": "off_topic", "details": " nope " }),
+    )
+    .unwrap();
+    assert_eq!(answer, Value::Null);
+    assert_eq!(
+        *api.reports.lock().unwrap(),
+        vec![(
+            "c1".to_string(),
+            "off_topic".to_string(),
+            Some("nope".to_string())
+        )]
+    );
+    assert_eq!(
+        api.tokens.lock().unwrap().last().unwrap().as_deref(),
+        Some(TOKEN)
+    );
+}
+
+#[test]
+fn reporting_signed_out_or_with_an_unknown_reason_makes_no_call() {
+    let api = Arc::new(ScriptedApi::default());
+    let h = harness(&api, &Arc::default());
+    let error = invoke(
+        &h,
+        "community_report_comment",
+        json!({ "modId": "m", "commentId": "c1", "reason": "spam" }),
+    )
+    .unwrap_err();
+    assert_eq!(error["code"], json!("community_signed_out"));
+    let h = harness(&api, &MemoryStore::holding(TOKEN));
+    let error = invoke(
+        &h,
+        "community_report_comment",
+        json!({ "modId": "m", "commentId": "c1", "reason": "boring" }),
+    )
+    .unwrap_err();
+    assert_eq!(error["code"], json!("comment_invalid"));
+    assert_eq!(api.calls(), 0);
+}
+
+#[test]
+fn a_banned_account_gets_the_suspension_message_on_every_write() {
+    let api = Arc::new(ScriptedApi::default());
+    *api.write.lock().unwrap() = Some(Err(CommentsApiError::Banned));
+    *api.report.lock().unwrap() = Some(Err(CommentsApiError::Banned));
+    let store = MemoryStore::holding(TOKEN);
+    let h = harness(&api, &store);
+    for (cmd, body) in [
+        (
+            "community_comment_post",
+            json!({ "modId": "m", "body": "x" }),
+        ),
+        (
+            "community_report_comment",
+            json!({ "modId": "m", "commentId": "c1", "reason": "spam" }),
+        ),
+    ] {
+        let error = invoke(&h, cmd, body).unwrap_err();
+        assert_eq!(error["code"], json!("community_banned"), "{cmd}");
+        assert_eq!(
+            error["message"],
+            json!("Your community account is suspended, so you can't post, star or publish.")
+        );
+    }
+    assert!(store.has_token(), "a ban does not sign the member out");
 }

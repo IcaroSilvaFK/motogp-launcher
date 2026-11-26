@@ -23,7 +23,7 @@ pub fn status_of(error: &AppError) -> StatusCode {
         | AppError::InvalidCode
         | AppError::UnsupportedFile(_)
         | AppError::ChecksumMismatch => StatusCode::BAD_REQUEST,
-        AppError::Forbidden => StatusCode::FORBIDDEN,
+        AppError::Forbidden | AppError::Banned => StatusCode::FORBIDDEN,
         AppError::ModIdTaken
         | AppError::VersionExists
         | AppError::OffsetMismatch { .. }
@@ -97,6 +97,7 @@ mod tests {
             (AppError::DiscordUnavailable, 502, "discord_unavailable"),
             (AppError::Internal("boom".into()), 500, "internal"),
             (AppError::Forbidden, 403, "forbidden"),
+            (AppError::Banned, 403, "banned"),
             (AppError::ModIdTaken, 409, "mod_id_taken"),
             (AppError::VersionExists, 409, "version_exists"),
             (

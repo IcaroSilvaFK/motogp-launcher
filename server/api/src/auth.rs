@@ -21,7 +21,7 @@ use axum::http::{HeaderMap, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
-use community_application::auth::CallbackParams;
+use community_application::auth::{CallbackOutcome, CallbackParams};
 use community_application::AppError;
 use community_domain::{SessionToken, User};
 use serde::Deserialize;
@@ -129,22 +129,43 @@ pub struct CallbackQuery {
     error: Option<String>,
 }
 
-/// `GET /auth/discord/callback`: 302 to the app's loopback with the one-time code.
+/// `GET /auth/discord/callback`: 302 to the app's loopback with the one-time
+/// code, or (for an admin web sign-in) the admin session page.
 async fn callback(
     State(app): State<AppState>,
+    headers: HeaderMap,
     query: Result<Query<CallbackQuery>, QueryRejection>,
-) -> Result<Response, ApiError> {
+) -> Result<Response, Response> {
+    // A browser that started an admin sign-in carries the `admin_login` cookie:
+    // show its errors as a page instead of JSON.
+    let admin_cookie = crate::admin_web::cookie_value(&headers, "admin_login");
+    let fail = |error: AppError| -> Response {
+        if admin_cookie.is_some() {
+            crate::admin_web::error_page(&error)
+        } else {
+            ApiError(error).into_response()
+        }
+    };
     let Query(query) =
-        query.map_err(|_| AppError::BadRequest("The query string is invalid.".into()))?;
-    let location = app
+        query.map_err(|_| fail(AppError::BadRequest("The query string is invalid.".into())))?;
+    let outcome = app
         .auth
-        .callback(CallbackParams {
-            code: query.code,
-            error: query.error,
-            state: query.state,
-        })
-        .await?;
-    found(&location)
+        .finish_callback(
+            CallbackParams {
+                code: query.code,
+                error: query.error,
+                state: query.state,
+            },
+            admin_cookie,
+        )
+        .await
+        .map_err(fail)?;
+    match outcome {
+        CallbackOutcome::App { location } => found(&location).map_err(IntoResponse::into_response),
+        CallbackOutcome::Admin { user } => crate::admin_web::finish_login(&app, user)
+            .await
+            .map_err(fail),
+    }
 }
 
 #[derive(Deserialize)]

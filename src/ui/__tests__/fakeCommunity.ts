@@ -3,7 +3,7 @@
 import { vi } from 'vitest';
 import type { CommunityAccount, ModComments } from '../../application';
 import { MAX_COMMENT_LENGTH, ModCommentsError } from '../../domain';
-import type { CommentsPage, CommunityStatus, ModComment } from '../../domain';
+import type { CommentsPage, CommunityStatus, ModComment, ReportReason } from '../../domain';
 
 export const PAGE_SIZE = 20;
 export const ME = 'rider';
@@ -85,6 +85,26 @@ export class FakeModComments implements ModComments {
     return Promise.resolve();
   });
 
+  /** Reports recorded by the fake server: one per (reporter, comment). */
+  readonly reports: { commentId: string; reason: ReportReason; details: string | null }[] = [];
+  /** A banned account: every write (post, edit, remove, report) answers `banned`. */
+  banned = false;
+
+  readonly report = vi.fn(
+    (_modId: string, commentId: string, reason: ReportReason, details?: string): Promise<void> => {
+      const refused = this.refuseWrite(null);
+      if (refused) return Promise.reject(refused);
+      const comment = this.stored.find((c) => c.id === commentId);
+      // An unknown comment and your own comment are both refused, like the server does.
+      if (!comment) return Promise.reject(new ModCommentsError('not_found'));
+      if (comment.author === this.account.name()) return Promise.reject(new ModCommentsError('invalid'));
+      if (!this.reports.some((r) => r.commentId === commentId)) {
+        this.reports.push({ commentId, reason, details: details?.trim() || null });
+      }
+      return Promise.resolve();
+    },
+  );
+
   /** Seeds a comment as if it were stored on the server earlier. */
   add(author: string, body: string, createdAtMs = Date.now() - 2 * HOUR, avatar: string | null = null): Stored {
     const comment: Stored = { id: `c${this.nextId++}`, author, avatar, body, createdAtMs, edited: false };
@@ -109,6 +129,7 @@ export class FakeModComments implements ModComments {
   private refuseWrite(body: string | null): ModCommentsError | null {
     if (this.offline) return new ModCommentsError('offline');
     if (this.account.name() === null) return new ModCommentsError('signed_out');
+    if (this.banned) return new ModCommentsError('banned');
     if (this.writes >= this.writeLimit) return new ModCommentsError('rate_limited', 42);
     if (body !== null) {
       const trimmed = body.trim();

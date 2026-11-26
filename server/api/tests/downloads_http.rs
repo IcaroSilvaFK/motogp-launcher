@@ -47,6 +47,11 @@ async fn setup(trust: bool) -> Setup {
         stars: star_service(store.clone()),
         downloads: downloads_state(store.clone(), clock.clone()),
         mods: community_api::testing::unused_mod_hosting(store.clone(), clock.clone()),
+        moderation: community_api::testing::moderation_service(
+            store.clone(),
+            clock.clone(),
+            Vec::new(),
+        ),
         comments: comments_state(store.clone(), clock.clone()),
     };
     Setup {

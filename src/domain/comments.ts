@@ -31,9 +31,11 @@ export interface CommentsPage {
  * Why a comment operation failed. `offline`: the server could not be reached; `signed_out`: a write
  * needs a session (the stored one is already forgotten when the server rejected it); `rate_limited`:
  * too many writes, see `retryAfterSecs`; `invalid`: empty, too long or otherwise refused; `not_found`:
- * the comment is gone; `failed`: anything else.
+ * the comment is gone; `banned`: the community account is suspended from writes (the session stays valid);
+ * `failed`: anything else.
  */
-export type ModCommentsErrorCode = 'offline' | 'signed_out' | 'rate_limited' | 'invalid' | 'not_found' | 'failed';
+export type ModCommentsErrorCode =
+  'offline' | 'signed_out' | 'rate_limited' | 'invalid' | 'not_found' | 'banned' | 'failed';
 
 /** Rejection of every `ModComments` call, carrying a typed code the UI can translate. */
 export class ModCommentsError extends Error {
@@ -55,6 +57,7 @@ const BACKEND_CODES: Record<string, ModCommentsErrorCode> = {
   comment_rate_limited: 'rate_limited',
   comment_invalid: 'invalid',
   comment_not_found: 'not_found',
+  community_banned: 'banned',
 };
 
 // The backend writes "... Try again in <N> seconds." into the message of `comment_rate_limited`.
@@ -115,3 +118,12 @@ export function commentDraftProblem(text: string): 'empty' | 'too_long' | null {
   if (trimmed === '') return 'empty';
   return [...trimmed].length > MAX_COMMENT_LENGTH ? 'too_long' : null;
 }
+
+/** Why a member reports a comment (the server's wire values). */
+export type ReportReason = 'spam' | 'abuse' | 'off_topic' | 'other';
+
+/** Every report reason, in the order a picker shows them. */
+export const REPORT_REASONS: readonly ReportReason[] = ['spam', 'abuse', 'off_topic', 'other'];
+
+/** Longest optional detail text of a report, in characters (the server enforces the same cap). */
+export const MAX_REPORT_DETAILS_LENGTH = 500;

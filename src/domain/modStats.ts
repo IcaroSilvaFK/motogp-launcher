@@ -8,8 +8,8 @@ export interface ModStats {
   starredByMe?: boolean;
 }
 
-/** Why a star or unstar did not go through. */
-export type ModStatsErrorKind = 'signedOut' | 'offline' | 'failed';
+/** Why a star or unstar did not go through (`banned`: the community account is suspended). */
+export type ModStatsErrorKind = 'signedOut' | 'offline' | 'banned' | 'failed';
 
 /** Rejection of `ModStatsSource.star` / `unstar`, carrying a typed kind the UI can act on. */
 export class ModStatsError extends Error {
@@ -25,6 +25,7 @@ export class ModStatsError extends Error {
 const BACKEND_KINDS: Record<string, ModStatsErrorKind> = {
   community_signed_out: 'signedOut',
   community_offline: 'offline',
+  community_banned: 'banned',
 };
 
 /** Maps a rejected IPC error (`{ code, message }`) to a typed error; anything unknown is `failed`. */

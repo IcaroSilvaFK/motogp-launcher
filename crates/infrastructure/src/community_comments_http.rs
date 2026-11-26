@@ -7,7 +7,7 @@
 use crate::community_http::{describe, percent_encode, MAX_BODY_BYTES};
 use crate::HttpCommunityApi;
 use motogp_application::{ApiComment, ApiCommentsPage, CommentsApiError, CommunityCommentsApi};
-use motogp_domain::SessionToken;
+use motogp_domain::{ReportReason, SessionToken};
 use reqwest::blocking::{RequestBuilder, Response};
 use reqwest::header::{CONTENT_TYPE, RETRY_AFTER};
 use reqwest::StatusCode;
@@ -135,6 +135,8 @@ fn status_error(response: &Response) -> CommentsApiError {
         StatusCode::BAD_REQUEST => CommentsApiError::Invalid,
         StatusCode::UNAUTHORIZED => CommentsApiError::Unauthorized,
         StatusCode::NOT_FOUND => CommentsApiError::NotFound,
+        // The only 403 the comment routes answer is `banned`.
+        StatusCode::FORBIDDEN => CommentsApiError::Banned,
         StatusCode::TOO_MANY_REQUESTS => {
             let retry_after_secs = response
                 .headers()
@@ -254,6 +256,28 @@ impl CommunityCommentsApi for HttpCommunityApi {
             self.client
                 .delete(self.url(&comment_path(mod_id, comment_id)))
                 .bearer_auth(token.expose()),
+        )?;
+        ok(response).map(drop)
+    }
+
+    fn report(
+        &self,
+        mod_id: &str,
+        comment_id: &str,
+        reason: ReportReason,
+        details: Option<&str>,
+        token: &SessionToken,
+    ) -> Result<(), CommentsApiError> {
+        let mut body = serde_json::json!({ "reason": reason.as_str() });
+        if let Some(details) = details {
+            body["details"] = details.into();
+        }
+        let response = send(
+            self.client
+                .post(self.url(&format!("{}/reports", comment_path(mod_id, comment_id))))
+                .bearer_auth(token.expose())
+                .header(CONTENT_TYPE, "application/json")
+                .body(body.to_string()),
         )?;
         ok(response).map(drop)
     }
@@ -388,11 +412,47 @@ mod tests {
     }
 
     #[test]
+    fn report_posts_the_reason_and_details_to_the_reports_path() {
+        let (base, requests) = serve_once("204 No Content", "");
+        api(&base)
+            .report(
+                "livery",
+                "a/b",
+                ReportReason::OffTopic,
+                Some("not a \"livery\""),
+                &token(),
+            )
+            .unwrap();
+        let request = requests.recv().unwrap();
+        assert!(request.starts_with("POST /mods/livery/comments/a%2Fb/reports "));
+        assert!(request.contains("tok-SECRET-123"));
+        assert!(request.contains(r#"{"details":"not a \"livery\"","reason":"off_topic"}"#));
+    }
+
+    #[test]
+    fn report_without_details_omits_the_field_and_maps_a_ban() {
+        let (base, requests) = serve_once("204 No Content", "");
+        api(&base)
+            .report("livery", "c1", ReportReason::Spam, None, &token())
+            .unwrap();
+        assert!(requests.recv().unwrap().contains(r#"{"reason":"spam"}"#));
+        let (base, _) = serve_once(
+            "403 Forbidden",
+            r#"{"error":{"code":"banned","message":"x"}}"#,
+        );
+        assert_eq!(
+            api(&base).report("livery", "c1", ReportReason::Spam, None, &token()),
+            Err(CommentsApiError::Banned)
+        );
+    }
+
+    #[test]
     fn statuses_map_to_typed_errors() {
         let cases = [
             ("400 Bad Request", CommentsApiError::Invalid),
             ("401 Unauthorized", CommentsApiError::Unauthorized),
             ("404 Not Found", CommentsApiError::NotFound),
+            ("403 Forbidden", CommentsApiError::Banned),
             (
                 "429 Too Many Requests\r\nRetry-After: 12",
                 CommentsApiError::RateLimited {

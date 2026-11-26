@@ -67,9 +67,11 @@ impl CommunityAuthService {
                 self.store.delete()?;
                 Ok(CommunityStatus::SignedOut)
             }
-            Err(CommunityApiError::Unreachable(_) | CommunityApiError::Protocol(_)) => {
-                Ok(CommunityStatus::Offline)
-            }
+            Err(
+                CommunityApiError::Unreachable(_)
+                | CommunityApiError::Protocol(_)
+                | CommunityApiError::Banned,
+            ) => Ok(CommunityStatus::Offline),
         }
     }
 

@@ -57,6 +57,31 @@ describe('createTauriModComments', () => {
     for (const call of invokeMock.mock.calls) expect(JSON.stringify(call)).not.toMatch(/token/i);
   });
 
+  it('reports a comment over IPC with trimmed details and resolves with nothing', async () => {
+    invokeMock.mockResolvedValueOnce(null);
+    await expect(createTauriModComments().report('m', 'c1', 'off_topic', '  not a livery ')).resolves.toBeUndefined();
+    expect(invokeMock).toHaveBeenCalledWith('community_report_comment', {
+      modId: 'm',
+      commentId: 'c1',
+      reason: 'off_topic',
+      details: 'not a livery',
+    });
+    invokeMock.mockResolvedValueOnce(null);
+    await createTauriModComments().report('m', 'c1', 'spam', '   ');
+    expect(invokeMock).toHaveBeenLastCalledWith('community_report_comment', {
+      modId: 'm',
+      commentId: 'c1',
+      reason: 'spam',
+    });
+  });
+
+  it('maps a suspended account to banned', async () => {
+    invokeMock.mockRejectedValueOnce({ code: 'community_banned', message: 'x' });
+    expect((await rejection(createTauriModComments().report('m', 'c', 'abuse'))).code).toBe('banned');
+    invokeMock.mockRejectedValueOnce({ code: 'community_banned', message: 'x' });
+    expect((await rejection(createTauriModComments().post('m', 'x'))).code).toBe('banned');
+  });
+
   it('turns backend errors into typed errors', async () => {
     invokeMock.mockRejectedValueOnce({ code: 'community_offline', message: 'x' });
     expect((await rejection(createTauriModComments().list('m'))).code).toBe('offline');

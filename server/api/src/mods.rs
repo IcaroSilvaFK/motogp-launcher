@@ -196,7 +196,7 @@ async fn mine(
     Ok(Json(json!({ "mods": mods })))
 }
 
-fn escape_html(text: &str) -> String {
+pub fn escape_html(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
     for ch in text.chars() {
         match ch {

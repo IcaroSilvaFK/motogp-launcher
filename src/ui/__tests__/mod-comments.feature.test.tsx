@@ -278,7 +278,14 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     });
 
     Then('it has no edit or delete actions', () => {
-      expect(itemWith('Not yours').queryByRole('button')).not.toBeInTheDocument();
+      // Someone else's comment only offers Report (#121); nothing that changes it.
+      expect(itemWith('Not yours').queryByRole('button', { name: 'Edit' })).not.toBeInTheDocument();
+      expect(itemWith('Not yours').queryByRole('button', { name: 'Delete' })).not.toBeInTheDocument();
+      expect(
+        itemWith('Not yours')
+          .getAllByRole('button')
+          .map((b) => b.textContent),
+      ).toEqual(['Report']);
       expect(itemWith('Mine').getByRole('button', { name: 'Edit' })).toBeInTheDocument();
       expect(itemWith('Mine').getByRole('button', { name: 'Delete' })).toBeInTheDocument();
     });
@@ -345,6 +352,146 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       const region = screen.getByRole('region', { name: 'Comments' });
       expect(region.querySelector('[onerror]')).toBeNull();
       expect(region.querySelectorAll('img')).toHaveLength(0);
+    });
+  });
+
+  Scenario('Reporting from the launcher', ({ Given, When, Then, And }) => {
+    let world: World;
+
+    Given("a signed-in user viewing someone else's comment", async () => {
+      world = setUp(signedIn());
+      world.comments.add('Ana', 'Buy cheap coins here');
+      openPage(world);
+      await waitFor(() => expect(items()).toHaveLength(1));
+    });
+
+    When('they choose Report, pick "Spam" and confirm', async () => {
+      const report = itemWith('Buy cheap coins here').getByRole('button', { name: 'Report' });
+      expect(report).toHaveAttribute('aria-expanded', 'false');
+      await world.user.click(report);
+      expect(report).toHaveAttribute('aria-expanded', 'true');
+      const picker = area().getByRole('form', { name: 'Report this comment' });
+      // The first reason takes focus; Send waits for a choice.
+      expect(within(picker).getByRole('radio', { name: 'Spam' })).toHaveFocus();
+      expect(within(picker).getByRole('button', { name: 'Send report' })).toBeDisabled();
+      expect(
+        within(picker)
+          .getAllByRole('radio')
+          .map((r) => r.getAttribute('value')),
+      ).toEqual(['spam', 'abuse', 'off_topic', 'other']);
+      expect(within(picker).getByRole('radio', { name: 'Abuse or harassment' })).toBeInTheDocument();
+      expect(within(picker).getByRole('radio', { name: 'Off-topic' })).toBeInTheDocument();
+      expect(within(picker).getByRole('radio', { name: 'Other' })).toBeInTheDocument();
+      await world.user.click(within(picker).getByRole('radio', { name: 'Spam' }));
+      await world.user.click(within(picker).getByRole('button', { name: 'Send report' }));
+    });
+
+    Then('the comment shows as reported', async () => {
+      const reported = await itemWith('Buy cheap coins here').findByRole('button', { name: 'Reported' });
+      expect(reported).toHaveAttribute('aria-disabled', 'true');
+      expect(reported).toHaveFocus();
+      expect(itemWith('Buy cheap coins here').getByRole('status')).toHaveTextContent(
+        'Thanks. The moderators will review this comment.',
+      );
+      expect(area().queryByRole('form', { name: 'Report this comment' })).not.toBeInTheDocument();
+      expect(world.comments.reports).toEqual([{ commentId: 'c1', reason: 'spam', details: null }]);
+    });
+
+    And('the report cannot be sent twice', async () => {
+      await world.user.click(itemWith('Buy cheap coins here').getByRole('button', { name: 'Reported' }));
+      expect(area().queryByRole('form', { name: 'Report this comment' })).not.toBeInTheDocument();
+      expect(world.comments.report).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  Scenario("Only other people's comments can be reported, and only when signed in", ({ Given, Then, And }) => {
+    let world: World;
+
+    Given('a mod has a comment by another user and one by the user', async () => {
+      world = setUp(signedIn());
+      world.comments.add('Ana', 'Theirs');
+      world.comments.add(ME, 'Mine');
+      openPage(world);
+      await waitFor(() => expect(items()).toHaveLength(2));
+    });
+
+    Then('their own comment has no Report action', () => {
+      expect(itemWith('Mine').queryByRole('button', { name: 'Report' })).not.toBeInTheDocument();
+      expect(itemWith('Theirs').getByRole('button', { name: 'Report' })).toBeInTheDocument();
+    });
+
+    And('signed out, no comment has a Report action', async () => {
+      cleanup();
+      world.account.current = signedOut();
+      openPage(world);
+      await waitFor(() => expect(items()).toHaveLength(2));
+      expect(area().queryByRole('button', { name: 'Report' })).not.toBeInTheDocument();
+    });
+  });
+
+  Scenario('A failed report is explained inside the picker', ({ Given, When, Then }) => {
+    let world: World;
+
+    Given('a signed-in user is reporting a comment', async () => {
+      world = setUp(signedIn());
+      world.comments.add('Ana', 'Rude words');
+      openPage(world);
+      await waitFor(() => expect(items()).toHaveLength(1));
+      await world.user.click(itemWith('Rude words').getByRole('button', { name: 'Report' }));
+    });
+
+    When('the server refuses it because they are writing too fast', async () => {
+      world.comments.writeLimit = 0;
+      const picker = area().getByRole('form', { name: 'Report this comment' });
+      await world.user.click(within(picker).getByRole('radio', { name: 'Abuse or harassment' }));
+      await world.user.type(within(picker).getByRole('textbox', { name: 'Details (optional)' }), 'Insults');
+      await world.user.click(within(picker).getByRole('button', { name: 'Send report' }));
+    });
+
+    Then('the picker says so and keeps the chosen reason', async () => {
+      const picker = area().getByRole('form', { name: 'Report this comment' });
+      expect(await within(picker).findByRole('alert')).toHaveTextContent(
+        'Slow down: you can comment again in 42 seconds.',
+      );
+      // One message, inside the picker: not repeated above the composer.
+      expect(area().getAllByRole('alert')).toHaveLength(1);
+      expect(within(picker).getByRole('radio', { name: 'Abuse or harassment' })).toBeChecked();
+      expect(within(picker).getByRole('textbox', { name: 'Details (optional)' })).toHaveValue('Insults');
+      expect(itemWith('Rude words').queryByRole('button', { name: 'Reported' })).not.toBeInTheDocument();
+    });
+  });
+
+  Scenario('A banned user sees the suspension message', ({ Given, When, Then, And }) => {
+    let world: World;
+
+    Given("the user's community account is suspended", async () => {
+      world = setUp(signedIn());
+      world.comments.banned = true;
+      world.comments.add('Ana', 'Hello');
+      world.comments.add(ME, 'Mine');
+      openPage(world);
+      await waitFor(() => expect(items()).toHaveLength(2));
+    });
+
+    When('they try to post a comment', async () => {
+      await post(world, 'Hi there');
+    });
+
+    Then('the comments area explains the suspension calmly', async () => {
+      const notice = await area().findByRole('status', { name: 'Account suspended' });
+      expect(notice).toHaveTextContent(
+        "Your community account is suspended, so you can't post, edit or report comments. You can still read them.",
+      );
+      // Calm: a status, not an alert, and the comments stay readable.
+      expect(area().queryByRole('alert')).not.toBeInTheDocument();
+      expect(bodies()).toEqual(['Hello', 'Mine']);
+    });
+
+    And('the composer and the write actions are gone', () => {
+      expect(area().queryByRole('textbox')).not.toBeInTheDocument();
+      for (const name of ['Report', 'Edit', 'Delete', 'Post comment']) {
+        expect(area().queryByRole('button', { name })).not.toBeInTheDocument();
+      }
     });
   });
 });

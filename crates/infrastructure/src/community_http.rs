@@ -123,7 +123,9 @@ pub(crate) fn describe(error: &reqwest::Error) -> String {
 
 /// Maps a non-success status to the port's error type.
 pub(crate) fn status_error(status: StatusCode) -> CommunityApiError {
-    if status == StatusCode::UNAUTHORIZED {
+    if status == StatusCode::FORBIDDEN {
+        CommunityApiError::Banned
+    } else if status == StatusCode::UNAUTHORIZED {
         CommunityApiError::Unauthorized
     } else if status.is_server_error() {
         CommunityApiError::Unreachable(format!("HTTP {}", status.as_u16()))

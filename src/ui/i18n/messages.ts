@@ -3,6 +3,7 @@ import type {
   Locale,
   PublishErrorCode,
   PublishFormErrorKey,
+  ReportReason,
   StorageCategory,
   UpdateErrorKind,
   VersionStatus,
@@ -331,6 +332,8 @@ export interface Messages {
     signInPrompt: string;
     notNow: string;
     failed: string;
+    /** The star was refused because the community account is suspended (#121). */
+    banned: string;
   };
   /** Mod page > Comments (#118). */
   comments: {
@@ -363,12 +366,26 @@ export interface Messages {
     delete: string;
     confirmDelete: string;
     dismiss: string;
+    /** Report someone else's comment (#121). */
+    report: string;
+    reportTitle: string;
+    reportReasonsLegend: string;
+    reportReasons: Record<ReportReason, string>;
+    reportDetails: string;
+    reportDetailsPlaceholder: string;
+    reportSend: string;
+    reported: string;
+    reportedStatus: string;
+    reportInvalid: string;
+    /** Shown in place of the composer once the server says the account is suspended. */
+    suspendedTitle: string;
     errors: {
       offline: string;
       signed_out: string;
       rate_limited: (seconds: number) => string;
       invalid: string;
       not_found: string;
+      banned: string;
       failed: string;
     };
   };

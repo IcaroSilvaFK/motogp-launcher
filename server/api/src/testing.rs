@@ -184,8 +184,9 @@ pub fn mod_hosting(
         service: Arc::new(community_application::ModHostingService {
             clock,
             tokens: Arc::new(OsTokenGenerator),
-            repo: store,
+            repo: store.clone(),
             storage: Arc::new(storage),
+            audit: store,
             admin_discord_ids,
             limits,
         }),
@@ -210,4 +211,21 @@ pub fn unused_mod_hosting(
             uploads_per_day: 1,
         },
     )
+}
+
+/// The real moderation service over the SQLite store. Admins are the given Discord ids.
+pub fn moderation_service(
+    store: Arc<SqliteStore>,
+    clock: Arc<dyn Clock>,
+    admin_discord_ids: Vec<DiscordId>,
+) -> Arc<community_application::ModerationService> {
+    Arc::new(community_application::ModerationService {
+        clock,
+        tokens: Arc::new(OsTokenGenerator),
+        repo: store.clone(),
+        audit: store.clone(),
+        comments: store.clone(),
+        users: store,
+        admin_discord_ids,
+    })
 }

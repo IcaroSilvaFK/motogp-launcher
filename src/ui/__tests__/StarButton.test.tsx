@@ -51,6 +51,17 @@ describe('StarButton', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
   });
 
+  it('explains a suspended account instead of the generic failure', async () => {
+    const user = userEvent.setup();
+    renderStar(source({ star: () => Promise.reject(new ModStatsError('banned')) }), account(SIGNED_IN));
+    await user.click(await screen.findByRole('button', { name: 'Star' }));
+    expect(await screen.findByRole('status')).toHaveTextContent(
+      "Your community account is suspended, so you can't star mods.",
+    );
+    expect(screen.queryByText('Could not update the star. Try again.')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Star' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
   it('reverts and says so when the star fails', async () => {
     const user = userEvent.setup();
     renderStar(source({ star: () => Promise.reject(new ModStatsError('offline')) }), account(SIGNED_IN));

@@ -56,3 +56,25 @@ Feature: Mod comments
   Scenario: No raw HTML
     Given a comment body "<img src=x onerror=alert(1)>"
     Then it is shown as text, not as an element
+
+  Scenario: Reporting from the launcher
+    Given a signed-in user viewing someone else's comment
+    When they choose Report, pick "Spam" and confirm
+    Then the comment shows as reported
+    And the report cannot be sent twice
+
+  Scenario: Only other people's comments can be reported, and only when signed in
+    Given a mod has a comment by another user and one by the user
+    Then their own comment has no Report action
+    And signed out, no comment has a Report action
+
+  Scenario: A failed report is explained inside the picker
+    Given a signed-in user is reporting a comment
+    When the server refuses it because they are writing too fast
+    Then the picker says so and keeps the chosen reason
+
+  Scenario: A banned user sees the suspension message
+    Given the user's community account is suspended
+    When they try to post a comment
+    Then the comments area explains the suspension calmly
+    And the composer and the write actions are gone

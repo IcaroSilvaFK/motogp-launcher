@@ -9,6 +9,8 @@ pub enum CommunityApiError {
     Unauthorized,
     /// DNS, connection, timeout or TLS failure, or a 5xx answer.
     Unreachable(String),
+    /// HTTP 403: the account is banned from community writes.
+    Banned,
     /// The server answered, but not with the documented contract
     /// (including 400 `invalid_code`).
     Protocol(String),
@@ -18,6 +20,7 @@ impl fmt::Display for CommunityApiError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             CommunityApiError::Unauthorized => write!(f, "the session is not valid"),
+            CommunityApiError::Banned => write!(f, "the account is banned from community writes"),
             CommunityApiError::Unreachable(detail) => {
                 write!(f, "the community server is unreachable: {detail}")
             }
@@ -80,6 +83,8 @@ pub enum CommunityError {
     /// The server answered, but the request did not go through (for example a
     /// rate limit).
     RequestFailed,
+    /// The account is banned from community writes (stars).
+    Banned,
 }
 
 impl fmt::Display for CommunityError {
@@ -92,6 +97,7 @@ impl fmt::Display for CommunityError {
             CommunityError::Credential(error) => write!(f, "{error}"),
             CommunityError::SignedOut => write!(f, "sign in to the community first"),
             CommunityError::RequestFailed => write!(f, "the community request failed"),
+            CommunityError::Banned => write!(f, "the community account is banned"),
         }
     }
 }
@@ -117,6 +123,7 @@ mod tests {
             .to_string()
             .contains("junk"));
         assert!(!CommunityApiError::Unauthorized.to_string().is_empty());
+        assert!(!CommunityApiError::Banned.to_string().is_empty());
         assert!(LoopbackError::Io("bind".into())
             .to_string()
             .contains("bind"));
@@ -129,6 +136,7 @@ mod tests {
             CommunityError::from(CredentialError("locked".into())),
             CommunityError::SignedOut,
             CommunityError::RequestFailed,
+            CommunityError::Banned,
         ];
         assert!(all.iter().all(|e| !e.to_string().is_empty()));
         assert!(all[4].to_string().contains("locked"));

@@ -62,6 +62,7 @@ describe('createTauriModStats.star / unstar', () => {
   it.each([
     ['community_signed_out', 'signedOut'],
     ['community_offline', 'offline'],
+    ['community_banned', 'banned'],
     ['community_request_failed', 'failed'],
     ['something_else', 'failed'],
   ])('maps the backend code %s to %s', async (code, kind) => {

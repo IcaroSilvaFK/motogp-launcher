@@ -62,3 +62,8 @@ Feature: Publishing a mod to the community server from the launcher
     Given the creator is signed in and opens the publish form
     When they press Escape
     Then Discover lists the mods again
+
+  Scenario: A suspended creator sees why publishing is refused
+    Given the creator is signed in but their community account is suspended
+    When they publish the mod
+    Then they see that the account is suspended, with no retry

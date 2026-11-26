@@ -225,6 +225,15 @@ mod tests {
     }
 
     #[test]
+    fn a_403_is_banned() {
+        let (base, _) = serve_once("403 Forbidden", r#"{"error":{"code":"banned"}}"#);
+        assert_eq!(
+            api(&base).star(&SessionToken::new("t"), "a"),
+            Err(CommunityApiError::Banned)
+        );
+    }
+
+    #[test]
     fn a_rate_limit_is_a_protocol_error_and_a_5xx_is_unreachable() {
         let (base, _) = serve_once("429 Too Many Requests", "{}");
         assert!(matches!(
