@@ -61,6 +61,8 @@
   --progress-height: 4px;
   --progress-indeterminate-width: 40%;
   --install-control-width: 240px;
+  /* Community account avatar in Settings (#122): 40dp, a Material list-item leading avatar */
+  --avatar-size: 40px;
   --icon-size-sm: 14px;
   /* Small status mark on an icon (the collapsed support entry's failure dot, #94) */
   --status-dot-size: 6px;
@@ -1114,6 +1116,19 @@ button {
   animation: spin var(--spin);
 }
 
+/* The same ring on a small busy button (the community sign-in waiting for the browser, #122); its
+   live status line ("Waiting for the browser…") carries the meaning under reduced motion. */
+.btn-busy::after {
+  content: '';
+  flex: none;
+  width: var(--spinner-size);
+  height: var(--spinner-size);
+  border: var(--spinner-stroke) solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: spin var(--spin);
+}
+
 @keyframes spin {
   to {
     transform: rotate(1turn);
@@ -2124,6 +2139,70 @@ button {
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
+}
+
+/* ---------- Settings > Community (#122) ---------- */
+
+/* Leading avatar + name/hint, like a Material two-line list item. */
+.account-identity {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.account-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--avatar-size);
+  height: var(--avatar-size);
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-3);
+  color: var(--text-muted);
+  object-fit: cover;
+}
+
+.account-avatar-initials {
+  color: var(--text);
+  font-size: var(--type-label-large);
+  font-weight: 600;
+}
+
+.account-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.account-result > :not(:empty) {
+  margin-top: var(--space-2);
+}
+
+/* Waiting / offline: neutral muted text in a live region (offline is not an error). */
+.account-status {
+  color: var(--text-muted);
+  font-size: var(--type-body-medium);
+}
+
+.account-error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--danger-text);
+  font-size: var(--type-body-medium);
+}
+
+.account-error > .icon {
+  flex: none;
+}
+
+.account-error-text {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ---------- Settings > Storage ---------- */

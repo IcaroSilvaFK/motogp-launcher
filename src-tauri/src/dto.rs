@@ -5,8 +5,8 @@ use motogp_application::{
     SessionEvent, SessionPhase, SessionSnapshot, SessionState,
 };
 use motogp_domain::{
-    CatalogDownload, CatalogEntry, Config, FileConflict, GameInfo, ModEntry, Profile,
-    StorageCategory, StorageUsage,
+    CatalogDownload, CatalogEntry, CommunityStatus, Config, FileConflict, GameInfo, ModEntry,
+    Profile, StorageCategory, StorageUsage,
 };
 use serde::Serialize;
 
@@ -395,6 +395,44 @@ impl From<AdView> for AdDto {
     }
 }
 
+/// The signed-in member as the WebView sees it. No token, ever.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommunityProfileDto {
+    pub display_name: String,
+    pub avatar_data_url: Option<String>,
+}
+
+/// Community sign-in state: `signed_out`, `signed_in` (with a profile) or `offline`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct CommunityStatusDto {
+    pub state: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub profile: Option<CommunityProfileDto>,
+}
+
+impl From<CommunityStatus> for CommunityStatusDto {
+    fn from(status: CommunityStatus) -> Self {
+        match status {
+            CommunityStatus::SignedOut => CommunityStatusDto {
+                state: "signed_out",
+                profile: None,
+            },
+            CommunityStatus::Offline => CommunityStatusDto {
+                state: "offline",
+                profile: None,
+            },
+            CommunityStatus::SignedIn(profile) => CommunityStatusDto {
+                state: "signed_in",
+                profile: Some(CommunityProfileDto {
+                    display_name: profile.display_name,
+                    avatar_data_url: profile.avatar_data_url,
+                }),
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -420,6 +458,37 @@ mod tests {
                 "imageDataUri": "data:image/png;base64,AAAA",
                 "sponsorLabel": "Acme",
             })
+        );
+    }
+
+    #[test]
+    fn the_community_status_dto_uses_snake_case_states_and_camel_case_profile() {
+        let signed_in = CommunityStatus::SignedIn(motogp_domain::CommunityProfile {
+            display_name: "rider".into(),
+            avatar_data_url: Some("data:image/png;base64,AA==".into()),
+        });
+        assert_eq!(
+            serde_json::to_value(CommunityStatusDto::from(signed_in)).unwrap(),
+            serde_json::json!({
+                "state": "signed_in",
+                "profile": { "displayName": "rider", "avatarDataUrl": "data:image/png;base64,AA==" },
+            })
+        );
+        let no_avatar = CommunityStatus::SignedIn(motogp_domain::CommunityProfile {
+            display_name: "rider".into(),
+            avatar_data_url: None,
+        });
+        assert_eq!(
+            serde_json::to_value(CommunityStatusDto::from(no_avatar)).unwrap()["profile"],
+            serde_json::json!({ "displayName": "rider", "avatarDataUrl": null })
+        );
+        assert_eq!(
+            serde_json::to_value(CommunityStatusDto::from(CommunityStatus::SignedOut)).unwrap(),
+            serde_json::json!({ "state": "signed_out" })
+        );
+        assert_eq!(
+            serde_json::to_value(CommunityStatusDto::from(CommunityStatus::Offline)).unwrap(),
+            serde_json::json!({ "state": "offline" })
         );
     }
 

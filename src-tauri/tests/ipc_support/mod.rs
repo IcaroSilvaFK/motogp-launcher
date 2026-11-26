@@ -4,13 +4,16 @@
 #![allow(dead_code)]
 use motogp_application::{
     AdBeaconError, AdBeaconSink, AdCache, AdCacheError, AdPayload, AdService, AdSource,
-    AdSourceError, AppError, BackgroundRunner, CachedAds, CatalogSource, CatalogSourceError,
-    FolderOpener, ModDownloader, ProcessInspector, RawAd, RawCatalog, RawEntry, SessionEvent,
-    SessionPublisher, SourceFetch, UrlOpener, WebPageOpener,
+    AdSourceError, AppError, AvatarFetcher, BackgroundRunner, CachedAds, CatalogSource,
+    CatalogSourceError, CommunityApi, CommunityAuthService, CredentialStore, FolderOpener,
+    LoopbackError, LoopbackReceiver, LoopbackSession, ModDownloader, PkceSource, ProcessInspector,
+    RawAd, RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch, UrlOpener,
+    WebPageOpener,
 };
 use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries, SystemClock};
 use motogp_launcher_lib::{
     compose_with_downloader, configure, production_downloader, run_recovery, Ads, AppState,
+    MemoryCredentialStore, UnavailableCommunityApi,
 };
 use serde_json::{json, Value};
 use std::fs;
@@ -248,7 +251,14 @@ impl Harness {
         downloader: Arc<dyn ModDownloader>,
         bundled_catalog: Option<RawCatalog>,
     ) -> Harness {
-        Harness::build(catalog_source, downloader, bundled_catalog, None, None)
+        Harness::build(
+            catalog_source,
+            downloader,
+            bundled_catalog,
+            None,
+            None,
+            None,
+        )
     }
 
     /// The composed state with this feed behind the real ad service and its
@@ -260,6 +270,19 @@ impl Harness {
             None,
             None,
             Some(source),
+            None,
+        )
+    }
+
+    /// The default composed state with the community service replaced (#122).
+    pub fn with_community(community: Arc<CommunityAuthService>) -> Harness {
+        Harness::build(
+            Arc::new(FakeCatalogSource::failing()),
+            production_downloader(),
+            None,
+            None,
+            None,
+            Some(community),
         )
     }
 
@@ -271,6 +294,7 @@ impl Harness {
             None,
             Some(ads),
             None,
+            None,
         )
     }
 
@@ -280,6 +304,7 @@ impl Harness {
         bundled_catalog: Option<RawCatalog>,
         ads: Option<Arc<Ads>>,
         ad_source: Option<Arc<dyn AdSource>>,
+        community: Option<Arc<CommunityAuthService>>,
     ) -> Harness {
         let tmp = TempDir::new().unwrap();
         let data = DataDir::new(tmp.path().join("data"));
@@ -308,9 +333,18 @@ impl Harness {
             catalog_source,
             ad_source.unwrap_or_else(|| Arc::new(FakeAdSource::serving(vec![]))),
             Arc::new(NoAdBeacon),
+            community_over(
+                Arc::new(UnavailableCommunityApi::new("offline in tests")),
+                Arc::new(MemoryCredentialStore::default()),
+                Arc::new(NoLoopback),
+            ),
             bundled_catalog,
             downloader,
         );
+        let state = match community {
+            Some(community) => state.with_community(community),
+            None => state,
+        };
         let state = match ads {
             Some(ads) => state.with_ads(ads),
             None => state,
@@ -392,4 +426,54 @@ impl Harness {
         fs::write(&path, content).unwrap();
         path
     }
+}
+
+/// Fixed `state` and verifier so tests can predict what the browser gets back.
+pub struct FixedPkce;
+
+impl PkceSource for FixedPkce {
+    fn state(&self) -> String {
+        "state-1".to_string()
+    }
+    fn verifier(&self) -> String {
+        "verifier-1".to_string()
+    }
+    fn challenge(&self, verifier: &str) -> String {
+        format!("challenge-of-{verifier}")
+    }
+}
+
+/// Avatars are never fetched in the interface tests.
+pub struct NoAvatarFetcher;
+
+impl AvatarFetcher for NoAvatarFetcher {
+    fn fetch(&self, _url: &str) -> Option<String> {
+        None
+    }
+}
+
+/// A loopback that cannot bind: sign-in fails before opening a browser.
+pub struct NoLoopback;
+
+impl LoopbackReceiver for NoLoopback {
+    fn bind(&self) -> Result<Box<dyn LoopbackSession>, LoopbackError> {
+        Err(LoopbackError::Io("no loopback in tests".to_string()))
+    }
+}
+
+/// The community service over fake ports (never a network, a browser or the
+/// Credential Manager).
+pub fn community_over(
+    api: Arc<dyn CommunityApi>,
+    store: Arc<dyn CredentialStore>,
+    loopback: Arc<dyn LoopbackReceiver>,
+) -> Arc<CommunityAuthService> {
+    Arc::new(CommunityAuthService::new(
+        api,
+        store,
+        loopback,
+        Arc::new(FixedPkce),
+        Arc::new(FakeWebOpener::default()),
+        Arc::new(NoAvatarFetcher),
+    ))
 }

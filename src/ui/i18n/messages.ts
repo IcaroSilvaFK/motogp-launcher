@@ -289,6 +289,25 @@ export interface Messages {
     available: (version: string) => string;
     install: string;
   };
+  /** Settings > Community: the Discord account row (#122). */
+  community: {
+    title: string;
+    accountLabel: string;
+    signedOutHint: string;
+    signedInHint: string;
+    signIn: string;
+    signOut: string;
+    waiting: string;
+    waitingHint: string;
+    offline: string;
+    loading: string;
+    dismiss: string;
+    errors: {
+      denied: string;
+      timeout: string;
+      failed: string;
+    };
+  };
   staleSession: {
     regionLabel: string;
     title: string;

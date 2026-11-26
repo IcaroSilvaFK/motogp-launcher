@@ -12,6 +12,9 @@ mod catalog_error;
 mod catalog_install;
 mod catalog_ports;
 mod catalog_service;
+mod community_error;
+mod community_ports;
+mod community_service;
 mod config_service;
 mod deploy_error;
 mod deploy_ports;
@@ -57,6 +60,12 @@ pub use catalog_service::{
     validate_catalog, validate_catalog_strict, CatalogOrigin, CatalogService, CatalogSnapshot,
     CatalogWarning, DEFAULT_CATALOG_TTL,
 };
+pub use community_error::{CommunityApiError, CommunityError, CredentialError, LoopbackError};
+pub use community_ports::{
+    AvatarFetcher, CallbackParams, CommunityApi, CredentialStore, LoopbackReceiver,
+    LoopbackSession, PkceSource, ServerUser,
+};
+pub use community_service::{CommunityAuthService, SIGN_IN_TIMEOUT};
 pub use config_service::ConfigService;
 pub use deploy_error::DeployError;
 pub use deploy_ports::{DeployFiles, DeployedRepository, DirCheck};

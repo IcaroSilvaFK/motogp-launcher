@@ -8,11 +8,14 @@ mod catalog_fallback;
 mod catalog_install_support;
 mod commands;
 mod commands_install;
+mod community_config;
+mod community_fallback;
 mod compose;
 mod dto;
 mod error;
 mod error_ads;
 mod error_catalog;
+mod error_community;
 mod error_game;
 mod error_install;
 mod error_library;
@@ -30,14 +33,17 @@ pub use catalog_fallback::UnavailableCatalogSource;
 pub use catalog_install_support::{production_downloader, UnavailableModDownloader};
 pub use commands::configure;
 pub use commands_install::{CatalogInstallProgressDto, CATALOG_INSTALL_PROGRESS_EVENT};
+pub use community_config::COMMUNITY_SERVER_URL;
+pub use community_fallback::{MemoryCredentialStore, UnavailableCommunityApi};
 pub use compose::{
     compose, compose_with_downloader, Ads, AppState, Catalog, Installer, Profiles, Settings,
     Storage,
 };
 pub use dto::{
-    AdDto, CatalogDownloadDto, CatalogDto, CatalogEntryDto, ConfigDto, CurrentSessionDto,
-    DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto, SessionErrorDto,
-    SessionEventDto, StorageCategoryDto, StorageUsageDto,
+    AdDto, CatalogDownloadDto, CatalogDto, CatalogEntryDto, CommunityProfileDto,
+    CommunityStatusDto, ConfigDto, CurrentSessionDto, DeploySessionDto, GameInfoDto, ModDto,
+    ProfileDto, RecoveryStatusDto, SessionErrorDto, SessionEventDto, StorageCategoryDto,
+    StorageUsageDto,
 };
 pub use error::CommandError;
 pub use startup::run_recovery;

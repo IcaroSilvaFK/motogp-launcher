@@ -43,3 +43,6 @@ export { categoryCounts, inLibrary, normalizeTitle, pageHost, selectEntries, sor
 export type { AdProvider } from './ports/AdProvider';
 export type { AdHandle } from './useAd';
 export { useAd } from './useAd';
+export type { CommunityAccount } from './ports/CommunityAccount';
+export type { CommunityAccountHandle, CommunityAccountState } from './useCommunityAccount';
+export { useCommunityAccount } from './useCommunityAccount';

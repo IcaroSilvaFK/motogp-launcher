@@ -4,9 +4,10 @@
 use crate::catalog_install_support::production_downloader;
 use motogp_application::{
     AdBeaconSink, AdCache, AdService, AdSource, ArtworkService, BackgroundRunner, CancelFlag,
-    CatalogInstaller, CatalogService, CatalogSource, DeployService, FolderOpener, GameService,
-    GameSettings, ModDownloader, PlayService, ProcessInspector, ProfileModPlanner, ProfileService,
-    RawCatalog, SessionPublisher, SessionService, StorageService, UrlOpener, WebPageOpener,
+    CatalogInstaller, CatalogService, CatalogSource, CommunityAuthService, DeployService,
+    FolderOpener, GameService, GameSettings, ModDownloader, PlayService, ProcessInspector,
+    ProfileModPlanner, ProfileService, RawCatalog, SessionPublisher, SessionService,
+    StorageService, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{
     mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsDownloadStaging, FsGameFiles,
@@ -50,6 +51,9 @@ pub struct AppState {
     pub ad_opener: Arc<dyn WebPageOpener>,
     /// Sponsored slots (#103). Feed and beacon injected, cache on disk.
     pub ads: Arc<Ads>,
+    /// Community account (#122): sign-in with Discord. Blocking network I/O and a
+    /// browser wait of up to 2 minutes, so commands never take `write_lock` for it.
+    pub community: Arc<CommunityAuthService>,
     /// Catalog installs (#74): downloads run off the runtime without `write_lock`.
     pub installer: Arc<Installer>,
     /// Cancel flags of the installs in flight, by catalog entry id.
@@ -80,6 +84,7 @@ pub fn compose<O, P>(
     catalog_source: Arc<dyn CatalogSource>,
     ad_source: Arc<dyn AdSource>,
     ad_beacon: Arc<dyn AdBeaconSink>,
+    community: Arc<CommunityAuthService>,
     bundled_catalog: Option<RawCatalog>,
 ) -> AppState
 where
@@ -100,6 +105,7 @@ where
         catalog_source,
         ad_source,
         ad_beacon,
+        community,
         bundled_catalog,
         production_downloader(),
     )
@@ -122,6 +128,7 @@ pub fn compose_with_downloader<O, P>(
     catalog_source: Arc<dyn CatalogSource>,
     ad_source: Arc<dyn AdSource>,
     ad_beacon: Arc<dyn AdBeaconSink>,
+    community: Arc<CommunityAuthService>,
     bundled_catalog: Option<RawCatalog>,
     downloader: Arc<dyn ModDownloader>,
 ) -> AppState
@@ -186,6 +193,7 @@ where
         )),
         web_opener,
         ad_opener,
+        community,
         ads: Arc::new(AdService::new(
             ad_source,
             Arc::new(JsonAdCache::new(data.ad_cache_file())) as Arc<dyn AdCache>,
@@ -196,6 +204,11 @@ where
 }
 
 impl AppState {
+    /// Replaces the community service (tests).
+    pub fn with_community(self, community: Arc<CommunityAuthService>) -> Self {
+        Self { community, ..self }
+    }
+
     /// Replaces the ad service (tests).
     pub fn with_ads(self, ads: Arc<Ads>) -> Self {
         Self { ads, ..self }

@@ -112,6 +112,8 @@ pub enum WebPolicy {
     /// Any well-formed `https://` URL (sponsor click URLs, which come from the
     /// validated ad feed and are never supplied by the WebView).
     AnyHttps,
+    /// Only the community sign-in start page on the configured server (issue #122).
+    CommunityStart,
 }
 
 impl WebPolicy {
@@ -119,7 +121,17 @@ impl WebPolicy {
         match self {
             WebPolicy::AllowListedHosts => check_page_url(url),
             WebPolicy::AnyHttps => check_https_url(url),
+            WebPolicy::CommunityStart => check_community_start(url),
         }
+    }
+}
+
+/// The community sign-in start page is the only URL this policy opens.
+fn check_community_start(url: &str) -> Result<(), PageUrlError> {
+    if crate::community_config::is_community_start_url(url) {
+        Ok(())
+    } else {
+        Err(PageUrlError::NotHttps)
     }
 }
 
@@ -147,6 +159,14 @@ impl<R: Runtime> TauriWebOpener<R> {
             policy: WebPolicy::AnyHttps,
         }
     }
+
+    /// Community sign-in: only the configured server's start page.
+    pub fn community(handle: AppHandle<R>) -> Self {
+        Self {
+            handle,
+            policy: WebPolicy::CommunityStart,
+        }
+    }
 }
 
 impl<R: Runtime> WebPageOpener for TauriWebOpener<R> {
@@ -169,6 +189,21 @@ impl<R: Runtime> WebPageOpener for TauriWebOpener<R> {
 mod tests {
     use super::*;
 
+    #[test]
+    fn the_community_policy_only_opens_the_sign_in_start_page() {
+        let start = format!(
+            "{}/auth/discord/start?redirect=x",
+            crate::community_config::COMMUNITY_SERVER_URL
+        );
+        assert_eq!(WebPolicy::CommunityStart.check(&start), Ok(()));
+        for url in [
+            "https://sponsor.example/x",
+            "https://overtake.gg/x",
+            "javascript:alert(1)",
+        ] {
+            assert!(WebPolicy::CommunityStart.check(url).is_err(), "{url}");
+        }
+    }
     #[test]
     fn the_https_only_policy_accepts_any_plain_https_url() {
         assert_eq!(

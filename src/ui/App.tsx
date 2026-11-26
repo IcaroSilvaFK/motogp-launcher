@@ -9,6 +9,7 @@ import {
 import type {
   AdPreferenceStore,
   AdProvider,
+  CommunityAccount,
   AppInfo,
   CatalogController,
   DiscoverViewStore,
@@ -20,6 +21,7 @@ import type {
 import { AdConsentBar } from './AdConsentBar';
 import { AdPreferenceProvider } from './AdPreferenceContext';
 import { AdsContext } from './AdsContext';
+import { CommunityContext } from './CommunityContext';
 import { AppInfoContext } from './AppInfoContext';
 import { DiscoverScreen } from './DiscoverScreen';
 import { I18nProvider, useI18n } from './i18n';
@@ -71,9 +73,11 @@ function Shell({
   discoverViewStore,
   adPreferenceStore,
   adProvider,
+  communityAccount,
 }: {
   controller: LauncherController;
   adProvider?: AdProvider;
+  communityAccount?: CommunityAccount;
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
@@ -103,6 +107,7 @@ function Shell({
   );
   const loading = state.status === 'loading';
   const ads = useMemo(() => ({ provider: adProvider }), [adProvider]);
+  const community = useMemo(() => ({ account: communityAccount }), [communityAccount]);
 
   useEffect(() => {
     void controller.start();
@@ -126,45 +131,47 @@ function Shell({
       <LauncherContext.Provider value={value}>
         <AdPreferenceProvider store={adPreferenceStore}>
           <AdsContext.Provider value={ads}>
-            <div className="app-shell">
-              <TitleBar controls={windowControls} />
-              <Sidebar
-                screens={screens}
-                current={screen}
-                onSelect={setScreen}
-                collapsed={collapsed}
-                onToggle={toggleSidebar}
-              />
-              <div className="app-content">
-                <div className="app-messages">
-                  <NoticeBar />
-                  <div className="notices">
-                    <AdConsentBar />
+            <CommunityContext.Provider value={community}>
+              <div className="app-shell">
+                <TitleBar controls={windowControls} />
+                <Sidebar
+                  screens={screens}
+                  current={screen}
+                  onSelect={setScreen}
+                  collapsed={collapsed}
+                  onToggle={toggleSidebar}
+                />
+                <div className="app-content">
+                  <div className="app-messages">
+                    <NoticeBar />
+                    <div className="notices">
+                      <AdConsentBar />
+                    </div>
+                    {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
                   </div>
-                  {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
+                  <main aria-busy={loading ? 'true' : undefined}>
+                    {loading ? (
+                      <LoadingState />
+                    ) : (
+                      // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
+                      <ScreenTransition key={screen}>
+                        {screen === 'library' && <LibraryScreen />}
+                        {screen === 'discover' && catalog && (
+                          <DiscoverScreen
+                            catalog={catalog}
+                            onGoToLibrary={() => setScreen('library')}
+                            viewStore={discoverViewStore}
+                          />
+                        )}
+                        {screen === 'profiles' && <ProfilesScreen />}
+                        {screen === 'settings' && <SettingsScreen />}
+                      </ScreenTransition>
+                    )}
+                  </main>
                 </div>
-                <main aria-busy={loading ? 'true' : undefined}>
-                  {loading ? (
-                    <LoadingState />
-                  ) : (
-                    // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
-                    <ScreenTransition key={screen}>
-                      {screen === 'library' && <LibraryScreen />}
-                      {screen === 'discover' && catalog && (
-                        <DiscoverScreen
-                          catalog={catalog}
-                          onGoToLibrary={() => setScreen('library')}
-                          viewStore={discoverViewStore}
-                        />
-                      )}
-                      {screen === 'profiles' && <ProfilesScreen />}
-                      {screen === 'settings' && <SettingsScreen />}
-                    </ScreenTransition>
-                  )}
-                </main>
+                <StatusBar onSetUpGame={() => setScreen('settings')} />
               </div>
-              <StatusBar onSetUpGame={() => setScreen('settings')} />
-            </div>
+            </CommunityContext.Provider>
           </AdsContext.Provider>
         </AdPreferenceProvider>
       </LauncherContext.Provider>
@@ -184,6 +191,7 @@ export function App({
   discoverViewStore,
   adPreferenceStore,
   adProvider,
+  communityAccount,
 }: {
   controller: LauncherController;
   locale?: Locale;
@@ -199,6 +207,7 @@ export function App({
   adPreferenceStore?: AdPreferenceStore;
   /** Sponsored placements (#104); absent means no ads at all. Slots render only while the preference allows. */
   adProvider?: AdProvider;
+  communityAccount?: CommunityAccount;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
@@ -212,6 +221,7 @@ export function App({
         discoverViewStore={discoverViewStore}
         adPreferenceStore={adPreferenceStore}
         adProvider={adProvider}
+        communityAccount={communityAccount}
       />
     </I18nProvider>
   );
