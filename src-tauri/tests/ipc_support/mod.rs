@@ -3,13 +3,14 @@
 //! opener / process / background / event ports. No real window, Steam or game.
 #![allow(dead_code)]
 use motogp_application::{
-    AppError, BackgroundRunner, CatalogSource, CatalogSourceError, FolderOpener, ModDownloader,
-    ProcessInspector, RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch, UrlOpener,
-    WebPageOpener,
+    AdBeaconError, AdBeaconSink, AdCache, AdCacheError, AdPayload, AdService, AdSource,
+    AdSourceError, AppError, BackgroundRunner, CachedAds, CatalogSource, CatalogSourceError,
+    FolderOpener, ModDownloader, ProcessInspector, RawAd, RawCatalog, RawEntry, SessionEvent,
+    SessionPublisher, SourceFetch, UrlOpener, WebPageOpener,
 };
-use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries};
+use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries, SystemClock};
 use motogp_launcher_lib::{
-    compose_with_downloader, configure, production_downloader, run_recovery, AppState,
+    compose_with_downloader, configure, production_downloader, run_recovery, Ads, AppState,
 };
 use serde_json::{json, Value};
 use std::fs;
@@ -58,6 +59,54 @@ impl WebPageOpener for FakeWebOpener {
         self.opened.lock().unwrap().push(url.to_string());
         Ok(())
     }
+}
+
+/// Feed that serves the given creatives (one fetch result per call).
+pub struct FakeAdSource {
+    creatives: Vec<motogp_domain::AdCreativeDraft>,
+}
+
+impl FakeAdSource {
+    pub fn serving(creatives: Vec<motogp_domain::AdCreativeDraft>) -> Self {
+        Self { creatives }
+    }
+}
+
+impl AdSource for FakeAdSource {
+    fn fetch(&self) -> Result<AdPayload, AdSourceError> {
+        Ok(AdPayload {
+            creatives: self.creatives.iter().cloned().map(RawAd::Draft).collect(),
+        })
+    }
+}
+
+struct NoAdCache;
+
+impl AdCache for NoAdCache {
+    fn load(&self) -> Result<Option<CachedAds>, AdCacheError> {
+        Ok(None)
+    }
+    fn save(&self, _ads: &CachedAds) -> Result<(), AdCacheError> {
+        Ok(())
+    }
+}
+
+struct NoAdBeacon;
+
+impl AdBeaconSink for NoAdBeacon {
+    fn send_impression(&self, _url: &str) -> Result<(), AdBeaconError> {
+        Ok(())
+    }
+}
+
+/// An ad service over `source`, with no cache and no beacon.
+pub fn ads_over(source: Arc<dyn AdSource>) -> Arc<Ads> {
+    Arc::new(AdService::new(
+        source,
+        Arc::new(NoAdCache) as Arc<dyn AdCache>,
+        Arc::new(NoAdBeacon) as Arc<dyn AdBeaconSink>,
+        SystemClock,
+    ))
 }
 
 /// Catalog source that never touches the network: serves the given drafts, or
@@ -168,6 +217,8 @@ pub struct Harness {
     pub opened: Arc<Mutex<Vec<String>>>,
     pub folders_opened: Arc<Mutex<Vec<PathBuf>>>,
     pub pages_opened: Arc<Mutex<Vec<String>>>,
+    /// Sponsor pages opened through the ad opener.
+    pub ad_pages_opened: Arc<Mutex<Vec<String>>>,
     pub runner: Arc<ManualRunner>,
     pub recorder: Arc<Recorder>,
     pub app: App<MockRuntime>,
@@ -197,6 +248,39 @@ impl Harness {
         downloader: Arc<dyn ModDownloader>,
         bundled_catalog: Option<RawCatalog>,
     ) -> Harness {
+        Harness::build(catalog_source, downloader, bundled_catalog, None, None)
+    }
+
+    /// The composed state with this feed behind the real ad service and its
+    /// disk cache (#103).
+    pub fn with_ad_source(source: Arc<dyn AdSource>) -> Harness {
+        Harness::build(
+            Arc::new(FakeCatalogSource::failing()),
+            production_downloader(),
+            None,
+            None,
+            Some(source),
+        )
+    }
+
+    /// The default composed state with the ad service replaced (#103).
+    pub fn with_ads(ads: Arc<Ads>) -> Harness {
+        Harness::build(
+            Arc::new(FakeCatalogSource::failing()),
+            production_downloader(),
+            None,
+            Some(ads),
+            None,
+        )
+    }
+
+    fn build(
+        catalog_source: Arc<dyn CatalogSource>,
+        downloader: Arc<dyn ModDownloader>,
+        bundled_catalog: Option<RawCatalog>,
+        ads: Option<Arc<Ads>>,
+        ad_source: Option<Arc<dyn AdSource>>,
+    ) -> Harness {
         let tmp = TempDir::new().unwrap();
         let data = DataDir::new(tmp.path().join("data"));
         fs::create_dir_all(data.root()).unwrap();
@@ -206,6 +290,8 @@ impl Harness {
         let folders_opened = folder_opener.opened.clone();
         let web_opener = FakeWebOpener::default();
         let pages_opened = web_opener.opened.clone();
+        let ad_opener = FakeWebOpener::default();
+        let ad_pages_opened = ad_opener.opened.clone();
         let runner = Arc::new(ManualRunner::default());
         let recorder = Arc::new(Recorder::default());
         let state = compose_with_downloader(
@@ -215,13 +301,20 @@ impl Harness {
             opener,
             Arc::new(folder_opener),
             Arc::new(web_opener),
+            Arc::new(ad_opener),
             NoProcesses,
             recorder.clone(),
             runner.clone(),
             catalog_source,
+            ad_source.unwrap_or_else(|| Arc::new(FakeAdSource::serving(vec![]))),
+            Arc::new(NoAdBeacon),
             bundled_catalog,
             downloader,
         );
+        let state = match ads {
+            Some(ads) => state.with_ads(ads),
+            None => state,
+        };
         let app = configure(tauri::test::mock_builder())
             .manage(state)
             .build(mock_context(noop_assets()))
@@ -234,6 +327,7 @@ impl Harness {
             opened,
             folders_opened,
             pages_opened,
+            ad_pages_opened,
             runner,
             recorder,
             app,

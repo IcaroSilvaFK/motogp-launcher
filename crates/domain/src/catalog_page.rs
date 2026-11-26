@@ -40,9 +40,28 @@ pub fn check_page_url(url: &str) -> Result<(), PageUrlError> {
     check_https_url_on_hosts(url, &ALLOWED_PAGE_HOSTS)
 }
 
+/// Checks that `url` is a plain `https` URL (no credentials, port 443 only) on
+/// any host. Used for sponsor click URLs, which come from a validated feed.
+pub fn check_https_url(url: &str) -> Result<(), PageUrlError> {
+    https_host(url).map(drop)
+}
+
 /// Like [`check_page_url`] but against an explicit host list: `https` only,
 /// no credentials, host equal to one of `hosts` or a subdomain of it.
 pub fn check_https_url_on_hosts(url: &str, hosts: &[&str]) -> Result<(), PageUrlError> {
+    let host = https_host(url)?;
+    let allowed = hosts
+        .iter()
+        .any(|allowed| host == *allowed || host.ends_with(&format!(".{allowed}")));
+    if allowed {
+        Ok(())
+    } else {
+        Err(PageUrlError::HostNotAllowed { host })
+    }
+}
+
+/// Validates the shape of a plain https URL and returns its lowercase host.
+fn https_host(url: &str) -> Result<String, PageUrlError> {
     let scheme_ok = url
         .get(..8)
         .is_some_and(|s| s.eq_ignore_ascii_case("https://"));
@@ -61,14 +80,10 @@ pub fn check_https_url_on_hosts(url: &str, hosts: &[&str]) -> Result<(), PageUrl
         return Err(PageUrlError::NotHttps);
     }
     let host = host.trim_end_matches('.').to_ascii_lowercase();
-    let allowed = hosts
-        .iter()
-        .any(|allowed| host == *allowed || host.ends_with(&format!(".{allowed}")));
-    if allowed {
-        Ok(())
-    } else {
-        Err(PageUrlError::HostNotAllowed { host })
+    if host.is_empty() {
+        return Err(PageUrlError::NotHttps);
     }
+    Ok(host)
 }
 
 #[cfg(test)]
@@ -128,6 +143,31 @@ mod tests {
                 ),
                 "{url}"
             );
+        }
+    }
+
+    #[test]
+    fn any_host_is_accepted_by_the_https_only_check() {
+        for url in [
+            "https://sponsor.example/x",
+            "HTTPS://Sponsor.Example:443/x?a=b",
+        ] {
+            assert_eq!(check_https_url(url), Ok(()), "{url}");
+        }
+    }
+
+    #[test]
+    fn the_https_only_check_rejects_unsafe_shapes() {
+        for url in [
+            "http://sponsor.example/x",
+            "javascript:alert(1)",
+            "https://user:pw@sponsor.example/x",
+            "https://sponsor.example:8443/x",
+            "https://",
+            "https://a.example/a b",
+            "https://:443/x",
+        ] {
+            assert_eq!(check_https_url(url), Err(PageUrlError::NotHttps), "{url}");
         }
     }
 

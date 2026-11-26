@@ -46,9 +46,26 @@ pub trait AdCache: Send + Sync {
     fn save(&self, ads: &CachedAds) -> Result<(), AdCacheError>;
 }
 
+/// A shared cache is a cache.
+impl<T: AdCache + ?Sized> AdCache for std::sync::Arc<T> {
+    fn load(&self) -> Result<Option<CachedAds>, AdCacheError> {
+        (**self).load()
+    }
+    fn save(&self, ads: &CachedAds) -> Result<(), AdCacheError> {
+        (**self).save(ads)
+    }
+}
+
 /// Port: tells the sponsor an impression happened (one HTTPS GET in production).
 pub trait AdBeaconSink: Send + Sync {
     fn send_impression(&self, impression_url: &str) -> Result<(), AdBeaconError>;
+}
+
+/// A shared beacon is a beacon.
+impl<T: AdBeaconSink + ?Sized> AdBeaconSink for std::sync::Arc<T> {
+    fn send_impression(&self, impression_url: &str) -> Result<(), AdBeaconError> {
+        (**self).send_impression(impression_url)
+    }
 }
 
 #[cfg(test)]
@@ -70,6 +87,45 @@ mod tests {
         assert_eq!(
             shared.fetch(),
             Err(AdSourceError::Network("offline".to_string()))
+        );
+    }
+
+    struct EmptyCache;
+
+    impl AdCache for EmptyCache {
+        fn load(&self) -> Result<Option<CachedAds>, AdCacheError> {
+            Ok(None)
+        }
+        fn save(&self, _ads: &CachedAds) -> Result<(), AdCacheError> {
+            Ok(())
+        }
+    }
+
+    struct FailingBeacon;
+
+    impl AdBeaconSink for FailingBeacon {
+        fn send_impression(&self, _url: &str) -> Result<(), AdBeaconError> {
+            Err(AdBeaconError("down".to_string()))
+        }
+    }
+
+    #[test]
+    fn a_shared_dyn_cache_forwards_to_the_inner_cache() {
+        let shared: Arc<dyn AdCache> = Arc::new(EmptyCache);
+        assert_eq!(shared.load(), Ok(None));
+        let ads = CachedAds {
+            fetched_at_ms: 1,
+            creatives: vec![],
+        };
+        assert_eq!(shared.save(&ads), Ok(()));
+    }
+
+    #[test]
+    fn a_shared_dyn_beacon_forwards_to_the_inner_beacon() {
+        let shared: Arc<dyn AdBeaconSink> = Arc::new(FailingBeacon);
+        assert_eq!(
+            shared.send_impression("https://x.example/i"),
+            Err(AdBeaconError("down".to_string()))
         );
     }
 }

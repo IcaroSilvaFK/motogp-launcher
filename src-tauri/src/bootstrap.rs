@@ -3,11 +3,13 @@
 //! only runs with a real window and WebView2; everything it wires is tested
 //! through `compose`, `commands`, `adapters` and `startup`.
 use crate::adapters::{TauriEvents, TauriFolderOpener, TauriOpener, TauriWebOpener};
+use crate::ads_fallback::{NullAdBeacon, NullAdSource};
 use crate::{compose, configure, run_recovery, UnavailableCatalogSource};
-use motogp_application::{CatalogSource, InstanceGuard, InstanceLock};
+use motogp_application::{AdBeaconSink, AdSource, CatalogSource, InstanceGuard, InstanceLock};
 use motogp_infrastructure::{
-    bundled_catalog, DataDir, FileInstanceLock, HttpCatalogConfig, HttpCatalogSource, SteamArtwork,
-    SteamLibraries, SysinfoProcesses, ThreadRunner,
+    bundled_catalog, DataDir, FileInstanceLock, HttpAdBeaconSink, HttpAdConfig, HttpAdSource,
+    HttpCatalogConfig, HttpCatalogSource, SteamArtwork, SteamLibraries, SysinfoProcesses,
+    SystemClock, ThreadRunner,
 };
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -44,6 +46,33 @@ fn catalog_source() -> Arc<dyn CatalogSource> {
     }
 }
 
+/// The HTTPS ad source and beacon, built from one config. If either client
+/// cannot be built the app starts with the null adapters: no ad is shown.
+fn ad_adapters() -> (Arc<dyn AdSource>, Arc<dyn AdBeaconSink>) {
+    let mut config = HttpAdConfig::github(env!("CARGO_PKG_VERSION"));
+    // Debug builds read the feed from `dev`, so ads merged there can be seen
+    // in `tauri dev` before they are promoted to `main`.
+    if cfg!(debug_assertions) {
+        config.url = config.url.replace("/main/", "/dev/");
+        config.raw_base_url = config.raw_base_url.replace("/main/", "/dev/");
+    }
+    let source: Arc<dyn AdSource> = match HttpAdSource::new(config.clone(), SystemClock) {
+        Ok(source) => Arc::new(source),
+        Err(error) => {
+            eprintln!("ad source unavailable: {error}");
+            Arc::new(NullAdSource)
+        }
+    };
+    let beacon: Arc<dyn AdBeaconSink> = match HttpAdBeaconSink::new(&config) {
+        Ok(beacon) => Arc::new(beacon),
+        Err(error) => {
+            eprintln!("ad beacon unavailable: {error}");
+            Arc::new(NullAdBeacon)
+        }
+    };
+    (source, beacon)
+}
+
 /// Keeps the single-instance lock alive in the managed state.
 struct InstanceHold(#[allow(dead_code)] Mutex<Option<InstanceGuard>>);
 
@@ -72,6 +101,7 @@ pub fn run() {
             }
         }
         let handle = app.handle().clone();
+        let (ad_source, ad_beacon) = ad_adapters();
         let state = compose(
             &data,
             steam_libraries(),
@@ -79,10 +109,13 @@ pub fn run() {
             TauriOpener::new(handle.clone()),
             Arc::new(TauriFolderOpener::new(handle.clone())),
             Arc::new(TauriWebOpener::new(handle.clone())),
+            Arc::new(TauriWebOpener::https_only(handle.clone())),
             SysinfoProcesses::default(),
             Arc::new(TauriEvents::new(handle)),
             Arc::new(ThreadRunner),
             catalog_source(),
+            ad_source,
+            ad_beacon,
             bundled_catalog()
                 .map_err(|error| eprintln!("bundled catalog unavailable: {error}"))
                 .ok(),

@@ -7,11 +7,13 @@
 //! blocking pool, never on the main thread, and mutations are serialized
 //! through `AppState::write_lock` so they cannot lose each other's updates.
 use crate::dto::{
-    CatalogDto, ConfigDto, ConflictDto, CurrentSessionDto, DeploySessionDto, GameInfoDto, ModDto,
-    ProfileDto, RecoveryStatusDto, StorageUsageDto,
+    AdDto, CatalogDto, ConfigDto, ConflictDto, CurrentSessionDto, DeploySessionDto, GameInfoDto,
+    ModDto, ProfileDto, RecoveryStatusDto, StorageUsageDto,
 };
+use crate::error_ads::unknown_creative;
 use crate::{AppState, CommandError};
 use motogp_application::{import_mods as import_batch, remove_mod as remove_everywhere};
+use motogp_domain::AdSlot;
 use std::path::{Path, PathBuf};
 use tauri::{Builder, Runtime, State};
 
@@ -298,6 +300,56 @@ pub async fn open_support_page(state: State<'_, AppState>) -> CommandResult<()> 
     .await
 }
 
+/// The sponsored creative for `slot`, or `null`. An unknown slot name, ads
+/// switched off or an empty feed all mean "no ad" and never an error. The
+/// frontend sends only `slot`; `adsEnabled` defaults to on.
+#[tauri::command]
+pub async fn get_ad(
+    state: State<'_, AppState>,
+    slot: String,
+    ads_enabled: Option<bool>,
+) -> CommandResult<Option<AdDto>> {
+    read_blocking(state, move |state| {
+        let Some(slot) = AdSlot::parse(&slot) else {
+            return Ok(None);
+        };
+        let view = state.ads.get_ad(slot, ads_enabled.unwrap_or(true))?;
+        Ok(view.map(AdDto::from))
+    })
+    .await
+}
+
+/// Opens a sponsor page in the default browser. The WebView sends only the
+/// slot and the creative id; the URL comes from the validated feed.
+#[tauri::command]
+pub async fn ad_clicked(
+    state: State<'_, AppState>,
+    slot: String,
+    creative_id: String,
+) -> CommandResult<()> {
+    read_blocking(state, move |state| {
+        let slot = AdSlot::parse(&slot).ok_or_else(unknown_creative)?;
+        Ok(state
+            .ads
+            .open_click(slot, &creative_id, state.ad_opener.as_ref())?)
+    })
+    .await
+}
+
+/// The slot really rendered: counts the impression once per creative.
+#[tauri::command]
+pub async fn ad_shown(
+    state: State<'_, AppState>,
+    slot: String,
+    creative_id: String,
+) -> CommandResult<()> {
+    read_blocking(state, move |state| {
+        let slot = AdSlot::parse(&slot).ok_or_else(unknown_creative)?;
+        Ok(state.ads.report_shown(slot, &creative_id)?)
+    })
+    .await
+}
+
 /// Registers every command on the builder; shared by the real app and the
 /// contract tests.
 pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
@@ -330,6 +382,9 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         refresh_catalog,
         open_catalog_page,
         open_support_page,
+        get_ad,
+        ad_clicked,
+        ad_shown,
         crate::commands_install::install_catalog_entry,
         crate::commands_install::cancel_catalog_install
     ])

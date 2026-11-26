@@ -50,3 +50,22 @@ Feature: Expose the launcher use cases through Tauri commands
     Given a cached catalog with the entry "rebalanced-ai"
     When the frontend invokes open_catalog_page with id "rebalanced-ai"
     Then the controlled web opener receives the entry's page URL
+
+  Scenario: Clicking an ad opens the system browser
+    Given an ad feed with the creative "acme-1" in the "discover" slot
+    When the frontend invokes get_ad with slot "discover"
+    Then it receives the creative "acme-1" without any URL
+    When the frontend invokes ad_clicked with slot "discover" and creativeId "acme-1"
+    Then the controlled ad opener receives the creative's click URL
+    And no game session was started
+
+  Scenario: The UI cannot open an arbitrary URL
+    Given an ad feed with the creative "acme-1" in the "discover" slot
+    When the frontend invokes ad_clicked with slot "discover" and creativeId "https://evil.example"
+    Then nothing is opened
+    And the command fails with code "ad_unknown_creative"
+
+  Scenario: No ad is served when the feed is empty
+    Given the composed state with an empty ad feed
+    When the frontend invokes get_ad with slot "discover"
+    Then it receives null

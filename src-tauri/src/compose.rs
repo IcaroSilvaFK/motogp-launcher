@@ -3,16 +3,16 @@
 //! background execution, events) is injected.
 use crate::catalog_install_support::production_downloader;
 use motogp_application::{
-    ArtworkService, BackgroundRunner, CancelFlag, CatalogInstaller, CatalogService, CatalogSource,
-    DeployService, FolderOpener, GameService, GameSettings, ModDownloader, PlayService,
-    ProcessInspector, ProfileModPlanner, ProfileService, RawCatalog, SessionPublisher,
-    SessionService, StorageService, UrlOpener, WebPageOpener,
+    AdBeaconSink, AdCache, AdService, AdSource, ArtworkService, BackgroundRunner, CancelFlag,
+    CatalogInstaller, CatalogService, CatalogSource, DeployService, FolderOpener, GameService,
+    GameSettings, ModDownloader, PlayService, ProcessInspector, ProfileModPlanner, ProfileService,
+    RawCatalog, SessionPublisher, SessionService, StorageService, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{
     mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsDownloadStaging, FsGameFiles,
-    FsStorageScanner, JsonCatalogCache, JsonConfigStore, JsonDeployedRepository, JsonModRepository,
-    JsonProfileStore, ModLibrary, MonotonicClock, Sha256Hasher, SteamArtwork, SteamLibraries,
-    SystemClock,
+    FsStorageScanner, JsonAdCache, JsonCatalogCache, JsonConfigStore, JsonDeployedRepository,
+    JsonModRepository, JsonProfileStore, ModLibrary, MonotonicClock, Sha256Hasher, SteamArtwork,
+    SteamLibraries, SystemClock,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -22,6 +22,7 @@ pub type Settings = GameSettings<JsonConfigStore, SteamLibraries, FsGameFiles>;
 pub type Storage = StorageService<FsStorageScanner, Arc<dyn FolderOpener + Send + Sync>>;
 pub type Catalog = CatalogService<Arc<dyn CatalogSource>, JsonCatalogCache, SystemClock>;
 pub type Installer = CatalogInstaller<Arc<dyn ModDownloader>, FsDownloadStaging, Sha256Hasher>;
+pub type Ads = AdService<Arc<dyn AdSource>, Arc<dyn AdCache>, Arc<dyn AdBeaconSink>, SystemClock>;
 
 /// Everything the commands need. Managed as Tauri state; cheap to clone so
 /// blocking use cases can run off the main thread.
@@ -45,6 +46,10 @@ pub struct AppState {
     pub catalog: Arc<Catalog>,
     /// Opens catalog pages in the default browser (https, allow-listed hosts).
     pub web_opener: Arc<dyn WebPageOpener>,
+    /// Opens sponsor click URLs (https only, any host).
+    pub ad_opener: Arc<dyn WebPageOpener>,
+    /// Sponsored slots (#103). Feed and beacon injected, cache on disk.
+    pub ads: Arc<Ads>,
     /// Catalog installs (#74): downloads run off the runtime without `write_lock`.
     pub installer: Arc<Installer>,
     /// Cancel flags of the installs in flight, by catalog entry id.
@@ -68,10 +73,13 @@ pub fn compose<O, P>(
     opener: O,
     folder_opener: Arc<dyn FolderOpener + Send + Sync>,
     web_opener: Arc<dyn WebPageOpener>,
+    ad_opener: Arc<dyn WebPageOpener>,
     inspector: P,
     publisher: Arc<dyn SessionPublisher>,
     runner: Arc<dyn BackgroundRunner>,
     catalog_source: Arc<dyn CatalogSource>,
+    ad_source: Arc<dyn AdSource>,
+    ad_beacon: Arc<dyn AdBeaconSink>,
     bundled_catalog: Option<RawCatalog>,
 ) -> AppState
 where
@@ -85,10 +93,13 @@ where
         opener,
         folder_opener,
         web_opener,
+        ad_opener,
         inspector,
         publisher,
         runner,
         catalog_source,
+        ad_source,
+        ad_beacon,
         bundled_catalog,
         production_downloader(),
     )
@@ -104,10 +115,13 @@ pub fn compose_with_downloader<O, P>(
     opener: O,
     folder_opener: Arc<dyn FolderOpener + Send + Sync>,
     web_opener: Arc<dyn WebPageOpener>,
+    ad_opener: Arc<dyn WebPageOpener>,
     inspector: P,
     publisher: Arc<dyn SessionPublisher>,
     runner: Arc<dyn BackgroundRunner>,
     catalog_source: Arc<dyn CatalogSource>,
+    ad_source: Arc<dyn AdSource>,
+    ad_beacon: Arc<dyn AdBeaconSink>,
     bundled_catalog: Option<RawCatalog>,
     downloader: Arc<dyn ModDownloader>,
 ) -> AppState
@@ -171,5 +185,19 @@ where
             bundled_catalog,
         )),
         web_opener,
+        ad_opener,
+        ads: Arc::new(AdService::new(
+            ad_source,
+            Arc::new(JsonAdCache::new(data.ad_cache_file())) as Arc<dyn AdCache>,
+            ad_beacon,
+            SystemClock,
+        )),
+    }
+}
+
+impl AppState {
+    /// Replaces the ad service (tests).
+    pub fn with_ads(self, ads: Arc<Ads>) -> Self {
+        Self { ads, ..self }
     }
 }
