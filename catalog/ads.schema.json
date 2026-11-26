@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/IcaroSilvaFK/motogp-launcher/main/catalog/ads.schema.json",
+  "title": "MotoGP Launcher sponsor feed",
+  "description": "Static sponsor feed read by the launcher. Add a creative by pull request.",
+  "type": "object",
+  "required": ["version", "creatives"],
+  "additionalProperties": false,
+  "properties": {
+    "version": { "const": 1 },
+    "creatives": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/creative" }
+    }
+  },
+  "$defs": {
+    "httpsUrl": {
+      "type": "string",
+      "description": "https only, public host name (no user info, no port, no localhost, no IP literal).",
+      "pattern": "^https://[^\\s@:/?#\\[\\]]+\\.[^\\s@:/?#\\[\\]]+([/?#]\\S*)?$"
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+    },
+    "creative": {
+      "type": "object",
+      "required": ["id", "slot", "title", "body", "image", "click_url", "sponsor_label"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+          "maxLength": 64
+        },
+        "slot": { "enum": ["discover", "sidebar", "about"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 60, "pattern": "\\S" },
+        "body": { "type": "string", "minLength": 1, "maxLength": 140, "pattern": "\\S" },
+        "image": {
+          "type": "string",
+          "description": "Repo-relative path (max 200 KiB) or an https URL. .png, .jpg, .jpeg or .webp only.",
+          "pattern": "\\.([pP][nN][gG]|[jJ][pP][eE]?[gG]|[wW][eE][bB][pP])$"
+        },
+        "click_url": { "$ref": "#/$defs/httpsUrl" },
+        "sponsor_label": { "type": "string", "minLength": 1, "maxLength": 40, "pattern": "\\S" },
+        "impression_url": { "$ref": "#/$defs/httpsUrl" },
+        "starts_at": { "$ref": "#/$defs/date" },
+        "expires_at": { "$ref": "#/$defs/date" }
+      }
+    }
+  }
+}
