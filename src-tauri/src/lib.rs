@@ -8,10 +8,13 @@ mod catalog_fallback;
 mod catalog_install_support;
 mod commands;
 mod commands_install;
+mod commands_stars;
 mod community_config;
 mod community_fallback;
+mod community_stars_fallback;
 mod compose;
 mod dto;
+mod dto_stars;
 mod error;
 mod error_ads;
 mod error_catalog;
@@ -35,6 +38,7 @@ pub use commands::configure;
 pub use commands_install::{CatalogInstallProgressDto, CATALOG_INSTALL_PROGRESS_EVENT};
 pub use community_config::COMMUNITY_SERVER_URL;
 pub use community_fallback::{MemoryCredentialStore, UnavailableCommunityApi};
+pub use community_stars_fallback::UnavailableModStatsApi;
 pub use compose::{
     compose, compose_with_downloader, Ads, AppState, Catalog, Installer, Profiles, Settings,
     Storage,
@@ -45,5 +49,6 @@ pub use dto::{
     ProfileDto, RecoveryStatusDto, SessionErrorDto, SessionEventDto, StorageCategoryDto,
     StorageUsageDto,
 };
+pub use dto_stars::{ModStatsDto, ModStatsListDto};
 pub use error::CommandError;
 pub use startup::run_recovery;

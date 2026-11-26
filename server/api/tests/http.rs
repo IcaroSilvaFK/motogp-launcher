@@ -8,7 +8,7 @@ use axum::extract::ConnectInfo;
 use axum::http::{header, Request, StatusCode};
 use axum::Router;
 use chrono::Duration;
-use community_api::testing::{auth_service, FakeClock, FakeDiscord};
+use community_api::testing::{auth_service, star_service, FakeClock, FakeDiscord};
 use community_api::{build_router, AppState, RateLimits};
 use community_application::ports::{HealthProbe, PortResult};
 use community_application::AppError;
@@ -30,8 +30,9 @@ impl HealthProbe for BrokenDb {
 async fn state_with(health: Arc<dyn HealthProbe>, clock: Arc<FakeClock>, trust: bool) -> AppState {
     let store = SqliteStore::connect_in_memory().await.unwrap();
     store.migrate().await.unwrap();
+    let store = Arc::new(store);
     let auth = auth_service(
-        Arc::new(store),
+        store.clone(),
         clock.clone(),
         Arc::new(FakeDiscord::new("rider")),
     );
@@ -39,6 +40,7 @@ async fn state_with(health: Arc<dyn HealthProbe>, clock: Arc<FakeClock>, trust: 
         clock: clock.clone(),
         health,
         auth,
+        stars: star_service(store),
         limits: RateLimits::new(clock),
         trust_proxy_headers: trust,
     }

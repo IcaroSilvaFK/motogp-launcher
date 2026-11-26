@@ -15,6 +15,7 @@ mod catalog_service;
 mod community_error;
 mod community_ports;
 mod community_service;
+mod community_stars;
 mod config_service;
 mod deploy_error;
 mod deploy_ports;
@@ -67,6 +68,7 @@ pub use community_ports::{
     LoopbackSession, PkceSource, ServerUser,
 };
 pub use community_service::{CommunityAuthService, SIGN_IN_TIMEOUT};
+pub use community_stars::{CommunityStarsService, ModStats, ModStatsApi};
 pub use config_service::ConfigService;
 pub use deploy_error::DeployError;
 pub use deploy_ports::{DeployFiles, DeployedRepository, DirCheck};

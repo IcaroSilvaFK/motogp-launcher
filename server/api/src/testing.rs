@@ -4,7 +4,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Duration, Utc};
 use community_application::ports::{AccessToken, Clock, DiscordOAuth, DiscordUser, PortResult};
-use community_application::{AppError, AuthService};
+use community_application::{AppError, AuthService, StarService};
 use community_infrastructure::{OsTokenGenerator, Sha256Hasher, SqliteStore};
 
 /// A clock that only moves when told to.
@@ -95,4 +95,9 @@ pub fn auth_service(
         codes: store,
         discord,
     })
+}
+
+/// Builds the real [`StarService`] over the SQLite store.
+pub fn star_service(store: Arc<SqliteStore>) -> Arc<StarService> {
+    Arc::new(StarService::new(store))
 }

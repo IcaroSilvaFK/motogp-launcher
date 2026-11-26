@@ -287,6 +287,14 @@ export const en: Messages = {
       failed: 'Could not sign in. Try again.',
     },
   },
+  stars: {
+    star: 'Star',
+    count: (stars) => `${stars} ${plural(stars, 'star', 'stars')}`,
+    sort: 'Most stars',
+    signInPrompt: 'Sign in with Discord to star mods.',
+    notNow: 'Not now',
+    failed: 'Could not update the star. Try again.',
+  },
   staleSession: {
     regionLabel: 'Old session pending',
     title: 'A previous game folder still has launcher files',

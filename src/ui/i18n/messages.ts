@@ -310,6 +310,15 @@ export interface Messages {
       failed: string;
     };
   };
+  /** Community stars (#119): the mod page button, the Discover counts and sort. */
+  stars: {
+    star: string;
+    count: (stars: number) => string;
+    sort: string;
+    signInPrompt: string;
+    notNow: string;
+    failed: string;
+  };
   staleSession: {
     regionLabel: string;
     title: string;

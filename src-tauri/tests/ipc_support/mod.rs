@@ -5,10 +5,10 @@
 use motogp_application::{
     AdBeaconError, AdBeaconSink, AdCache, AdCacheError, AdPayload, AdService, AdSource,
     AdSourceError, AppError, AvatarFetcher, BackgroundRunner, CachedAds, CatalogSource,
-    CatalogSourceError, CommunityApi, CommunityAuthService, CredentialStore, FolderOpener,
-    LoopbackError, LoopbackReceiver, LoopbackSession, ModDownloader, PkceSource, ProcessInspector,
-    RawAd, RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch, UrlOpener,
-    WebPageOpener,
+    CatalogSourceError, CommunityApi, CommunityAuthService, CommunityStarsService, CredentialStore,
+    FolderOpener, LoopbackError, LoopbackReceiver, LoopbackSession, ModDownloader, PkceSource,
+    ProcessInspector, RawAd, RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch,
+    UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries, SystemClock};
 use motogp_launcher_lib::{
@@ -306,6 +306,39 @@ impl Harness {
         ad_source: Option<Arc<dyn AdSource>>,
         community: Option<Arc<CommunityAuthService>>,
     ) -> Harness {
+        Harness::build_with(
+            catalog_source,
+            downloader,
+            bundled_catalog,
+            ads,
+            ad_source,
+            community,
+            None,
+        )
+    }
+
+    /// The default composed state with the mod stars service replaced (#119).
+    pub fn with_stars(stars: Arc<CommunityStarsService>) -> Harness {
+        Harness::build_with(
+            Arc::new(FakeCatalogSource::failing()),
+            production_downloader(),
+            None,
+            None,
+            None,
+            None,
+            Some(stars),
+        )
+    }
+
+    fn build_with(
+        catalog_source: Arc<dyn CatalogSource>,
+        downloader: Arc<dyn ModDownloader>,
+        bundled_catalog: Option<RawCatalog>,
+        ads: Option<Arc<Ads>>,
+        ad_source: Option<Arc<dyn AdSource>>,
+        community: Option<Arc<CommunityAuthService>>,
+        stars: Option<Arc<CommunityStarsService>>,
+    ) -> Harness {
         let tmp = TempDir::new().unwrap();
         let data = DataDir::new(tmp.path().join("data"));
         fs::create_dir_all(data.root()).unwrap();
@@ -343,6 +376,10 @@ impl Harness {
         );
         let state = match community {
             Some(community) => state.with_community(community),
+            None => state,
+        };
+        let state = match stars {
+            Some(stars) => state.with_stars(stars),
             None => state,
         };
         let state = match ads {

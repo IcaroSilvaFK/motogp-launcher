@@ -110,7 +110,7 @@ impl HttpCommunityApi {
 }
 
 /// An error text without the URL (it may carry query strings).
-fn describe(error: &reqwest::Error) -> String {
+pub(crate) fn describe(error: &reqwest::Error) -> String {
     let kind = if error.is_timeout() {
         "timed out"
     } else if error.is_connect() {
@@ -122,7 +122,7 @@ fn describe(error: &reqwest::Error) -> String {
 }
 
 /// Maps a non-success status to the port's error type.
-fn status_error(status: StatusCode) -> CommunityApiError {
+pub(crate) fn status_error(status: StatusCode) -> CommunityApiError {
     if status == StatusCode::UNAUTHORIZED {
         CommunityApiError::Unauthorized
     } else if status.is_server_error() {
@@ -133,7 +133,9 @@ fn status_error(status: StatusCode) -> CommunityApiError {
 }
 
 /// Reads at most [`MAX_BODY_BYTES`] and parses JSON.
-fn read_json<T: for<'de> Deserialize<'de>>(response: Response) -> Result<T, CommunityApiError> {
+pub(crate) fn read_json<T: for<'de> Deserialize<'de>>(
+    response: Response,
+) -> Result<T, CommunityApiError> {
     let mut bytes = Vec::new();
     response
         .take(MAX_BODY_BYTES + 1)

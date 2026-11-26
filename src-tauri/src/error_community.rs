@@ -27,6 +27,14 @@ impl From<&CommunityError> for CommandError {
                 "community_sign_in_failed",
                 "The saved community sign-in could not be accessed.",
             ),
+            CommunityError::SignedOut => (
+                "community_signed_out",
+                "Sign in to the community to do this.",
+            ),
+            CommunityError::RequestFailed => (
+                "community_request_failed",
+                "The community request failed. Try again.",
+            ),
         };
         CommandError {
             code: code.to_string(),
@@ -68,6 +76,15 @@ mod tests {
         assert_eq!(
             code(CommunityError::Credential(CredentialError("x".into()))),
             "community_sign_in_failed"
+        );
+    }
+
+    #[test]
+    fn signed_out_and_failed_requests_have_their_own_codes() {
+        assert_eq!(code(CommunityError::SignedOut), "community_signed_out");
+        assert_eq!(
+            code(CommunityError::RequestFailed),
+            "community_request_failed"
         );
     }
 

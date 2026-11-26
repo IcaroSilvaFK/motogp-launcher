@@ -12,3 +12,4 @@ export { createTauriAppInfo } from './tauri/TauriAppInfo';
 export { createTauriWindowControls } from './tauri/TauriWindowControls';
 export { createTauriAdProvider } from './tauri/TauriAdProvider';
 export { createTauriCommunityAccount } from './tauri/TauriCommunityAccount';
+export { createTauriModStats } from './tauri/TauriModStats';

@@ -6,3 +6,4 @@ export * from './types';
 export * from './update';
 export * from './ads';
 export * from './community';
+export * from './modStats';

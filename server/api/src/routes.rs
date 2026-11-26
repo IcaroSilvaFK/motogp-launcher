@@ -10,7 +10,9 @@ use crate::{ApiError, AppState};
 
 /// Routes added by feature issues. Auth is registered here; comments, stars... follow.
 pub fn extra_routes() -> Router<AppState> {
-    Router::new().merge(crate::auth::routes())
+    Router::new()
+        .merge(crate::auth::routes())
+        .merge(crate::stars::routes())
 }
 
 /// `GET /health`: 200 when the database answers.

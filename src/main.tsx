@@ -16,6 +16,7 @@ import {
   createLocalStorageDiscoverViewStore,
   createTauriAdProvider,
   createTauriCommunityAccount,
+  createTauriModStats,
   createLocalStorageLocaleStore,
   createLocalStorageNavStore,
   createTauriAppInfo,
@@ -77,6 +78,8 @@ createRoot(container).render(
       // Sponsored placements (#104): slots render only while the preference above allows them.
       adProvider={createTauriAdProvider(() => activeLocale)}
       communityAccount={createTauriCommunityAccount()}
+      // Community stars (#119): one cached store per app, shared by Discover and the mod page.
+      modStats={createTauriModStats()}
     />
   </StrictMode>,
 );

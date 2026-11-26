@@ -107,6 +107,8 @@ const GLYPHS = {
   heart: (
     <path d="M10 16c-3.8-2.6-6.5-5.1-6.5-8 0-2 1.5-3.5 3.4-3.5 1.3 0 2.4.7 3.1 1.8.7-1.1 1.8-1.8 3.1-1.8 1.9 0 3.4 1.5 3.4 3.5 0 2.9-2.7 5.4-6.5 8z" />
   ),
+  // Community stars (#119): a five-point star; CSS fills it when the mod is starred.
+  star: <path d="M10 3l2.1 4.4 4.8.6-3.5 3.3.9 4.8L10 13.8l-4.3 2.3.9-4.8L3.1 8l4.8-.6z" />,
   // Sponsored card without an image (#123): a generic megaphone on the icon tile.
   megaphone: (
     <>

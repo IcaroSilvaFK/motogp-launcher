@@ -3,6 +3,7 @@
 pub mod config;
 pub mod discord;
 pub mod sqlite;
+pub mod sqlite_stars;
 pub mod system;
 
 pub use config::{Config, ConfigError};

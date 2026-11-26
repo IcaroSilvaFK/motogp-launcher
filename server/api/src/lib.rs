@@ -4,6 +4,7 @@ pub mod auth;
 pub mod error;
 pub mod rate_limit;
 pub mod routes;
+pub mod stars;
 pub mod testing;
 
 use std::sync::Arc;
@@ -16,6 +17,7 @@ use axum::Router;
 use community_application::ports::{Clock, HealthProbe};
 use community_application::AppError;
 use community_application::AuthService;
+use community_application::StarService;
 use community_domain::UserId;
 use tower_http::trace::TraceLayer;
 
@@ -30,6 +32,8 @@ pub struct AppState {
     pub health: Arc<dyn HealthProbe>,
     /// Sign-in use cases and session lookup (used by the `AuthenticatedUser` extractor).
     pub auth: Arc<AuthService>,
+    /// Star use cases.
+    pub stars: Arc<StarService>,
     pub limits: RateLimits,
     /// Trust the right-most `X-Forwarded-For` (only behind our own proxy).
     pub trust_proxy_headers: bool,

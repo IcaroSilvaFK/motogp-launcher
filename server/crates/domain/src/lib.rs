@@ -1,5 +1,8 @@
 //! Community server domain: plain types and rules, no IO.
 
+pub mod stars;
+pub use stars::ModId;
+
 use std::fmt;
 
 use chrono::{DateTime, Duration, Utc};
