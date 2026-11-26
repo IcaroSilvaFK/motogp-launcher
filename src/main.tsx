@@ -17,6 +17,7 @@ import {
   createTauriAdProvider,
   createTauriCommunityAccount,
   createTauriModStats,
+  createTauriModComments,
   createLocalStorageLocaleStore,
   createLocalStorageNavStore,
   createTauriAppInfo,
@@ -80,6 +81,7 @@ createRoot(container).render(
       communityAccount={createTauriCommunityAccount()}
       // Community stars (#119): one cached store per app, shared by Discover and the mod page.
       modStats={createTauriModStats()}
+      modComments={createTauriModComments()}
     />
   </StrictMode>,
 );

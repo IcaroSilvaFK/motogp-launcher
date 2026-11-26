@@ -40,7 +40,8 @@ export function toCommunitySignInError(error: unknown): CommunitySignInError {
   return new CommunitySignInError((typeof code === 'string' && BACKEND_CODES[code]) || 'failed');
 }
 
-const RASTER_DATA_URL = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/;
+/** Raster images only: no SVG, which could carry script. */
+export const RASTER_DATA_URL = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/]+=*$/;
 
 /**
  * Validates an untrusted IPC answer. `null` for anything that is not a known state (a missing

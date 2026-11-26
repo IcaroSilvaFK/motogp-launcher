@@ -117,6 +117,20 @@ const GLYPHS = {
       <path d="M15.5 8.2a2.2 2.2 0 010 3.6" />
     </>
   ),
+  // Mod comments (#118): a speech bubble, a pencil and a bin, on the same 1.5px outline grid.
+  comment: <path d="M3.5 4.5h13v8.5h-7l-3.5 3v-3h-2.5z" />,
+  edit: (
+    <>
+      <path d="M4 16l.7-3.2 8.3-8.3 2.5 2.5-8.3 8.3z" />
+      <path d="M11.5 6l2.5 2.5" />
+    </>
+  ),
+  trash: (
+    <>
+      <path d="M4 6h12M8 6V4.5h4V6" />
+      <path d="M5.5 6l.8 9.5h7.4l.8-9.5" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof GLYPHS;

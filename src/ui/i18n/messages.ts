@@ -319,6 +319,46 @@ export interface Messages {
     notNow: string;
     failed: string;
   };
+  /** Mod page > Comments (#118). */
+  comments: {
+    title: string;
+    /** The count next to the heading; `more` while further pages exist ("20+"). */
+    count: (loaded: number, more: boolean) => string;
+    loading: string;
+    emptyTitle: string;
+    emptyHint: string;
+    offline: string;
+    retry: string;
+    loadMore: string;
+    edited: string;
+    /** Chip on the signed-in member's own comments. */
+    you: string;
+    composerLabel: string;
+    placeholder: string;
+    /** Visible character counter under a draft. */
+    counter: (used: number, max: number) => string;
+    tooLong: (over: number) => string;
+    shortcutHint: string;
+    post: string;
+    signIn: string;
+    signInHint: string;
+    accountOffline: string;
+    edit: string;
+    editLabel: string;
+    save: string;
+    cancel: string;
+    delete: string;
+    confirmDelete: string;
+    dismiss: string;
+    errors: {
+      offline: string;
+      signed_out: string;
+      rate_limited: (seconds: number) => string;
+      invalid: string;
+      not_found: string;
+      failed: string;
+    };
+  };
   staleSession: {
     regionLabel: string;
     title: string;

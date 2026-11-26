@@ -17,6 +17,7 @@ import type {
   DiscoverViewStore,
   LauncherController,
   ModStatsSource,
+  ModComments,
   NavPreferenceStore,
   UpdateController,
   WindowControls,
@@ -80,11 +81,13 @@ function Shell({
   adProvider,
   communityAccount,
   modStats,
+  modComments,
 }: {
   controller: LauncherController;
   adProvider?: AdProvider;
   communityAccount?: CommunityAccount;
   modStats?: ModStatsSource;
+  modComments?: ModComments;
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
@@ -118,7 +121,10 @@ function Shell({
   const ads = useMemo(() => ({ provider: adProvider }), [adProvider]);
   // One stars store per source, so Discover and the mod page share its 60 s cache (#119).
   const starsStore = useMemo(() => (modStats ? createModStatsStore(modStats) : undefined), [modStats]);
-  const community = useMemo(() => ({ account: communityAccount, stars: starsStore }), [communityAccount, starsStore]);
+  const community = useMemo(
+    () => ({ account: communityAccount, stars: starsStore, comments: modComments }),
+    [communityAccount, starsStore, modComments],
+  );
 
   useEffect(() => {
     void controller.start();
@@ -207,6 +213,7 @@ export function App({
   adProvider,
   communityAccount,
   modStats,
+  modComments,
 }: {
   controller: LauncherController;
   locale?: Locale;
@@ -227,6 +234,7 @@ export function App({
   communityAccount?: CommunityAccount;
   /** Community stars (#119); absent means no counts and no star button. */
   modStats?: ModStatsSource;
+  modComments?: ModComments;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
@@ -243,6 +251,7 @@ export function App({
         adProvider={adProvider}
         communityAccount={communityAccount}
         modStats={modStats}
+        modComments={modComments}
       />
     </I18nProvider>
   );

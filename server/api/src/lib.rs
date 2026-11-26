@@ -1,6 +1,7 @@
 //! Community server HTTP interface: router, error format, rate limiting.
 
 pub mod auth;
+pub mod comments;
 pub mod error;
 pub mod rate_limit;
 pub mod routes;
@@ -35,6 +36,8 @@ pub struct AppState {
     /// Star use cases.
     pub stars: Arc<StarService>,
     pub limits: RateLimits,
+    /// Mod comments use cases and their write limiter.
+    pub comments: comments::CommentsState,
     /// Trust the right-most `X-Forwarded-For` (only behind our own proxy).
     pub trust_proxy_headers: bool,
 }

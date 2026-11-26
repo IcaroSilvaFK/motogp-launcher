@@ -36,3 +36,7 @@ harness = false
 [[test]]
 name = "stars_features"
 harness = false
+
+[[test]]
+name = "comments_features"
+harness = false

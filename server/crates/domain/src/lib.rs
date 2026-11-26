@@ -2,6 +2,7 @@
 
 pub mod stars;
 pub use stars::ModId;
+pub mod comments;
 
 use std::fmt;
 

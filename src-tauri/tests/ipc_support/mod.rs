@@ -5,10 +5,10 @@
 use motogp_application::{
     AdBeaconError, AdBeaconSink, AdCache, AdCacheError, AdPayload, AdService, AdSource,
     AdSourceError, AppError, AvatarFetcher, BackgroundRunner, CachedAds, CatalogSource,
-    CatalogSourceError, CommunityApi, CommunityAuthService, CommunityStarsService, CredentialStore,
-    FolderOpener, LoopbackError, LoopbackReceiver, LoopbackSession, ModDownloader, PkceSource,
-    ProcessInspector, RawAd, RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch,
-    UrlOpener, WebPageOpener,
+    CatalogSourceError, CommunityApi, CommunityAuthService, CommunityCommentsService,
+    CommunityStarsService, CredentialStore, FolderOpener, LoopbackError, LoopbackReceiver,
+    LoopbackSession, ModDownloader, PkceSource, ProcessInspector, RawAd, RawCatalog, RawEntry,
+    SessionEvent, SessionPublisher, SourceFetch, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries, SystemClock};
 use motogp_launcher_lib::{
@@ -286,6 +286,20 @@ impl Harness {
         )
     }
 
+    /// The default composed state with the comments service replaced (#118).
+    pub fn with_comments(comments: Arc<CommunityCommentsService>) -> Harness {
+        Harness::build_with(
+            Arc::new(FakeCatalogSource::failing()),
+            production_downloader(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(comments),
+        )
+    }
+
     /// The default composed state with the ad service replaced (#103).
     pub fn with_ads(ads: Arc<Ads>) -> Harness {
         Harness::build(
@@ -314,6 +328,7 @@ impl Harness {
             ad_source,
             community,
             None,
+            None,
         )
     }
 
@@ -327,9 +342,12 @@ impl Harness {
             None,
             None,
             Some(stars),
+            None,
         )
     }
 
+    // One optional override per service the tests can swap; a struct would only rename them.
+    #[allow(clippy::too_many_arguments)]
     fn build_with(
         catalog_source: Arc<dyn CatalogSource>,
         downloader: Arc<dyn ModDownloader>,
@@ -338,6 +356,7 @@ impl Harness {
         ad_source: Option<Arc<dyn AdSource>>,
         community: Option<Arc<CommunityAuthService>>,
         stars: Option<Arc<CommunityStarsService>>,
+        comments: Option<Arc<CommunityCommentsService>>,
     ) -> Harness {
         let tmp = TempDir::new().unwrap();
         let data = DataDir::new(tmp.path().join("data"));
@@ -380,6 +399,10 @@ impl Harness {
         };
         let state = match stars {
             Some(stars) => state.with_stars(stars),
+            None => state,
+        };
+        let state = match comments {
+            Some(comments) => state.with_comments(comments),
             None => state,
         };
         let state = match ads {
@@ -511,6 +534,19 @@ pub fn community_over(
         loopback,
         Arc::new(FixedPkce),
         Arc::new(FakeWebOpener::default()),
+        Arc::new(NoAvatarFetcher),
+    ))
+}
+
+/// The comments service over fake ports (never a network or the Credential
+/// Manager).
+pub fn comments_over(
+    api: Arc<dyn motogp_application::CommunityCommentsApi>,
+    store: Arc<dyn CredentialStore>,
+) -> Arc<CommunityCommentsService> {
+    Arc::new(CommunityCommentsService::new(
+        api,
+        store,
         Arc::new(NoAvatarFetcher),
     ))
 }

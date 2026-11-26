@@ -9,7 +9,7 @@ use std::sync::Mutex;
 
 /// A server that can never be reached.
 pub struct UnavailableCommunityApi {
-    reason: String,
+    pub(crate) reason: String,
 }
 
 impl UnavailableCommunityApi {

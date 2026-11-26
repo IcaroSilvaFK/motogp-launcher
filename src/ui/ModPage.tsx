@@ -7,6 +7,7 @@ import { CategoryCover, InlineError } from './CatalogParts';
 import { Icon } from './Icon';
 import { formatDay, formatSize, useI18n } from './i18n';
 import { CatalogInstallButton } from './InstallButton';
+import { ModComments } from './ModComments';
 import { SafeMarkdown } from './SafeMarkdown';
 import { ScreenshotGallery } from './ScreenshotGallery';
 import { StarButton } from './StarButton';
@@ -196,6 +197,7 @@ export function ModPage({
               ))}
             </dl>
           </section>
+          <ModComments modId={entry.id} />
         </div>
 
         <div className="mod-aside">
