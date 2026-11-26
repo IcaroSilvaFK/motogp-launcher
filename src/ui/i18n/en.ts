@@ -7,6 +7,12 @@ export const en: Messages = {
   appName: 'MotoGP Launcher',
   loading: 'Loading…',
   dismiss: 'Dismiss',
+  ads: {
+    consentLabel: 'Sponsored content',
+    consentText: 'The launcher shows sponsored cards. They do not track you.',
+    keep: 'Keep',
+    turnOff: 'Turn off ads',
+  },
   nav: {
     label: 'Main navigation',
     library: 'Library',
@@ -169,6 +175,10 @@ export const en: Messages = {
     chooseFolder: 'Choose folder…',
     gameHint: 'The launcher copies the active profile into this game folder when you press Play.',
     preferences: 'Preferences',
+    adPreference: 'Sponsored content',
+    adPreferenceHint: 'Cards from project sponsors. No tracking.',
+    adShow: 'Show',
+    adOff: 'Off',
     languageHint: 'Applies immediately and is remembered.',
     language: 'Language',
     languageNames: { 'pt-BR': 'Português (Brasil)', en: 'English' },

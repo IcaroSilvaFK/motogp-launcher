@@ -7,6 +7,7 @@ export type {
   SessionPhase,
 } from './controller';
 export type {
+  AdPreferenceStore,
   DiscoverView,
   DiscoverViewStore,
   DropEvents,
@@ -20,6 +21,7 @@ export type {
 export { loadLocale, saveLocale } from './localePreference';
 export { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarPreference';
 export { loadDiscoverView, saveDiscoverView } from './discoverViewPreference';
+export { loadAdPreference, saveAdPreference } from './adPreference';
 export { createLauncherController } from './createLauncherController';
 export { selectCanPlay } from './selectCanPlay';
 export { selectCanStop } from './selectCanStop';
