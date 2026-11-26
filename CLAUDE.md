@@ -20,11 +20,23 @@ Everything runs inside Claude; Codex is no longer part of the flow (decided 2026
    - **UI specialist** (decided 2026-11-23): visual redesigns, layout, design tokens and screen usability in `src/ui` go to the `ui-designer` agent ([.claude/agents/ui-designer.md](.claude/agents/ui-designer.md), **model: Opus**) instead of a Sonnet dev. Same rules as any dev (TDD, no commits, hands off to QA). Reference screenshots from other products are inspiration only: reuse patterns, never their brand. If the agent type is not loaded in the session, spawn a general-purpose agent with `model: "opus"` and the file's body as its instructions.
 4. **QA agents (N)**: run the gates and write/complete the BDD scenarios. Problem found → report back to the Coordinator. No problem → notify the PO. **Model: Haiku** (`model: "haiku"`).
 
-Rule: the chat does not implement directly. Demand (PO) → Coordinator elaborates and dispatches devs (Sonnet) → dev delivers to QA (Haiku) → QA fails: back to Coordinator / QA passes: PO → PO commits, opens the PR, merges and closes the issue → PO reports to the user.
+### Task size decides the process (decided 2026-11-26)
+
+The full pipeline is slow and costly, so it is reserved for complex work. The PO classifies every demand before dispatching it:
+
+| Size | Examples | Process |
+|------|----------|---------|
+| **Trivial** | copy or translation tweak, doc or CLAUDE.md edit, config value, catalog/ads JSON entry, one-line fix | The PO does it directly on its own branch, runs the narrow check (the touched crate's tests or `corepack pnpm test`), opens the PR and merges on green CI. No issue needed (the PR describes it), no Coordinator, no QA agent. |
+| **Simple** | a bug fix or small feature inside one layer or crate, a UI tweak on one screen, no new port or IPC contract | Issue with a short task and Gherkin written by the PO. **One dev** (Sonnet; `ui-designer` for visual work) implements with TDD and runs the gates for what it touched (fmt, lint, types, the touched crate's or frontend tests). No Coordinator, no separate QA agent, no llvm-cov: CI is the full gate. A CI failure goes back to a new dev. |
+| **Complex** | spans layers or crates, adds a port, IPC command or contract, touches the session/game state, or needs a design decision | Full pipeline below: Coordinator elaborates in detail (context, scope, contracts, Gherkin, files), devs, QA running the gates on the impacted parts (see "Incremental testing only"). |
+
+When in doubt between two sizes, pick the smaller one; CI still guards the merge. If a trivial or simple task turns out bigger, promote it.
+
+Rule for complex tasks: the chat does not implement directly. Demand (PO) → Coordinator elaborates and dispatches devs (Sonnet) → dev delivers to QA (Haiku) → QA fails: back to Coordinator / QA passes: PO → PO commits, opens the PR, merges and closes the issue → PO reports to the user.
 
 If a subagent cannot spawn other agents, the PO spawns the devs and QA itself, using exactly the task the Coordinator wrote, and routes QA reports back to the Coordinator (via `SendMessage`).
 
-## Git / issues flow (mandatory for every task)
+## Git / issues flow (complex tasks; simple tasks skip the Coordinator and QA steps, trivial ones also skip the issue)
 
 1. **PO publishes the issue** on the remote repository (`gh issue create`) with the demand.
 2. **Coordinator elaborates** the task with all the details (context, scope, Gherkin acceptance criteria) and adds them to the issue.
@@ -33,6 +45,7 @@ If a subagent cannot spawn other agents, the PO spawns the devs and QA itself, u
 5. **QA validates** (all gates + scenarios). Failures go back to the Coordinator, who dispatches a new dev; this loops until QA passes and notifies the PO.
 6. **Integration check (PO, before every push):** QA approved the branch against the `dev` it started from, so it may not compose with what merged since. The PO commits, rebases onto the current `origin/dev` and, if `dev` moved since the branch was cut or last checked, runs the cheap integration gate in the worktree: `cargo check --workspace --all-targets` (Rust touched on either side), `cargo test -p <crate>` for every crate both sides touched, and `corepack pnpm tsc --noEmit` + `corepack pnpm test` (frontend touched on either side). Any failure goes back to the Coordinator as a normal QA failure. Typical breaks: a new enum variant hitting an exhaustive `match` written by another issue, a renamed port, a new IPC error code missing from a mapping, two BDD runner lists edited at once.
 7. Only then: **the PO pushes and opens the PR to `dev`** referencing the issue (`Closes #<no>`).
+   **Every PR description ends with a "Cost" section (decided 2026-11-26):** total tokens and total wall-clock time spent on the task, summed over every agent that worked on it (Coordinator, devs, QA, fix rounds), taken from each agent's completion usage (`subagent_tokens`, `duration_ms`). Show the total and a one-line split per agent, e.g. `Tokens: 245k (coordinator 75k, dev 120k, QA 50k) · Time: 1h 12m`. For work the PO did itself, give the elapsed time and write the tokens as "not measured". Coordinators report the usage of the agents they spawned in their final report so the PO can fill this in.
 8. **The PO merges on its own** (the user granted blanket merge permission on 2026-11-19): once QA approved and CI is green, merge the PR (`gh pr merge --merge --delete-branch`) without asking. `Closes #N` does not auto-close issues on merges into `dev` (the default branch is `main`), so close the issue/card manually right after the merge.
 
 **Tooling notes:**
@@ -46,8 +59,12 @@ Parallelism applies to **agents**, never to heavy local processes. The limits be
 
 - **Rust builds: one at a time, 2 jobs.** `~/.cargo/config.toml` sets one shared `target-dir` on C: (`C:/Users/whyy/.cache/motogp-target/shared`), `jobs = 2` and `RUST_TEST_THREADS = 2`. Cargo locks the shared dir, so concurrent builds queue ("Blocking waiting for file lock" = wait). **Never set `CARGO_TARGET_DIR`**: run `unset CARGO_TARGET_DIR` before cargo. A stale-rlib doctest error (`unresolved import motogp_domain::...`) is fixed with `cargo clean -p motogp-domain -p motogp-application`.
 - **Process watchdog:** `C:\Users\whyy\.claude\motogp-guard.ps1` runs in the background during agent work. Every 3 s it gives cargo, rustc, linker, llvm-cov, project Node and rust-analyzer processes **idle** priority, and pins them to logical cores 0–3, leaving 4–15 free. Start it at the beginning of every session (`& "C:\Users\whyy\.claude\motogp-guard.ps1"` in a background PowerShell).
-- **Devs iterate narrowly:** use `cargo test -p <crate>` while working; run the full workspace gates once at the end. No clippy or llvm-cov during rebases or conflict fixes, because CI runs everything.
-- **Coverage (`cargo llvm-cov`) only in QA**, once per issue. It rebuilds everything with instrumentation and is the heaviest step.
+- **Incremental testing only (decided 2026-11-26):** locally, devs, QA and the PO run tests **only for the impacted parts**, never the whole workspace or the whole frontend suite:
+  - Rust: `cargo test -p <crate>` for each touched crate. Add a dependent crate only when a public type or port it uses changed.
+  - Frontend: `corepack pnpm vitest related <changed files> --run` (tests that import the changed files) plus the touched `.feature` test. `tsc --noEmit` and lint still run, since they are fast and catch cross-file breaks.
+  - fmt and clippy only on the touched crates (`cargo clippy -p <crate>`).
+  - The full suite runs **only in CI**, which stays the merge gate. A CI failure in an untouched area goes back as a normal fix task.
+- **Coverage (`cargo llvm-cov`, `pnpm test --coverage`) is not run locally**, not even by QA: CI measures it. Run it locally only to investigate a CI coverage failure, and only for the affected crate.
 - **Stop stale work:** when an issue's code is about to change (for example after a QA failure), stop its running QA. Remove a merged issue's worktree right away.
 - **Prefer CI over local:** PR validation, rebases with no code changes and installer builds rely on GitHub Actions, not local builds.
 
@@ -80,4 +97,4 @@ Details in [docs/validation-workflow.md](docs/validation-workflow.md). Summary:
 - **BDD:** every issue has acceptance criteria in Gherkin, and each scenario becomes a test.
 - **TDD:** Red → Green → Refactor; test always before code. Coverage ≥ 90% in domain/application and ≥ 80% overall.
 - **Clean Architecture:** dependencies only point inward (`interface → infrastructure → application → domain`). Rust in separate crates (`domain`, `application`, `infrastructure`, `src-tauri`). Frontend in `domain/application/infrastructure/ui`, with boundaries checked in lint.
-- **Gates:** QA (Haiku) runs fmt, lint, types, tests, BDD, architecture and coverage. The CI in `.github/workflows/validacao.yml` repeats the same gates.
+- **Gates:** locally, QA (Haiku) runs fmt, lint, types, tests, BDD and architecture **on the impacted parts only**. The CI in `.github/workflows/validacao.yml` runs every gate on everything, including coverage, and is the merge gate.
