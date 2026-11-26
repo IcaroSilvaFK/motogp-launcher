@@ -1,4 +1,5 @@
 import type {
+  CatalogInstallResult,
   Catalog,
   CatalogInstallProgress,
   CommandError,
@@ -332,13 +333,26 @@ export class FakeGateway implements LauncherGateway {
   installGate: Promise<void> | null = null;
   private readonly progressListeners = new Set<(progress: CatalogInstallProgress) => void>();
 
-  async installCatalogEntry(id: string): Promise<ModEntry[]> {
+  /** Name of the enabled mod that makes the next auto-enable conflict; null means no conflict. */
+  installConflictWith: string | null = null;
+
+  async installCatalogEntry(id: string, enableAfterInstall = false): Promise<CatalogInstallResult> {
     // The call is recorded (and may fail) first; the gate then keeps it "in flight".
-    await this.run('installCatalogEntry', [id], () => undefined);
+    await this.run('installCatalogEntry', [id, enableAfterInstall], () => undefined);
     if (this.installGate) await this.installGate;
     const mods = this.installResult ?? [{ id, name: id, files: [`${id}.pak`], size_bytes: 1024 }];
     for (const mod of mods) if (!this.mods.some((m) => m.id === mod.id)) this.mods.push(mod);
-    return mods.map((mod) => ({ ...mod }));
+    const modId = mods[0]?.id ?? id;
+    const active = this.profiles.find((p) => p.id === this.config.active_profile);
+    const conflictWith = enableAfterInstall && this.installConflictWith ? this.installConflictWith : undefined;
+    const enabled = enableAfterInstall && conflictWith === undefined && !!active && active.id !== VANILLA_ID;
+    if (enabled && active) active.mod_ids = [...active.mod_ids, modId];
+    return {
+      mods: mods.map((mod) => ({ ...mod })),
+      modId,
+      enabled,
+      ...(conflictWith === undefined ? {} : { conflictWith }),
+    };
   }
 
   cancelCatalogInstall(id: string): Promise<void> {

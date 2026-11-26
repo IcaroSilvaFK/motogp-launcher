@@ -8,6 +8,7 @@ import {
 } from '../application';
 import type {
   AdPreferenceStore,
+  AutoEnablePreferenceStore,
   AdProvider,
   CommunityAccount,
   AppInfo,
@@ -20,6 +21,7 @@ import type {
 } from '../application';
 import { AdConsentBar } from './AdConsentBar';
 import { AdPreferenceProvider } from './AdPreferenceContext';
+import { AutoEnablePreferenceProvider } from './AutoEnablePreferenceContext';
 import { AdsContext } from './AdsContext';
 import { CommunityContext } from './CommunityContext';
 import { AppInfoContext } from './AppInfoContext';
@@ -72,6 +74,7 @@ function Shell({
   catalog,
   discoverViewStore,
   adPreferenceStore,
+  autoEnableStore,
   adProvider,
   communityAccount,
 }: {
@@ -85,6 +88,8 @@ function Shell({
   catalog?: CatalogController;
   discoverViewStore?: DiscoverViewStore;
   adPreferenceStore?: AdPreferenceStore;
+  /** "Enable mods after installing from Discover" (#129); without it the preference is on and not persisted. */
+  autoEnableStore?: AutoEnablePreferenceStore;
 }) {
   const state = useLauncherState(controller);
   const screens = useMemo(() => (catalog ? ALL_SCREENS : ALL_SCREENS.filter((id) => id !== 'discover')), [catalog]);
@@ -130,49 +135,51 @@ function Shell({
     <AppInfoContext.Provider value={info}>
       <LauncherContext.Provider value={value}>
         <AdPreferenceProvider store={adPreferenceStore}>
-          <AdsContext.Provider value={ads}>
-            <CommunityContext.Provider value={community}>
-              <div className="app-shell">
-                <TitleBar controls={windowControls} />
-                <Sidebar
-                  screens={screens}
-                  current={screen}
-                  onSelect={setScreen}
-                  collapsed={collapsed}
-                  onToggle={toggleSidebar}
-                />
-                <div className="app-content">
-                  <div className="app-messages">
-                    <NoticeBar />
-                    <div className="notices">
-                      <AdConsentBar />
+          <AutoEnablePreferenceProvider store={autoEnableStore}>
+            <AdsContext.Provider value={ads}>
+              <CommunityContext.Provider value={community}>
+                <div className="app-shell">
+                  <TitleBar controls={windowControls} />
+                  <Sidebar
+                    screens={screens}
+                    current={screen}
+                    onSelect={setScreen}
+                    collapsed={collapsed}
+                    onToggle={toggleSidebar}
+                  />
+                  <div className="app-content">
+                    <div className="app-messages">
+                      <NoticeBar onOpenLibrary={() => setScreen('library')} />
+                      <div className="notices">
+                        <AdConsentBar />
+                      </div>
+                      {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
                     </div>
-                    {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
+                    <main aria-busy={loading ? 'true' : undefined}>
+                      {loading ? (
+                        <LoadingState />
+                      ) : (
+                        // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
+                        <ScreenTransition key={screen}>
+                          {screen === 'library' && <LibraryScreen />}
+                          {screen === 'discover' && catalog && (
+                            <DiscoverScreen
+                              catalog={catalog}
+                              onGoToLibrary={() => setScreen('library')}
+                              viewStore={discoverViewStore}
+                            />
+                          )}
+                          {screen === 'profiles' && <ProfilesScreen />}
+                          {screen === 'settings' && <SettingsScreen />}
+                        </ScreenTransition>
+                      )}
+                    </main>
                   </div>
-                  <main aria-busy={loading ? 'true' : undefined}>
-                    {loading ? (
-                      <LoadingState />
-                    ) : (
-                      // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
-                      <ScreenTransition key={screen}>
-                        {screen === 'library' && <LibraryScreen />}
-                        {screen === 'discover' && catalog && (
-                          <DiscoverScreen
-                            catalog={catalog}
-                            onGoToLibrary={() => setScreen('library')}
-                            viewStore={discoverViewStore}
-                          />
-                        )}
-                        {screen === 'profiles' && <ProfilesScreen />}
-                        {screen === 'settings' && <SettingsScreen />}
-                      </ScreenTransition>
-                    )}
-                  </main>
+                  <StatusBar onSetUpGame={() => setScreen('settings')} />
                 </div>
-                <StatusBar onSetUpGame={() => setScreen('settings')} />
-              </div>
-            </CommunityContext.Provider>
-          </AdsContext.Provider>
+              </CommunityContext.Provider>
+            </AdsContext.Provider>
+          </AutoEnablePreferenceProvider>
         </AdPreferenceProvider>
       </LauncherContext.Provider>
     </AppInfoContext.Provider>
@@ -190,6 +197,7 @@ export function App({
   catalog,
   discoverViewStore,
   adPreferenceStore,
+  autoEnableStore,
   adProvider,
   communityAccount,
 }: {
@@ -205,6 +213,8 @@ export function App({
   discoverViewStore?: DiscoverViewStore;
   /** The sponsored-content choice (#105); without it ads stay off. */
   adPreferenceStore?: AdPreferenceStore;
+  /** "Enable mods after installing from Discover" (#129); without it the preference is on and not persisted. */
+  autoEnableStore?: AutoEnablePreferenceStore;
   /** Sponsored placements (#104); absent means no ads at all. Slots render only while the preference allows. */
   adProvider?: AdProvider;
   communityAccount?: CommunityAccount;
@@ -220,6 +230,7 @@ export function App({
         catalog={catalog}
         discoverViewStore={discoverViewStore}
         adPreferenceStore={adPreferenceStore}
+        autoEnableStore={autoEnableStore}
         adProvider={adProvider}
         communityAccount={communityAccount}
       />

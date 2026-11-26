@@ -63,7 +63,7 @@ export function createTauriGateway(invoke: InvokeFn = tauriInvoke, listen: Liste
     getCatalog: () => call('get_catalog'),
     refreshCatalog: () => call('refresh_catalog'),
     openCatalogPage: (id) => call('open_catalog_page', { id }),
-    installCatalogEntry: (id) => call('install_catalog_entry', { id }),
+    installCatalogEntry: (id, enableAfterInstall) => call('install_catalog_entry', { id, enableAfterInstall }),
     cancelCatalogInstall: (id) => call('cancel_catalog_install', { id }),
     onCatalogInstallProgress: (handler) =>
       subscribe<CatalogInstallProgress>(

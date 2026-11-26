@@ -3,6 +3,7 @@ import { selectCanInstall } from '../application';
 import type { CatalogInstallState } from '../domain';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
+import { useAutoEnablePreference } from './AutoEnablePreferenceContext';
 import { useLauncher } from './LauncherContext';
 
 export interface InstallButtonProps {
@@ -100,7 +101,7 @@ export function InstallButton({ state, disabled = false, onInstall, onRetry, onC
         <div className="install-control" data-status="installed">
           <span className="badge badge-on install-done" role="status">
             <Icon name="check" />
-            {t.catalogInstall.installed}
+            {state.enabled ? t.catalogInstall.installedEnabled : t.catalogInstall.installed}
           </span>
         </div>
       );
@@ -132,7 +133,8 @@ export function InstallButton({ state, disabled = false, onInstall, onRetry, onC
 /** InstallButton wired to the launcher: the entry's install state, the session lock and the controller. */
 export function CatalogInstallButton({ entryId }: { entryId: string }) {
   const { controller, state } = useLauncher();
-  const start = () => void controller.installCatalogEntry(entryId);
+  const { enabled } = useAutoEnablePreference();
+  const start = () => void controller.installCatalogEntry(entryId, { enable: enabled });
   return (
     <InstallButton
       state={state.catalogInstalls[entryId] ?? IDLE}

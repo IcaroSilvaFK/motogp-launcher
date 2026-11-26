@@ -271,13 +271,18 @@ where
     }
 
     /// Imports the staged file into the library. Re-checks the session lock
-    /// and always removes the staging area.
+    /// and always removes the staging area. With `enable_in` (the active
+    /// profile id) every imported mod is also enabled there, unless it would
+    /// conflict with a mod already enabled: then it stays installed but
+    /// disabled and the outcome names the conflicting mod (#129). A failure
+    /// while enabling never fails the install: the mod simply stays disabled.
     pub fn install<R, F, A, MH, PR, PC>(
         &self,
         mods: &ModService<R, F, A, MH>,
         profiles: &ProfileService<PR, PC>,
         staged: StagedDownload,
-    ) -> Result<Vec<ModEntry>, CatalogInstallError>
+        enable_in: Option<&str>,
+    ) -> Result<InstallOutcome, CatalogInstallError>
     where
         R: ModRepository,
         F: LibraryFiles,
@@ -287,8 +292,13 @@ where
         PC: Clock,
     {
         let result = ensure_idle(profiles).and_then(|()| {
-            mods.import(staged.path())
-                .map_err(CatalogInstallError::Library)
+            let entries = mods
+                .import(staged.path())
+                .map_err(CatalogInstallError::Library)?;
+            Ok(match enable_in {
+                Some(profile_id) => enable_imported(mods, profiles, profile_id, entries),
+                None => InstallOutcome::installed_only(entries),
+            })
         });
         self.discard(staged);
         result
@@ -298,6 +308,87 @@ where
     pub fn discard(&self, staged: StagedDownload) {
         self.staging.remove(staged.entry_id());
     }
+}
+
+/// Result of an install: the imported mods and what happened to enabling them.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct InstallOutcome {
+    pub mods: Vec<ModEntry>,
+    /// Id of the first imported mod (the one the install is about).
+    pub mod_id: String,
+    /// True when every imported mod was enabled in the profile.
+    pub enabled: bool,
+    /// Name of the enabled mod that blocked enabling, when there was a conflict.
+    pub conflict_with: Option<String>,
+}
+
+impl InstallOutcome {
+    fn installed_only(mods: Vec<ModEntry>) -> Self {
+        Self {
+            mod_id: mods.first().map(|m| m.id.clone()).unwrap_or_default(),
+            mods,
+            enabled: false,
+            conflict_with: None,
+        }
+    }
+}
+
+fn enable_imported<R, F, A, MH, PR, PC>(
+    mods: &ModService<R, F, A, MH>,
+    profiles: &ProfileService<PR, PC>,
+    profile_id: &str,
+    entries: Vec<ModEntry>,
+) -> InstallOutcome
+where
+    R: ModRepository,
+    F: LibraryFiles,
+    A: ArchiveReader,
+    MH: ContentHasher,
+    PR: ProfileRepository,
+    PC: Clock,
+{
+    let mut outcome = InstallOutcome::installed_only(entries);
+    let Ok(profile) = profiles.get(profile_id) else {
+        return outcome;
+    };
+    // Vanilla means "no mods": nothing is ever enabled there.
+    if profile.is_vanilla() {
+        return outcome;
+    }
+    let Ok(library) = mods.list() else {
+        return outcome;
+    };
+    let mut order = profile.mod_ids.clone();
+    let mut all_enabled = !outcome.mods.is_empty();
+    for entry in &outcome.mods {
+        let mut candidate = order.clone();
+        candidate.push(entry.id.clone());
+        let blocker = mods.list_conflicts(&candidate).ok().and_then(|conflicts| {
+            conflicts
+                .into_iter()
+                .find(|c| c.mod_ids.contains(&entry.id))
+                .and_then(|c| c.mod_ids.into_iter().find(|id| *id != entry.id))
+        });
+        match blocker {
+            Some(other) => {
+                all_enabled = false;
+                if outcome.conflict_with.is_none() {
+                    outcome.conflict_with = Some(
+                        library
+                            .iter()
+                            .find(|m| m.id == other)
+                            .map_or(other, |m| m.name.clone()),
+                    );
+                }
+            }
+            None => order = candidate,
+        }
+    }
+    if order.len() > profile.mod_ids.len() && profiles.set_mods(profile_id, order).is_err() {
+        all_enabled = false;
+    }
+    outcome.enabled = all_enabled;
+    outcome
 }
 
 fn ensure_idle<PR, PC>(profiles: &ProfileService<PR, PC>) -> Result<(), CatalogInstallError>

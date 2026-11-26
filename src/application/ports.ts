@@ -1,6 +1,7 @@
 import type {
   Catalog,
   CatalogInstallProgress,
+  CatalogInstallResult,
   Config,
   FileConflict,
   CurrentSession,
@@ -60,8 +61,8 @@ export interface LauncherGateway {
   // Catalog pages (#73).
   /** Opens the entry's web page in the default browser. Only the id is sent: the backend owns the URL and its policy. */
   openCatalogPage(id: string): Promise<void>;
-  /** Downloads, verifies and imports a catalog entry; resolves with the imported mods. */
-  installCatalogEntry(id: string): Promise<ModEntry[]>;
+  /** Downloads, verifies and imports a catalog entry, optionally enabling it in the active profile (#129). */
+  installCatalogEntry(id: string, enableAfterInstall: boolean): Promise<CatalogInstallResult>;
   /** Cancels the in-flight install of the entry; a no-op when nothing is in flight. */
   cancelCatalogInstall(id: string): Promise<void>;
   /** Progress of catalog installs. Synchronous: a failed registration only means no progress is shown. */
@@ -109,4 +110,10 @@ export interface DiscoverViewStore {
 export interface AdPreferenceStore {
   load(): 'on' | 'off' | null;
   save(value: 'on' | 'off'): void;
+}
+
+/** "Enable mods after installing from Discover" (#129). `null` means never chosen (default on); `load` may throw. */
+export interface AutoEnablePreferenceStore {
+  load(): boolean | null;
+  save(value: boolean): void;
 }

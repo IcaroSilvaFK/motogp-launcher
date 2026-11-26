@@ -224,6 +224,8 @@ export interface Messages {
     preferences: string;
     adPreference: string;
     adPreferenceHint: string;
+    autoEnable: string;
+    autoEnableHint: string;
     adShow: string;
     adOff: string;
     languageHint: string;
@@ -320,6 +322,11 @@ export interface Messages {
     cancel: string;
   };
   notices: {
+    modInstalled: (name: string) => string;
+    modInstalledEnabled: (name: string) => string;
+    modInstalledConflict: (name: string, other: string) => string;
+    undo: string;
+    openLibrary: string;
     imported: (count: number) => string;
     modRemoved: string;
     gameConfigured: (name: string) => string;
@@ -347,6 +354,7 @@ export interface Messages {
     verifying: string;
     installing: string;
     installed: string;
+    installedEnabled: string;
     failed: string;
     retry: string;
     cancel: string;

@@ -1,4 +1,10 @@
-import type { CatalogInstallProgress, CatalogInstallState, CommandError, SessionEvent } from '../domain';
+import type {
+  CatalogInstallProgress,
+  CatalogInstallResult,
+  CatalogInstallState,
+  CommandError,
+  SessionEvent,
+} from '../domain';
 import { VANILLA_ID, isSupportedModFile, isVanilla, toCommandError, toggleMod } from '../domain';
 import type { LauncherController, LauncherDeps, LauncherState, Notice, SessionPhase } from './controller';
 import { selectCanInstall } from './selectCanInstall';
@@ -464,12 +470,13 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         set({ error: toCommandError(caught), ...(version === sessionVersion ? { session: previous } : {}) });
       }
     },
-    async installCatalogEntry(id) {
+    async installCatalogEntry(id, options) {
       if (installing.has(id) || !selectCanInstall(state)) return;
       installing.add(id);
       setInstall(id, { status: 'downloading', received: 0, total: 0, percent: 0 });
+      let result: CatalogInstallResult;
       try {
-        await gateway.installCatalogEntry(id);
+        result = await gateway.installCatalogEntry(id, options?.enable ?? false);
       } catch (caught) {
         const error = toCommandError(caught);
         // A cancel is the user's choice, not a failure.
@@ -478,9 +485,22 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
       } finally {
         installing.delete(id);
       }
-      setInstall(id, { status: 'installed' });
+      setInstall(id, {
+        status: 'installed',
+        enabled: result.enabled,
+        ...(result.conflictWith === undefined ? {} : { conflictWith: result.conflictWith }),
+      });
+      set({
+        notice: {
+          kind: 'mod-installed',
+          modId: result.modId,
+          name: result.mods.find((mod) => mod.id === result.modId)?.name ?? id,
+          enabled: result.enabled,
+          ...(result.conflictWith === undefined ? {} : { conflictWith: result.conflictWith }),
+        },
+      });
       try {
-        await load(['mods']);
+        await load(result.enabled ? ['mods', 'profiles'] : ['mods']);
       } catch (caught) {
         set({ error: toCommandError(caught) });
       }

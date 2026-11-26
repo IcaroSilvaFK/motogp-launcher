@@ -104,18 +104,21 @@ describe('Given the game artwork command', () => {
 });
 
 describe('Given the catalog install commands', () => {
-  it('When installing and cancelling Then the commands take only the id', async () => {
+  it('When installing and cancelling Then the commands take the id and the auto-enable flag', async () => {
     const invoke = vi.fn().mockResolvedValue([]);
     const gateway = createTauriGateway(invoke);
-    await gateway.installCatalogEntry('rebalanced-ai');
+    await gateway.installCatalogEntry('rebalanced-ai', true);
     await gateway.cancelCatalogInstall('rebalanced-ai');
-    expect(invoke).toHaveBeenNthCalledWith(1, 'install_catalog_entry', { id: 'rebalanced-ai' });
+    expect(invoke).toHaveBeenNthCalledWith(1, 'install_catalog_entry', {
+      id: 'rebalanced-ai',
+      enableAfterInstall: true,
+    });
     expect(invoke).toHaveBeenNthCalledWith(2, 'cancel_catalog_install', { id: 'rebalanced-ai' });
   });
 
   it('When the backend rejects Then the code is preserved', async () => {
     const invoke = vi.fn().mockRejectedValue({ code: 'download_hash_mismatch', message: 'x' });
-    await expect(createTauriGateway(invoke).installCatalogEntry('a')).rejects.toEqual({
+    await expect(createTauriGateway(invoke).installCatalogEntry('a', false)).rejects.toEqual({
       code: 'download_hash_mismatch',
       message: 'x',
     });

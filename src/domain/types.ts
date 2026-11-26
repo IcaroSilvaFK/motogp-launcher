@@ -222,5 +222,15 @@ export type CatalogInstallState =
   | { status: 'downloading'; received: number; total: number; percent: number }
   | { status: 'verifying' }
   | { status: 'importing' }
-  | { status: 'installed' }
+  | { status: 'installed'; enabled: boolean; conflictWith?: string }
   | { status: 'failed'; code: ErrorCode; message: string };
+
+/** What the backend reports after installing a catalog entry (#129). */
+export interface CatalogInstallResult {
+  mods: ModEntry[];
+  modId: string;
+  /** True when the mod was also enabled in the active profile. */
+  enabled: boolean;
+  /** Name of the enabled mod that blocked enabling (the new mod stays installed but disabled). */
+  conflictWith?: string;
+}
