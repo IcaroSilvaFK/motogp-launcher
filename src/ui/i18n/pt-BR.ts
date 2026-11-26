@@ -288,6 +288,14 @@ export const ptBR: Messages = {
       failed: 'Não foi possível entrar. Tente novamente.',
     },
   },
+  stars: {
+    star: 'Estrela',
+    count: (stars) => `${stars} ${plural(stars, 'estrela', 'estrelas')}`,
+    sort: 'Mais estrelas',
+    signInPrompt: 'Entre com o Discord para dar estrelas aos mods.',
+    notNow: 'Agora não',
+    failed: 'Não foi possível atualizar a estrela. Tente novamente.',
+  },
   staleSession: {
     regionLabel: 'Sessão antiga pendente',
     title: 'Uma pasta de jogo anterior ainda tem arquivos do launcher',

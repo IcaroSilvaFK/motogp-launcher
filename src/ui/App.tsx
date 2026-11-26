@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
+  createModStatsStore,
   loadSidebarCollapsed,
   readAppVersion,
   saveSidebarCollapsed,
@@ -15,6 +16,7 @@ import type {
   CatalogController,
   DiscoverViewStore,
   LauncherController,
+  ModStatsSource,
   NavPreferenceStore,
   UpdateController,
   WindowControls,
@@ -77,10 +79,12 @@ function Shell({
   autoEnableStore,
   adProvider,
   communityAccount,
+  modStats,
 }: {
   controller: LauncherController;
   adProvider?: AdProvider;
   communityAccount?: CommunityAccount;
+  modStats?: ModStatsSource;
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
@@ -112,7 +116,9 @@ function Shell({
   );
   const loading = state.status === 'loading';
   const ads = useMemo(() => ({ provider: adProvider }), [adProvider]);
-  const community = useMemo(() => ({ account: communityAccount }), [communityAccount]);
+  // One stars store per source, so Discover and the mod page share its 60 s cache (#119).
+  const starsStore = useMemo(() => (modStats ? createModStatsStore(modStats) : undefined), [modStats]);
+  const community = useMemo(() => ({ account: communityAccount, stars: starsStore }), [communityAccount, starsStore]);
 
   useEffect(() => {
     void controller.start();
@@ -200,6 +206,7 @@ export function App({
   autoEnableStore,
   adProvider,
   communityAccount,
+  modStats,
 }: {
   controller: LauncherController;
   locale?: Locale;
@@ -218,6 +225,8 @@ export function App({
   /** Sponsored placements (#104); absent means no ads at all. Slots render only while the preference allows. */
   adProvider?: AdProvider;
   communityAccount?: CommunityAccount;
+  /** Community stars (#119); absent means no counts and no star button. */
+  modStats?: ModStatsSource;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
@@ -233,6 +242,7 @@ export function App({
         autoEnableStore={autoEnableStore}
         adProvider={adProvider}
         communityAccount={communityAccount}
+        modStats={modStats}
       />
     </I18nProvider>
   );

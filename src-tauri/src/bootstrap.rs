@@ -6,17 +6,17 @@ use crate::adapters::{TauriEvents, TauriFolderOpener, TauriOpener, TauriWebOpene
 use crate::ads_fallback::{NullAdBeacon, NullAdSource};
 use crate::{
     compose, configure, run_recovery, MemoryCredentialStore, UnavailableCatalogSource,
-    UnavailableCommunityApi, COMMUNITY_SERVER_URL,
+    UnavailableCommunityApi, UnavailableModStatsApi, COMMUNITY_SERVER_URL,
 };
 use motogp_application::{
     AdBeaconSink, AdSource, AvatarFetcher, CatalogSource, CommunityApi, CommunityAuthService,
-    CredentialStore, InstanceGuard, InstanceLock,
+    CommunityStarsService, CredentialStore, InstanceGuard, InstanceLock, ModStatsApi,
 };
 use motogp_infrastructure::{
     bundled_catalog, DataDir, FileInstanceLock, HttpAdBeaconSink, HttpAdConfig, HttpAdSource,
     HttpAvatarFetcher, HttpCatalogConfig, HttpCatalogSource, HttpCommunityApi, HttpCommunityConfig,
-    OsPkce, SteamArtwork, SteamLibraries, SysinfoProcesses, SystemClock, TcpLoopbackReceiver,
-    ThreadRunner, WindowsCredentialStore,
+    HttpModStatsApi, OsPkce, SteamArtwork, SteamLibraries, SysinfoProcesses, SystemClock,
+    TcpLoopbackReceiver, ThreadRunner, WindowsCredentialStore,
 };
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -83,7 +83,9 @@ fn ad_adapters() -> (Arc<dyn AdSource>, Arc<dyn AdBeaconSink>) {
 /// The community account: HTTP client, Windows Credential Manager, loopback
 /// listener and avatar fetcher. A piece that cannot be built degrades to an
 /// offline community (or an in-memory session) instead of stopping the app.
-fn community_service(handle: tauri::AppHandle) -> Arc<CommunityAuthService> {
+fn community_service(
+    handle: tauri::AppHandle,
+) -> (Arc<CommunityAuthService>, Arc<CommunityStarsService>) {
     let version = env!("CARGO_PKG_VERSION");
     let api: Arc<dyn CommunityApi> =
         match HttpCommunityApi::new(HttpCommunityConfig::new(COMMUNITY_SERVER_URL, version)) {
@@ -107,14 +109,24 @@ fn community_service(handle: tauri::AppHandle) -> Arc<CommunityAuthService> {
             Arc::new(NoAvatars)
         }
     };
-    Arc::new(CommunityAuthService::new(
+    let stars_api: Arc<dyn ModStatsApi> =
+        match HttpModStatsApi::new(HttpCommunityConfig::new(COMMUNITY_SERVER_URL, version)) {
+            Ok(api) => Arc::new(api),
+            Err(error) => {
+                eprintln!("community stars client unavailable: {error}");
+                Arc::new(UnavailableModStatsApi::new(error.to_string()))
+            }
+        };
+    let stars = Arc::new(CommunityStarsService::new(stars_api, store.clone()));
+    let auth = Arc::new(CommunityAuthService::new(
         api,
         store,
         Arc::new(TcpLoopbackReceiver),
         Arc::new(OsPkce),
         Arc::new(TauriWebOpener::community(handle)),
         avatars,
-    ))
+    ));
+    (auth, stars)
 }
 
 /// Avatar fetcher used when the HTTP client cannot be built: initials only.
@@ -156,6 +168,7 @@ pub fn run() {
         let handle = app.handle().clone();
         let handle_for_community = handle.clone();
         let (ad_source, ad_beacon) = ad_adapters();
+        let (community, stars) = community_service(handle_for_community);
         let state = compose(
             &data,
             steam_libraries(),
@@ -170,11 +183,12 @@ pub fn run() {
             catalog_source(),
             ad_source,
             ad_beacon,
-            community_service(handle_for_community),
+            community.clone(),
             bundled_catalog()
                 .map_err(|error| eprintln!("bundled catalog unavailable: {error}"))
                 .ok(),
         );
+        let state = state.with_stars(stars);
         // Recovery finishes before the state exists, so no command can run
         // `play` earlier. A failure is already on the error channel and blocks
         // new deploys; it must not stop the app from starting.

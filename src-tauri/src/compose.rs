@@ -2,12 +2,13 @@
 //! varies between production and tests (Steam, opener, process table,
 //! background execution, events) is injected.
 use crate::catalog_install_support::production_downloader;
+use crate::{MemoryCredentialStore, UnavailableModStatsApi};
 use motogp_application::{
     AdBeaconSink, AdCache, AdService, AdSource, ArtworkService, BackgroundRunner, CancelFlag,
-    CatalogInstaller, CatalogService, CatalogSource, CommunityAuthService, DeployService,
-    FolderOpener, GameService, GameSettings, ModDownloader, PlayService, ProcessInspector,
-    ProfileModPlanner, ProfileService, RawCatalog, SessionPublisher, SessionService,
-    StorageService, UrlOpener, WebPageOpener,
+    CatalogInstaller, CatalogService, CatalogSource, CommunityAuthService, CommunityStarsService,
+    DeployService, FolderOpener, GameService, GameSettings, ModDownloader, PlayService,
+    ProcessInspector, ProfileModPlanner, ProfileService, RawCatalog, SessionPublisher,
+    SessionService, StorageService, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{
     mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsDownloadStaging, FsGameFiles,
@@ -54,6 +55,8 @@ pub struct AppState {
     /// Community account (#122): sign-in with Discord. Blocking network I/O and a
     /// browser wait of up to 2 minutes, so commands never take `write_lock` for it.
     pub community: Arc<CommunityAuthService>,
+    /// Mod stars (#119): reads the session from the credential store itself.
+    pub stars: Arc<CommunityStarsService>,
     /// Catalog installs (#74): downloads run off the runtime without `write_lock`.
     pub installer: Arc<Installer>,
     /// Cancel flags of the installs in flight, by catalog entry id.
@@ -194,6 +197,11 @@ where
         web_opener,
         ad_opener,
         community,
+        // Offline until the bootstrap (or a test) swaps in the real service.
+        stars: Arc::new(CommunityStarsService::new(
+            Arc::new(UnavailableModStatsApi::new("not configured")),
+            Arc::new(MemoryCredentialStore::default()),
+        )),
         ads: Arc::new(AdService::new(
             ad_source,
             Arc::new(JsonAdCache::new(data.ad_cache_file())) as Arc<dyn AdCache>,
@@ -204,6 +212,11 @@ where
 }
 
 impl AppState {
+    /// Replaces the stars service (bootstrap and tests).
+    pub fn with_stars(self, stars: Arc<CommunityStarsService>) -> Self {
+        Self { stars, ..self }
+    }
+
     /// Replaces the community service (tests).
     pub fn with_community(self, community: Arc<CommunityAuthService>) -> Self {
         Self { community, ..self }

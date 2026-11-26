@@ -46,5 +46,8 @@ export type { AdProvider } from './ports/AdProvider';
 export type { AdHandle } from './useAd';
 export { useAd } from './useAd';
 export type { CommunityAccount } from './ports/CommunityAccount';
+export type { ModStatsSource } from './ports/ModStatsSource';
+export type { ModStatsSnapshot, ModStatsStore, ToggleStarResult } from './modStatsStore';
+export { createModStatsStore, MOD_STATS_TTL_MS, useModStats } from './modStatsStore';
 export type { CommunityAccountHandle, CommunityAccountState } from './useCommunityAccount';
 export { useCommunityAccount } from './useCommunityAccount';

@@ -171,6 +171,10 @@
   --ad-tile-size: 48px;
   --ad-tile-size-compact: 40px;
 
+  /* Community stars (#119): the signed-out prompt's width (a Material menu width) and its layer. */
+  --star-prompt-width: 280px;
+  --layer-popover: 10;
+
   font-family: var(--font-body);
   font-size: var(--type-body-large);
   color: var(--text);
@@ -3595,4 +3599,81 @@ button {
 .ad-consent .btn-icon {
   width: 24px;
   padding: 0;
+}
+
+/* ---------- Community stars (#119) ---------- */
+
+/* The mod page's star toggle sits first in the header buttons; the prompt hangs under it. */
+.star-control {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.star-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Starred: the tonal look of a selected Material toggle, with the glyph filled. */
+.star-button[aria-pressed='true'] {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+  color: var(--accent-text);
+}
+
+.star-button[aria-pressed='true'] .star-icon {
+  fill: currentColor;
+}
+
+.star-count {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--type-body-medium);
+}
+
+/* On the Discover cards the count joins the meta line at its size. */
+.mod-meta .star-count {
+  font-size: inherit;
+}
+
+.star-count-icon {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+}
+
+/* The live region for a failed toggle takes no room while empty. */
+.star-feedback:empty {
+  margin: 0;
+}
+
+/* Signed-out prompt: a small Material menu-like surface, not a modal. */
+.star-prompt {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: var(--layer-popover);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: var(--star-prompt-width);
+  padding: var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  background: var(--surface-3);
+  animation: fade-in var(--motion-enter) backwards;
+}
+
+.star-prompt-text {
+  font-size: var(--type-body-medium);
+}
+
+.star-prompt-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }

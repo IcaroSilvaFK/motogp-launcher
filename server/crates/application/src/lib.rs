@@ -4,6 +4,8 @@
 pub mod auth;
 pub mod error;
 pub mod ports;
+pub mod stars;
 
 pub use auth::AuthService;
 pub use error::AppError;
+pub use stars::{ModStats, StarRepository, StarService};

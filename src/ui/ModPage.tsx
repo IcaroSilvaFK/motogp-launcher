@@ -9,6 +9,7 @@ import { formatDay, formatSize, useI18n } from './i18n';
 import { CatalogInstallButton } from './InstallButton';
 import { SafeMarkdown } from './SafeMarkdown';
 import { ScreenshotGallery } from './ScreenshotGallery';
+import { StarButton } from './StarButton';
 
 /** Header cover: the entry thumbnail, or the category cover when there is none or it fails. */
 function ModCover({ entry }: { entry: CatalogEntry }) {
@@ -153,6 +154,7 @@ export function ModPage({
         </div>
         <div className="mod-actions">
           <div className="mod-buttons">
+            <StarButton modId={entry.id} />
             {hasDownload && <CatalogInstallButton entryId={entry.id} />}
             {/* One main action: Install when there is a download, otherwise Open page. */}
             <button type="button" className={hasDownload ? 'btn' : 'btn btn-accent-outline'} onClick={onOpenPage}>

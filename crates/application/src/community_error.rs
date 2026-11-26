@@ -75,6 +75,11 @@ pub enum CommunityError {
     SignInDenied,
     /// The credential store failed.
     Credential(CredentialError),
+    /// The action needs a session and there is none (or the server rejected it).
+    SignedOut,
+    /// The server answered, but the request did not go through (for example a
+    /// rate limit).
+    RequestFailed,
 }
 
 impl fmt::Display for CommunityError {
@@ -85,6 +90,8 @@ impl fmt::Display for CommunityError {
             CommunityError::SignInTimeout => write!(f, "sign-in timed out"),
             CommunityError::SignInDenied => write!(f, "sign-in was denied"),
             CommunityError::Credential(error) => write!(f, "{error}"),
+            CommunityError::SignedOut => write!(f, "sign in to the community first"),
+            CommunityError::RequestFailed => write!(f, "the community request failed"),
         }
     }
 }
@@ -120,6 +127,8 @@ mod tests {
             CommunityError::SignInTimeout,
             CommunityError::SignInDenied,
             CommunityError::from(CredentialError("locked".into())),
+            CommunityError::SignedOut,
+            CommunityError::RequestFailed,
         ];
         assert!(all.iter().all(|e| !e.to_string().is_empty()));
         assert!(all[4].to_string().contains("locked"));

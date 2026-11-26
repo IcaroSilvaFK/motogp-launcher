@@ -153,6 +153,36 @@ It reads `Authorization: Bearer <token>`, resolves the session through `AuthServ
 per-user rate limit (`429 rate_limited` with `Retry-After`) and rejects with `401 unauthorized` when the token is
 missing, unknown, expired or revoked. Register the route in `routes::extra_routes()`; no other wiring is needed.
 
+### Stars
+
+Mod ids are catalog slugs (`^[a-z0-9]+(-[a-z0-9]+)*$`, 1 to 100 characters); the server does not know the
+catalog, so any valid slug is accepted. One star per (user, mod): table `mod_stars`, migration
+`server/migrations/0003_stars.sql` (`user_id` references `users(id)` with `ON DELETE CASCADE`).
+
+#### `PUT /mods/{id}/star` and `DELETE /mods/{id}/star`
+
+Require `Authorization: Bearer <token>`. Both are idempotent: starring twice keeps one star, and unstarring a
+mod that is not starred succeeds.
+
+```json
+{ "id": "ducati-2025", "stars": 11, "starredByMe": true }
+```
+
+`DELETE` answers the same shape with `"starredByMe": false`. Errors: `400 bad_request` (invalid id),
+`401 unauthorized`, `429 rate_limited`.
+
+#### `GET /mods/stats`
+
+Optional authentication. Lists only mods with at least one star, ordered by id.
+
+```json
+{ "mods": [{ "id": "ducati-2025", "stars": 11, "starredByMe": false }] }
+```
+
+`starredByMe` is present only when a valid bearer token is sent (that call also pays the per-user rate limit).
+A missing, unknown, expired or revoked token is answered anonymously (no `starredByMe`, never `401`), so counts
+keep working when a session goes stale.
+
 ## Adding routes in later issues
 
 1. Write the use case in `community-application` against the ports in `ports.rs`; add new ports there when needed.

@@ -8,17 +8,20 @@ import {
   selectEntries,
   sortEntries,
   useCatalogState,
+  useModStats,
 } from '../application';
 import type { CatalogController, CatalogSort, DiscoverView, DiscoverViewStore } from '../application';
 import { AdSlot } from './AdSlot';
 import { BannerIcon } from './BannerIcon';
 import { CategoryCover, InlineError } from './CatalogParts';
+import { useCommunity } from './CommunityContext';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { formatDay, formatInstantDate, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 import { ModPage } from './ModPage';
 import { stagger } from './motion';
+import { StarCount } from './StarButton';
 
 type View = DiscoverView;
 
@@ -113,6 +116,11 @@ export function DiscoverScreen({
   };
   const [openId, setOpenId] = useState<string | null>(null);
   const returnPoint = useRef<ReturnPoint | null>(null);
+  // Community stars (#119): one cached load per visit; offline or unwired, no counts are shown.
+  const { stars: starsStore } = useCommunity();
+  const starStats = useModStats(starsStore);
+  const showStars = starStats.stats.size > 0;
+  const starsOf = (id: string) => starStats.stats.get(id)?.stars ?? 0;
 
   useEffect(() => {
     void catalog.load();
@@ -271,7 +279,7 @@ export function DiscoverScreen({
     { category: null, label: t.discover.all, count: entries.length },
     ...categoryCounts(entries).map((item) => ({ category: item.category, label: item.category, count: item.count })),
   ];
-  const visible = sortEntries(selectEntries(entries, { category, query }), sort);
+  const visible = sortEntries(selectEntries(entries, { category, query }), sort, starsOf);
 
   const clearFilters = () => {
     setCategory(null);
@@ -317,6 +325,7 @@ export function DiscoverScreen({
           <select value={sort} onChange={(event) => setSort(event.target.value as CatalogSort)}>
             <option value="updated">{t.discover.sortUpdated}</option>
             <option value="name">{t.discover.sortName}</option>
+            {starsStore && <option value="stars">{t.stars.sort}</option>}
           </select>
         </label>
         <ViewToggle view={view} onChange={changeView} />
@@ -361,6 +370,8 @@ export function DiscoverScreen({
                         <span className="num">{t.discover.version(entry.version)}</span>
                         <span className="dot" aria-hidden="true" />
                         <span>{t.discover.updated(formatDay(entry.updatedAt, locale))}</span>
+                        {showStars && <span className="dot" aria-hidden="true" />}
+                        {showStars && <StarCount stars={starsOf(entry.id)} />}
                       </span>
                       {owned && (
                         <span className="badge badge-on catalog-card-badge" title={t.discover.inLibraryDetail}>

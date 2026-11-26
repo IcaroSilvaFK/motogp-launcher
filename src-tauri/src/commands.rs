@@ -412,6 +412,9 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         community_me,
         community_sign_in,
         community_sign_out,
+        crate::commands_stars::community_mod_stats,
+        crate::commands_stars::community_star,
+        crate::commands_stars::community_unstar,
         crate::commands_install::install_catalog_entry,
         crate::commands_install::cancel_catalog_install
     ])

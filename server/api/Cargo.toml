@@ -32,3 +32,7 @@ sqlx = { version = "=0.8.6", default-features = false, features = ["sqlite"] }
 [[test]]
 name = "features"
 harness = false
+
+[[test]]
+name = "stars_features"
+harness = false

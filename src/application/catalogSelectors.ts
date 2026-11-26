@@ -7,7 +7,7 @@ export interface CategoryCount {
   count: number;
 }
 
-export type CatalogSort = 'updated' | 'name';
+export type CatalogSort = 'updated' | 'name' | 'stars';
 
 export interface CatalogFilter {
   /** `null` keeps every category. */
@@ -38,12 +38,23 @@ export function selectEntries(entries: readonly CatalogEntry[], filter: CatalogF
   );
 }
 
-/** A sorted copy: most recently updated first (ties by name), or by name ascending. */
-export function sortEntries(entries: readonly CatalogEntry[], sort: CatalogSort): CatalogEntry[] {
+// `updatedAt` is `YYYY-MM-DD`, so the string order is the date order.
+const byUpdated = (a: CatalogEntry, b: CatalogEntry): number => b.updatedAt.localeCompare(a.updatedAt) || byName(a, b);
+
+/**
+ * A sorted copy: most recently updated first (ties by name), by name ascending, or by most stars
+ * (#119; ties by most recent update then name). Without a stars lookup every mod counts 0 stars,
+ * so `stars` falls back to the updated order.
+ */
+export function sortEntries(
+  entries: readonly CatalogEntry[],
+  sort: CatalogSort,
+  starsOf: (id: string) => number = () => 0,
+): CatalogEntry[] {
   const copy = [...entries];
   if (sort === 'name') return copy.sort(byName);
-  // `updatedAt` is `YYYY-MM-DD`, so the string order is the date order.
-  return copy.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt) || byName(a, b));
+  if (sort === 'stars') return copy.sort((a, b) => starsOf(b.id) - starsOf(a.id) || byUpdated(a, b));
+  return copy.sort(byUpdated);
 }
 
 /** Lower case without any whitespace, so "Rebalanced  AI" and "rebalancedai" compare equal. */

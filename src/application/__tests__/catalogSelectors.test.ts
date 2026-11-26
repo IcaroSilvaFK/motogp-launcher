@@ -84,6 +84,24 @@ describe('sortEntries', () => {
       'Yamaha Livery',
     ]);
   });
+
+  it('sorts by most stars, ties by most recent update then name (#119)', () => {
+    const stars: Record<string, number> = { yamaha: 12, 'rebalanced-ai': 5 };
+    const starsOf = (id: string) => stars[id] ?? 0;
+    expect(sortEntries(all, 'stars', starsOf).map((e) => e.id)).toEqual(['yamaha', 'rebalanced-ai', 'tyre-model']);
+    const twin = entry({ id: 'aaa', title: 'Aaa', updatedAt: '2026-11-10' });
+    const tied = { yamaha: 3, 'rebalanced-ai': 3, aaa: 3, 'tyre-model': 3 } as Record<string, number>;
+    expect(sortEntries([...all, twin], 'stars', (id) => tied[id] ?? 0).map((e) => e.id)).toEqual([
+      'tyre-model',
+      'aaa',
+      'rebalanced-ai',
+      'yamaha',
+    ]);
+  });
+
+  it('falls back to the updated order when sorting by stars without counts', () => {
+    expect(sortEntries(all, 'stars').map((e) => e.id)).toEqual(sortEntries(all, 'updated').map((e) => e.id));
+  });
 });
 
 describe('inLibrary', () => {
