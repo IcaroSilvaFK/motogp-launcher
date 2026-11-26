@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "creatives": [
+    {
+      "id": "house-support",
+      "slot": "about",
+      "title": "Support the launcher",
+      "body": "MotoGP Launcher is free and open source. Help keep it going.",
+      "image": "catalog/ads/house-support.png",
+      "click_url": "https://apoia.se/",
+      "sponsor_label": "House ad"
+    }
+  ]
+}

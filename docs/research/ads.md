@@ -371,6 +371,8 @@ Feature: Ad preference
 
 Create `catalog/ads.json` with a house ad (Apoia.se, issue #94) and the PR flow to add a sponsor; document the creative size and label rules.
 
+Delivered in [../sponsors.md](../sponsors.md).
+
 ```gherkin
 Feature: Maintaining the sponsor feed
 

@@ -18,6 +18,8 @@ The #37 spike found no usable public API, so the launcher reads **its own static
 
 ## Add a mod to the catalog by PR
 
+Sponsors are added the same way: see [../sponsors.md](../sponsors.md).
+
 1. Fork the repository and edit `catalog/catalog.json` (add an object to `entries`, keep the file valid JSON).
 2. Fill every required field: `id` (unique lowercase slug such as `rebalanced-ai`), `title`, `author`, `game` (for example `MotoGP 26`), `category`, `description`, `version`, `updatedAt` (`YYYY-MM-DD`) and `pageUrl`.
 3. Rules: every URL must be `https`; the id must be unique; `thumbnailUrl` is optional.
