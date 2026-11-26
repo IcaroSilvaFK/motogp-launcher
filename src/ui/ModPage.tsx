@@ -202,6 +202,9 @@ export function ModPage({
           </section>
           <DownloadChart id={entry.id} />
           <ModComments modId={entry.id} />
+          {/* Sponsored card (#104, #136): the last item of the main column, after everything the
+              user came for, so inserting it after load moves nothing above it. */}
+          <AdSlot slot="discover" />
         </div>
 
         <div className="mod-aside">
@@ -218,9 +221,6 @@ export function ModPage({
               </button>
             )}
           </section>
-          {/* Sponsored card (#104): below the author card, in a column that grows downward, so
-              inserting it after load moves nothing above it. */}
-          <AdSlot slot="discover" />
         </div>
       </div>
     </section>

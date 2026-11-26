@@ -26,64 +26,18 @@ function AdCard({ slot, ad, onClick }: { slot: AdSlotId; ad: AdViewModel; onClic
   const titleId = `${id}-title`;
   const opensId = `${id}-opens`;
   const sponsor = sponsorOf(ad, t.ads.sponsored);
+  // Settings > About never shows an image: it is a support row, so the icon tile stands in.
+  const image = slot === 'about' ? null : ad.imageDataUri;
+  const classes = [
+    // About is one more row of the About card (#136): the settings row pattern, as a support card.
+    slot === 'about' ? 'setting-row' : null,
+    'ad-slot',
+    `ad-slot-${slot}`,
+    image === null ? 'ad-text-first' : null,
+  ];
 
-  // One disclosure label; the sponsor's name is a quieter byline, never a second equal label.
-  const label = (
-    <p id={labelId} className="ad-label">
-      {t.ads.sponsored}
-    </p>
-  );
-  const byline = sponsor !== null && <p className="ad-byline">{sponsor}</p>;
-
-  const action = (
-    <>
-      <button
-        type="button"
-        className={`btn btn-sm ad-action${slot === 'sidebar' ? ' btn-ghost' : ''}`}
-        aria-describedby={`${titleId} ${opensId}`}
-        onClick={onClick}
-      >
-        <Icon name="external" />
-        {t.ads.learnMore}
-      </button>
-      <span id={opensId} hidden>
-        {t.ads.opensInBrowser}
-      </span>
-    </>
-  );
-
-  // Settings > About: a quiet setting row, no image (the least visible slot).
-  if (slot === 'about') {
-    return (
-      <section aria-labelledby={labelId} className="setting-row ad-slot ad-slot-about" data-slot={slot}>
-        <div className="setting-text">
-          {label}
-          <p className="hint ad-line">
-            <span id={titleId} className="ad-title">
-              {ad.title}
-            </span>
-            {ad.body !== '' && (
-              <>
-                <span className="dot" aria-hidden="true" />
-                <span className="ad-text">{ad.body}</span>
-              </>
-            )}
-          </p>
-          {byline}
-        </div>
-        <div className="setting-control">{action}</div>
-      </section>
-    );
-  }
-
-  // Discover and sidebar cards: a fixed-ratio media thumb, or a text-first card with an icon tile.
-  const image = ad.imageDataUri;
   return (
-    <section
-      aria-labelledby={labelId}
-      className={`ad-slot ad-slot-${slot}${image === null ? ' ad-text-first' : ''}`}
-      data-slot={slot}
-    >
+    <section aria-labelledby={labelId} className={classes.filter(Boolean).join(' ')} data-slot={slot}>
       {image === null ? (
         <span className="ad-tile" aria-hidden="true">
           <Icon name="megaphone" />
@@ -92,14 +46,41 @@ function AdCard({ slot, ad, onClick }: { slot: AdSlotId; ad: AdViewModel; onClic
         <img className="ad-media" src={image} alt="" draggable={false} />
       )}
       <div className="ad-content">
-        {label}
-        <p id={titleId} className="ad-title">
-          {ad.title}
-        </p>
-        {ad.body !== '' && <p className="ad-text">{ad.body}</p>}
-        {byline}
+        {/* The disclosure first, on its own line; the sponsor's name is a quieter byline beside
+            it, never a second equal label. */}
+        <div className="ad-meta">
+          <p id={labelId} className="ad-label">
+            {t.ads.sponsored}
+          </p>
+          {sponsor !== null && (
+            <>
+              <span className="dot" aria-hidden="true" />
+              <p className="ad-byline">{sponsor}</p>
+            </>
+          )}
+        </div>
+        <div className="ad-copy">
+          <p id={titleId} className="ad-title">
+            {ad.title}
+          </p>
+          {ad.body !== '' && <p className="ad-text">{ad.body}</p>}
+        </div>
       </div>
-      <div className="ad-actions">{action}</div>
+      <div className="ad-actions">
+        {/* One outlined (secondary) action in every slot: the accent stays reserved for Play. */}
+        <button
+          type="button"
+          className="btn btn-sm ad-action"
+          aria-describedby={`${titleId} ${opensId}`}
+          onClick={onClick}
+        >
+          <Icon name="external" />
+          {t.ads.learnMore}
+        </button>
+        <span id={opensId} hidden>
+          {t.ads.opensInBrowser}
+        </span>
+      </div>
     </section>
   );
 }
@@ -123,7 +104,8 @@ function ConnectedAdSlot({ slot, provider }: { slot: AdSlotId; provider: AdProvi
  * loaded, when ads are off, without a provider, while the launcher loads and during a game
  * session; the fetch runs in an effect, so it never delays Play or a screen. A card is a labeled
  * region ("Sponsored") with the creative image (`alt=""`) or, without one, an icon tile (#123), the
- * title, body, the sponsor's name as a byline and one action; the click
+ * label and the sponsor's byline, the title, body and one action (#136: one markup, laid out per
+ * slot in CSS: a compact card in the sidebar, a slim banner in Discover, a row in About); the click
  * sends only the slot and the creative id, and the creative is reported as shown once per mount.
  */
 export function AdSlot({ slot }: { slot: AdSlotId }) {

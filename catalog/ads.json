@@ -4,42 +4,42 @@
     {
       "id": "house-support",
       "slot": "about",
-      "title": "Support the project",
-      "body": "MotoGP Launcher is free and open source. Help keep it going.",
+      "title": "Keep the launcher free",
+      "body": "Backers on Apoia.se fund new features and the fixes after each game patch.",
       "click_url": "https://apoia.se/",
       "sponsor_label": "MotoGP Launcher",
       "locales": {
         "pt-BR": {
-          "title": "Apoie o projeto",
-          "body": "O MotoGP Launcher é gratuito e de código aberto. Ajude a mantê-lo."
+          "title": "Mantenha o launcher gratuito",
+          "body": "Quem apoia no Apoia.se financia novos recursos e as correções após cada patch do jogo."
         }
       }
     },
     {
       "id": "house-publish-mod",
       "slot": "discover",
-      "title": "Made a mod? Publish it here",
-      "body": "Add your mod to the catalog and let players install it in one click.",
+      "title": "Made a mod?",
+      "body": "List it in the catalog so riders can install it in one click.",
       "click_url": "https://github.com/IcaroSilvaFK/motogp-launcher/blob/dev/docs/publishing-mods.md",
       "sponsor_label": "MotoGP Launcher",
       "locales": {
         "pt-BR": {
-          "title": "Fez um mod? Publique aqui",
-          "body": "Coloque seu mod no catálogo e deixe os jogadores instalarem em um clique."
+          "title": "Fez um mod?",
+          "body": "Coloque no catálogo e os pilotos instalam com um clique."
         }
       }
     },
     {
-      "id": "house-support-sidebar",
+      "id": "house-community-sidebar",
       "slot": "sidebar",
-      "title": "Enjoying the launcher?",
-      "body": "Support its development on Apoia.se.",
-      "click_url": "https://apoia.se/",
+      "title": "Ideas or bugs?",
+      "body": "Help shape the next release on GitHub.",
+      "click_url": "https://github.com/IcaroSilvaFK/motogp-launcher/issues",
       "sponsor_label": "MotoGP Launcher",
       "locales": {
         "pt-BR": {
-          "title": "Curtindo o launcher?",
-          "body": "Apoie o desenvolvimento no Apoia.se."
+          "title": "Ideias ou bugs?",
+          "body": "Ajude a definir a próxima versão no GitHub."
         }
       }
     }

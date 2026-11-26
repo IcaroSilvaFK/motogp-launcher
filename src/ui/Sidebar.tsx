@@ -54,10 +54,12 @@ export function Sidebar({
           </button>
         ))}
       </nav>
+      {/* Sponsored card (#104, #136): only while expanded, in its own region that takes just the
+          free height between the navigation and the footer, pinned to its bottom. When that height
+          is below the card's budget the card is hidden whole (CSS container query), never cut off,
+          and the support entry and the toggle below never move. */}
+      <div className="sidebar-ad">{!collapsed && <AdSlot slot="sidebar" />}</div>
       <div className="sidebar-footer">
-        {/* Sponsored card (#104): only while expanded; it grows upward into the free space, so the
-            support entry and the toggle below never move. */}
-        {!collapsed && <AdSlot slot="sidebar" />}
         <SupportLink placement="sidebar" collapsed={collapsed} />
         <button
           type="button"

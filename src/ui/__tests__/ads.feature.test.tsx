@@ -4,6 +4,7 @@
 import { describeFeature } from '@amiceli/vitest-cucumber';
 import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
 import { expect, vi } from 'vitest';
 import { createCatalogController } from '../../application';
 import type {
@@ -16,6 +17,7 @@ import type {
 } from '../../application';
 import type { AdViewModel, Catalog, CatalogEntry } from '../../domain';
 import { App } from '../App';
+import type { Locale } from '../i18n';
 import { createFakeController } from './fakeController';
 import type { FakeController } from './fakeController';
 import { loadFrontendFeature } from './features';
@@ -102,6 +104,7 @@ let preferenceStore: MemoryPreferenceStore;
 function launch({
   state = readyToPlay,
   preference = 'on',
+  locale = 'en',
   catalog = createCatalogController({
     gateway: {
       getCatalog: () => Promise.resolve(catalogData),
@@ -109,14 +112,19 @@ function launch({
       openCatalogPage: () => Promise.resolve(),
     },
   }),
-}: { state?: Partial<LauncherState>; preference?: 'on' | 'off'; catalog?: CatalogController } = {}) {
+}: {
+  state?: Partial<LauncherState>;
+  preference?: 'on' | 'off';
+  locale?: Locale;
+  catalog?: CatalogController;
+} = {}) {
   const controller = createFakeController(state);
   const user = userEvent.setup();
   preferenceStore = memoryPreferenceStore(preference);
   render(
     <App
       controller={controller}
-      locale="en"
+      locale={locale}
       navStore={navStore(false)}
       catalog={catalog}
       adPreferenceStore={preferenceStore}
@@ -153,6 +161,23 @@ const SESSION: Record<string, SessionPhase> = {
   stopping: { kind: 'stopping', since: null },
   'cleaning up': { kind: 'cleaning-up' },
 };
+
+/** The stylesheet without comments. */
+const css = readFileSync(`${import.meta.dirname}/../styles.css`, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+
+/** The bodies of every rule whose selector list contains exactly `selector`, joined. */
+function rule(selector: string): string {
+  return [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)]
+    .filter(([, list = '']) => list.split(',').some((item) => item.trim() === selector))
+    .map(([, , body = '']) => body)
+    .join('\n');
+}
+
+async function openModPage(title: string) {
+  await openDiscover();
+  await world.user.click(screen.getByRole('button', { name: title }));
+  return screen.findByRole('heading', { level: 2, name: title });
+}
 
 const feature = await loadFrontendFeature('ads');
 
@@ -454,6 +479,135 @@ describeFeature(feature, ({ Scenario, ScenarioOutline, BeforeEachScenario, After
       provider.get.mockClear();
       await openDiscover();
       await act(() => Promise.resolve());
+      expect(adRegions()).toHaveLength(0);
+      expect(document.querySelector('.ad-slot')).toBeNull();
+      expect(provider.get).not.toHaveBeenCalled();
+    });
+  });
+
+  // ---------- Ad presentation (#136) ----------
+
+  Scenario('Sidebar ad fits short windows', ({ Given, And, Then }) => {
+    Given('an ad is available', () => {
+      launch();
+    });
+
+    And('the window is 680px tall', () => {
+      window.innerHeight = 680;
+      window.dispatchEvent(new Event('resize'));
+    });
+
+    Then('the sidebar ad is fully visible or hidden, never cut off', async () => {
+      const card = await within(sidebar()).findByRole('region', { name: 'Sponsored' });
+      // Its own region between the navigation and the footer, sized only by the sidebar's free
+      // height (size containment), so the card never pushes the footer or forces a scroll.
+      const region = card.parentElement as HTMLElement;
+      expect(region).toHaveClass('sidebar-ad');
+      expect(region.previousElementSibling).toHaveClass('side-nav');
+      expect(region.nextElementSibling).toHaveClass('sidebar-footer');
+      const box = rule('.sidebar-ad');
+      expect(box).toMatch(/container:\s*sidebar-ad\s*\/\s*size/);
+      expect(box).toMatch(/min-height:\s*0/);
+      expect(box).toMatch(/overflow:\s*hidden/);
+      // The card never grows past its height budget, and it is removed (display: none: neither
+      // seen nor focusable) whenever the free height is below that same budget. Whole or absent.
+      const budget = /--ad-sidebar-height:\s*(\d+)px/.exec(css)?.[1];
+      expect(budget).toBeDefined();
+      expect(rule('.ad-slot-sidebar')).toMatch(/max-height:\s*var\(--ad-sidebar-height\)/);
+      expect(css).toMatch(
+        new RegExp(
+          `@container sidebar-ad \\(height < ${budget}px\\)\\s*\\{\\s*\\.ad-slot-sidebar\\s*\\{\\s*display:\\s*none;?\\s*\\}`,
+        ),
+      );
+      // Clamped text, so the content always fits the budget.
+      expect(rule('.ad-slot-sidebar .ad-title')).toMatch(/-webkit-line-clamp:\s*2/);
+      expect(rule('.ad-slot-sidebar .ad-text')).toMatch(/-webkit-line-clamp:\s*2/);
+    });
+  });
+
+  Scenario('Discover ad does not displace the grid', ({ Given, When, Then }) => {
+    Given('an ad is available', () => {
+      launch();
+    });
+
+    When('the Discover screen loads with an ad', async () => {
+      await openDiscover();
+      await discoverAd();
+    });
+
+    Then('the first row of mods is visible above the fold', async () => {
+      const card = await discoverAd();
+      const results = screen.getByRole('list', { name: /results/i });
+      // Never above the grid: the banner follows the results in the document.
+      expect(results.compareDocumentPosition(card) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(results.contains(card)).toBe(false);
+      // A slim one-line banner: a short media frame, the title and the body never wrap.
+      expect(rule('.ad-slot-discover')).toMatch(/max-width:\s*var\(--ad-banner-max-width\)/);
+      expect(rule('.ad-slot-discover .ad-title')).toMatch(/white-space:\s*nowrap/);
+      expect(rule('.ad-slot-discover .ad-text')).toMatch(/white-space:\s*nowrap/);
+      expect(rule('.ad-slot-discover .ad-media')).toMatch(/height:\s*var\(--ad-banner-media-height\)/);
+    });
+  });
+
+  Scenario('The mod page ad sits after the main content', ({ Given, When, Then }) => {
+    Given('an ad is available', () => {
+      launch();
+    });
+
+    When('the user opens a mod page from Discover', async () => {
+      await openModPage('Tyre Model');
+    });
+
+    Then('the sponsored card is the last item of the main column', async () => {
+      const page = screen.getByRole('main');
+      const card = await within(page).findByRole('region', { name: 'Sponsored' });
+      const main = card.parentElement as HTMLElement;
+      expect(main).toHaveClass('mod-main');
+      expect(main.lastElementChild).toBe(card);
+      expect(card.closest('.mod-aside')).toBeNull();
+    });
+  });
+
+  ScenarioOutline('Ads are clearly labelled', ({ Given, Then }, variables) => {
+    Given('an ad is available in "<locale>"', () => {
+      launch({ locale: variables.locale as Locale });
+    });
+
+    Then('every ad shows a "<label>" label in the current language', async () => {
+      const label = variables.label as string;
+      const settings = variables.locale === 'en' ? 'Settings' : 'Configurações';
+      await within(sidebar()).findByRole('region', { name: label });
+      await world.user.click(within(screen.getByRole('navigation')).getByRole('button', { name: settings }));
+      const regions = await screen.findAllByRole('region', { name: label });
+      // The sidebar and the About slot, each named by one visible label at the top of the card.
+      expect(regions).toHaveLength(2);
+      for (const region of regions) {
+        const tag = region.querySelector('.ad-label');
+        expect(tag).toHaveTextContent(new RegExp(`^${label}$`));
+        expect(tag).toBeVisible();
+        expect(region).toHaveAttribute('aria-labelledby', tag?.id);
+      }
+    });
+  });
+
+  Scenario('Ads respect the preference', ({ Given, And, When, Then }) => {
+    Given('an ad is available', () => {
+      // The default provider resolves a creative; the stored preference is applied at launch.
+    });
+
+    And('ads are disabled', () => {
+      launch({ preference: 'off' });
+    });
+
+    When('the user visits Discover, a mod page and Settings', async () => {
+      await openModPage('Tyre Model');
+      await act(() => Promise.resolve());
+      expect(adRegions()).toHaveLength(0);
+      await open('Settings');
+      await act(() => Promise.resolve());
+    });
+
+    Then('no slot renders', () => {
       expect(adRegions()).toHaveLength(0);
       expect(document.querySelector('.ad-slot')).toBeNull();
       expect(provider.get).not.toHaveBeenCalled();

@@ -176,12 +176,15 @@
   --mod-sha-width: 16ch;
   --scrim-viewer: rgba(0, 0, 0, 0.88);
 
-  /* Sponsored cards (#123): the Discover banner's max width, its 16:9 media height, and the
-     square thumb / icon tile sizes (Discover 48dp, sidebar 40dp). */
+  /* Sponsored cards (#123, #136): the slim Discover banner's max width and its 16:9 media height,
+     the icon tile sizes (Discover and About 40dp, sidebar 32dp) and the sidebar card's height
+     budget. The sidebar card never grows past the budget and is hidden whenever the free height of
+     the sidebar is below it (the `@container sidebar-ad` query repeats this value: no var() there). */
   --ad-banner-max-width: 640px;
-  --ad-media-height: 64px;
-  --ad-tile-size: 48px;
-  --ad-tile-size-compact: 40px;
+  --ad-banner-media-height: 40px;
+  --ad-tile-size: 40px;
+  --ad-tile-size-compact: 32px;
+  --ad-sidebar-height: 168px;
 
   /* Community stars (#119): the signed-out prompt's width (a Material menu width) and its layer. */
   --star-prompt-width: 280px;
@@ -2346,16 +2349,19 @@ button {
   color: var(--text);
 }
 
-/* ---------- Sponsored placements (#104) ---------- */
+/* ---------- Sponsored placements (#104, #136) ---------- */
 
-/* Quiet by design: the card surface and border, muted label, no accent (reserved for Play). A slot
-   only exists once its creative loaded (no placeholder), and it fades in where it moves nothing:
-   after the Discover results, grown upward in the sidebar footer, as the last About row. */
+/* Quiet by design: a surface-container card with the outline border, no accent (reserved for Play).
+   A slot only exists once its creative loaded (no placeholder), and it fades in where it moves
+   nothing: after the Discover results, at the end of a mod page's main column, at the bottom of
+   the sidebar's free space, as the last About row. One markup for every slot: the media (or the
+   icon tile), the content (meta line, then the copy) and one outlined action; each slot only
+   changes the layout. */
 .ad-slot {
+  line-height: 1.4;
   animation: fade-in var(--motion-enter) backwards;
 }
 
-/* Both cards share one markup on a grid: media (or the icon tile), the text column, the action. */
 .ad-slot-discover,
 .ad-slot-sidebar {
   display: grid;
@@ -2366,7 +2372,7 @@ button {
   padding: var(--space-3);
   background: var(--surface-1);
   border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   color: var(--text);
 }
 
@@ -2374,7 +2380,6 @@ button {
 .ad-media {
   display: block;
   grid-area: media;
-  height: var(--ad-media-height);
   aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: var(--radius-sm);
@@ -2384,6 +2389,7 @@ button {
 /* Text-first variant: a quiet tonal tile (the info tokens, never the accent) instead of an image. */
 .ad-tile {
   display: grid;
+  flex: none;
   grid-area: media;
   place-items: center;
   width: var(--ad-tile-size);
@@ -2398,32 +2404,31 @@ button {
   display: flex;
   grid-area: content;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 2px;
   min-width: 0;
 }
 
+/* The meta line: the disclosure as a small all-caps tag, then the sponsor's byline. */
+.ad-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-muted);
+}
+
 .ad-label {
+  flex: none;
   color: var(--text-muted);
   font-size: var(--type-label-small);
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
-.ad-slot-discover .ad-title,
-.ad-slot-sidebar .ad-title {
-  color: var(--text);
-  font-size: var(--type-body-medium);
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.ad-slot-discover .ad-text,
-.ad-slot-sidebar .ad-text {
-  color: var(--text-muted);
-  font-size: var(--type-body-small);
-}
-
-/* The sponsor's name: a small muted byline under the text, never a second label. */
+/* The sponsor's name: muted like the label but in its normal case, never a second label. */
 .ad-byline {
+  min-width: 0;
   overflow: hidden;
   color: var(--text-muted);
   font-size: var(--type-label-small);
@@ -2431,48 +2436,100 @@ button {
   white-space: nowrap;
 }
 
+.ad-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ad-title {
+  color: var(--text);
+  font-size: var(--type-body-medium);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.ad-text {
+  color: var(--text-muted);
+  font-size: var(--type-body-small);
+}
+
 .ad-actions {
   display: flex;
+  flex: none;
   grid-area: actions;
   align-items: center;
 }
 
-/* Discover: one banner after the results, capped and centered so it never stretches into a bar:
-   16:9 media (or the 48dp tile) on the left, the text, the outlined action on the right. */
+/* Discover (and the end of a mod page): a slim two-line banner after the results, capped and
+   centered so it never stretches into a bar or pushes the grid down: a short 16:9 frame (or the
+   40dp tile), the meta line, then the title and the body on one line, the action at the end. */
 .ad-slot-discover {
   column-gap: var(--space-4);
   width: 100%;
   max-width: var(--ad-banner-max-width);
   margin: var(--space-5) auto 0;
-  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.ad-slot-discover .ad-media {
+  height: var(--ad-banner-media-height);
+}
+
+.ad-slot-discover .ad-copy {
+  flex-direction: row;
+  align-items: baseline;
+  gap: var(--space-2);
 }
 
 .ad-slot-discover .ad-title {
+  flex: none;
+  max-width: 60%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ad-slot-discover .ad-text {
-  display: -webkit-box;
+  min-width: 0;
   overflow: hidden;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-/* Sidebar footer: compact and never wider than the sidebar. A small square thumb (or a 40dp tile)
-   beside the text, title and body clamped to two lines, a text action under them on the right. */
+/* On a mod page the banner is the last item of the main column, aligned with its content. */
+.mod-main > .ad-slot-discover {
+  margin: 0;
+}
+
+/* Sidebar: the card's own region takes only the free height between the navigation and the
+   footer (size containment, so the card never adds height to the sidebar) and pins the card to
+   its bottom, right above the footer. */
+.sidebar-ad {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  justify-content: flex-end;
+  min-height: 0;
+  overflow: hidden;
+  container: sidebar-ad / size;
+}
+
+/* A compact card within a fixed height budget: a 32dp tile (or square thumb) beside the meta line
+   and the copy, title and body clamped to two lines each, the action across the bottom. */
 .ad-slot-sidebar {
   grid-template-areas:
     'media content'
     'actions actions';
   grid-template-columns: auto minmax(0, 1fr);
   align-items: start;
-  row-gap: var(--space-1);
+  row-gap: var(--space-2);
   column-gap: var(--space-2);
   max-width: 100%;
-  margin-bottom: var(--space-2);
-  padding: var(--space-2) var(--space-2) var(--space-1);
+  max-height: var(--ad-sidebar-height);
+  overflow: hidden;
+  background: var(--surface-2);
   white-space: normal;
 }
 
@@ -2480,14 +2537,11 @@ button {
 .ad-slot-sidebar .ad-tile {
   width: var(--ad-tile-size-compact);
   height: var(--ad-tile-size-compact);
+  border-radius: var(--radius-md);
 }
 
 .ad-slot-sidebar .ad-media {
   aspect-ratio: 1;
-}
-
-.ad-slot-sidebar .ad-content {
-  gap: 0;
 }
 
 .ad-slot-sidebar .ad-title,
@@ -2498,36 +2552,35 @@ button {
   -webkit-line-clamp: 2;
 }
 
-.ad-slot-sidebar .ad-actions {
-  justify-content: flex-end;
+.ad-slot-sidebar .ad-action {
+  width: 100%;
 }
 
-/* Short windows keep the navigation and the footer actions: the sidebar card steps aside. */
-@media (max-height: 680px) {
+/* Not enough free height for the whole card: it steps aside entirely (removed, so it is neither
+   seen nor focusable), never cut off. The value is --ad-sidebar-height. */
+@container sidebar-ad (height < 168px) {
   .ad-slot-sidebar {
     display: none;
   }
 }
 
-/* Settings > About: the quietest slot, one line (title · body) next to the action. */
-.ad-line {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  min-width: 0;
+/* Settings > About: a support row of the About card: the 40dp tile, the meta line, the title and
+   the body (wrapping, never truncated), the action on the right. */
+.ad-slot-about {
+  justify-content: flex-start;
+  gap: var(--space-4);
+}
+
+.ad-slot-about .ad-content {
+  flex: 1;
 }
 
 .ad-slot-about .ad-title {
-  flex: none;
-  color: var(--text);
-  font-weight: 500;
+  font-size: var(--type-body-large);
 }
 
-.ad-slot-about .ad-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.ad-slot-about .ad-actions {
+  margin-left: auto;
 }
 
 /* ---------- Cards, lists, details ---------- */
