@@ -20,11 +20,23 @@ Everything runs inside Claude; Codex is no longer part of the flow (decided 2026
    - **UI specialist** (decided 2026-11-23): visual redesigns, layout, design tokens and screen usability in `src/ui` go to the `ui-designer` agent ([.claude/agents/ui-designer.md](.claude/agents/ui-designer.md), **model: Opus**) instead of a Sonnet dev. Same rules as any dev (TDD, no commits, hands off to QA). Reference screenshots from other products are inspiration only: reuse patterns, never their brand. If the agent type is not loaded in the session, spawn a general-purpose agent with `model: "opus"` and the file's body as its instructions.
 4. **QA agents (N)**: run the gates and write/complete the BDD scenarios. Problem found → report back to the Coordinator. No problem → notify the PO. **Model: Haiku** (`model: "haiku"`).
 
-Rule: the chat does not implement directly. Demand (PO) → Coordinator elaborates and dispatches devs (Sonnet) → dev delivers to QA (Haiku) → QA fails: back to Coordinator / QA passes: PO → PO commits, opens the PR, merges and closes the issue → PO reports to the user.
+### Task size decides the process (decided 2026-11-26)
+
+The full pipeline is slow and costly, so it is reserved for complex work. The PO classifies every demand before dispatching it:
+
+| Size | Examples | Process |
+|------|----------|---------|
+| **Trivial** | copy or translation tweak, doc or CLAUDE.md edit, config value, catalog/ads JSON entry, one-line fix | The PO does it directly on its own branch, runs the narrow check (the touched crate's tests or `corepack pnpm test`), opens the PR and merges on green CI. No issue needed (the PR describes it), no Coordinator, no QA agent. |
+| **Simple** | a bug fix or small feature inside one layer or crate, a UI tweak on one screen, no new port or IPC contract | Issue with a short task and Gherkin written by the PO. **One dev** (Sonnet; `ui-designer` for visual work) implements with TDD and runs the gates for what it touched (fmt, lint, types, the touched crate's or frontend tests). No Coordinator, no separate QA agent, no llvm-cov: CI is the full gate. A CI failure goes back to a new dev. |
+| **Complex** | spans layers or crates, adds a port, IPC command or contract, touches the session/game state, or needs a design decision | Full pipeline below: Coordinator elaborates in detail (context, scope, contracts, Gherkin, files), devs, QA with every gate including coverage. |
+
+When in doubt between two sizes, pick the smaller one; CI still guards the merge. If a trivial or simple task turns out bigger, promote it.
+
+Rule for complex tasks: the chat does not implement directly. Demand (PO) → Coordinator elaborates and dispatches devs (Sonnet) → dev delivers to QA (Haiku) → QA fails: back to Coordinator / QA passes: PO → PO commits, opens the PR, merges and closes the issue → PO reports to the user.
 
 If a subagent cannot spawn other agents, the PO spawns the devs and QA itself, using exactly the task the Coordinator wrote, and routes QA reports back to the Coordinator (via `SendMessage`).
 
-## Git / issues flow (mandatory for every task)
+## Git / issues flow (complex tasks; simple tasks skip the Coordinator and QA steps, trivial ones also skip the issue)
 
 1. **PO publishes the issue** on the remote repository (`gh issue create`) with the demand.
 2. **Coordinator elaborates** the task with all the details (context, scope, Gherkin acceptance criteria) and adds them to the issue.
