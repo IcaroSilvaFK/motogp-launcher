@@ -612,3 +612,17 @@ Sponsored creatives: domain validation, ports and `AdService` (no adapters or IP
 | A house ad sends no beacon | `a_creative_without_impression_url_sends_no_beacon` + cucumber |
 | Clicking opens the creative's URL by id | `clicking_opens_the_click_url_of_the_creative`, `an_opener_failure_is_reported_as_open` + cucumber |
 | An unknown creative id cannot be opened | `clicking_an_unknown_creative_opens_nothing`, `reporting_an_unknown_creative_or_wrong_slot_is_an_error` + cucumber |
+
+### Issue #102: scenario traceability
+
+Ad HTTP source, file cache and impression beacon adapters (no IPC wiring yet). Gherkin: `crates/infrastructure/tests/features/ad-feed.feature` (steps in `tests/bdd/ad_feed.rs`). The scenarios compose the real `AdService` with `HttpAdSource`, `JsonAdCache` and `HttpAdBeaconSink`, a local 127.0.0.1 server (or a refused local port for "offline"), a temp dir and a fixed clock. Decision: an oversized, non-raster or undownloadable image fails the whole `fetch()`, so `AdService` keeps the previous creatives and never overwrites the cache.
+
+| Scenario | Tests |
+|----------|-------|
+| Offline with a fresh cache | cucumber (7 day TTL, cached 1 day ago, refused port); `ad_cache.rs` `save_then_load_roundtrips_and_creates_parents`, `missing_file_is_none` |
+| Offline with an expired cache | cucumber (creative expired, stale cache, offline: no creative, no error); `ad_cache.rs` `invalid_cached_creatives_are_dropped`, `corrupt_file_is_an_error`, `unknown_version_is_an_error`; `ad_http.rs` `connection_refused_is_a_network_error` |
+| An oversized or non-image creative is refused | cucumber (5 MiB image: `TooLarge`, cache file byte-for-byte unchanged, previous creative still served) and the outline for `image/svg+xml` and `text/html`; `ad_http.rs` `an_image_over_the_cap_fails_the_whole_fetch`, `a_streamed_image_over_the_cap_fails_the_whole_fetch`, `a_non_raster_image_fails_the_whole_fetch`, `an_image_without_a_content_type_fails_the_whole_fetch`, `image_download_errors_are_mapped` |
+| Feed parsing and dates | `parse_rejects_wrong_top_level_shapes`, `parse_reads_snake_case_fields_and_optional_ones`, `parse_keeps_malformed_creatives_as_unparseable`, `domain_rules_are_not_duplicated_in_the_adapter`, `a_future_start_is_skipped_and_today_or_past_is_kept`, `expiry_is_the_end_of_that_day_in_utc`, `unreal_or_malformed_dates_are_unparseable` |
+| Image resolution and encoding | `images_resolve_against_the_base_or_stay_https`, `a_base_without_a_trailing_slash_still_resolves`, `jpeg_and_webp_are_accepted_with_content_type_parameters`, `base64_matches_the_rfc_4648_vectors`, `only_png_jpeg_and_webp_are_images`, `a_shared_image_is_downloaded_once` |
+| Feed transport | `github_config_has_the_documented_defaults`, `fetches_the_feed_and_inlines_the_image_as_a_data_uri` (User-Agent), `a_404_feed_is_not_published`, `other_statuses_map_to_http_error`, `a_feed_over_the_cap_is_too_large`, `a_streamed_feed_over_the_cap_is_too_large`, `invalid_json_is_invalid` |
+| Impression beacon | `a_2xx_beacon_is_ok_and_sends_the_user_agent`, `a_non_2xx_beacon_is_an_error`, `a_refused_beacon_connection_is_an_error`, `a_non_https_beacon_is_refused_without_a_request` |

@@ -3,6 +3,8 @@
 //! Fs/JSON, ZIP/SHA-256 and Steam/process code goes here when needed, never
 //! in the core (`domain`/`application`).
 
+mod ad_cache;
+mod ad_http;
 mod bundled_catalog;
 mod catalog_cache;
 mod catalog_http;
@@ -30,6 +32,11 @@ mod win_path;
 mod windows_registry;
 mod zip_archive;
 
+pub use ad_cache::JsonAdCache;
+pub use ad_http::{
+    parse_ads, FeedEntry, HttpAdBeaconSink, HttpAdConfig, HttpAdSource, DEFAULT_ADS_URL,
+    DEFAULT_RAW_BASE_URL,
+};
 pub use bundled_catalog::bundled_catalog;
 pub use catalog_cache::JsonCatalogCache;
 pub use catalog_http::{parse_catalog, HttpCatalogConfig, HttpCatalogSource, DEFAULT_CATALOG_URL};
