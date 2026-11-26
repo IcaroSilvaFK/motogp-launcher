@@ -68,3 +68,35 @@ Feature: Sponsored placements
     Given an ad is shown in the sidebar
     When the user selects "Off" in Settings > Preferences
     Then no slot renders in the sidebar, Discover or Settings > About
+
+  # Ad presentation (#136): size, placement and labelling of every slot.
+
+  Scenario: Sidebar ad fits short windows
+    Given an ad is available
+    And the window is 680px tall
+    Then the sidebar ad is fully visible or hidden, never cut off
+
+  Scenario: Discover ad does not displace the grid
+    Given an ad is available
+    When the Discover screen loads with an ad
+    Then the first row of mods is visible above the fold
+
+  Scenario: The mod page ad sits after the main content
+    Given an ad is available
+    When the user opens a mod page from Discover
+    Then the sponsored card is the last item of the main column
+
+  Scenario Outline: Ads are clearly labelled
+    Given an ad is available in "<locale>"
+    Then every ad shows a "<label>" label in the current language
+
+    Examples:
+      | locale | label       |
+      | en     | Sponsored   |
+      | pt-BR  | Patrocinado |
+
+  Scenario: Ads respect the preference
+    Given an ad is available
+    And ads are disabled
+    When the user visits Discover, a mod page and Settings
+    Then no slot renders
