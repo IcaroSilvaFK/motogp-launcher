@@ -20,6 +20,8 @@ import {
   createTauriCommunityAccount,
   createTauriModStats,
   createTauriModComments,
+  createTauriModPublisher,
+  createTauriPublishPicker,
   createLocalStorageLocaleStore,
   createLocalStorageNavStore,
   createLocalStorageUsagePreferenceStore,
@@ -95,6 +97,9 @@ createRoot(container).render(
       modComments={createTauriModComments()}
       downloadStats={downloadStats}
       usagePreference={usagePreference}
+      // Mod hosting (#130): publish form and "My mods".
+      modPublisher={createTauriModPublisher()}
+      publishPicker={createTauriPublishPicker()}
     />
   </StrictMode>,
 );

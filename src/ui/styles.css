@@ -72,6 +72,12 @@
   --icon-size-sm: 14px;
   /* Small status mark on an icon (the collapsed support entry's failure dot, #94) */
   --status-dot-size: 6px;
+  /* Mod hosting (#130): Material primary tabs (48dp, 3dp indicator), the publish form's line
+     length (two field columns at the 900px minimum window) and the two-line description editor */
+  --tab-height: 48px;
+  --tab-indicator-height: 3px;
+  --publish-form-max-width: 880px;
+  --publish-textarea-min-height: 64px;
 
   /* Spacing scale (4/8px grid) */
   --space-1: 4px;
@@ -3980,4 +3986,375 @@ button {
   flex-direction: column;
   align-items: flex-start;
   gap: var(--space-2);
+}
+
+/* ---------- Mod hosting (#130, PublishScreen / PublishModForm / MyModsList) ---------- */
+
+/* Material primary tabs: label-large text, a currentColor state layer, and a 3dp accent
+   indicator under the selected tab. The tab row sits on a 1px divider. */
+.tabs {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border);
+}
+
+.tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--tab-height);
+  padding: 0 var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--type-label-large);
+  font-weight: var(--type-label-large-weight);
+  cursor: pointer;
+  transition:
+    color var(--transition),
+    var(--transition-focus);
+}
+
+.tab::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: currentColor;
+  opacity: var(--state-layer, 0);
+  pointer-events: none;
+  transition: opacity var(--transition);
+}
+
+.tab:hover {
+  --state-layer: var(--state-hover-opacity);
+  color: var(--text);
+}
+
+.tab:focus-visible {
+  --state-layer: var(--state-focus-opacity);
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.tab:active {
+  --state-layer: var(--state-pressed-opacity);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--accent-text);
+}
+
+.tab[aria-selected='true']::after {
+  content: '';
+  position: absolute;
+  right: var(--space-2);
+  bottom: 0;
+  left: var(--space-2);
+  height: var(--tab-indicator-height);
+  border-radius: var(--tab-indicator-height) var(--tab-indicator-height) 0 0;
+  background: var(--accent);
+}
+
+.tab-count {
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-lg);
+  background: var(--surface-3);
+  color: var(--text);
+  font-size: var(--type-label-small);
+}
+
+.tab-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.tab-panel[hidden] {
+  display: none;
+}
+
+/* The form: one card, two titled sections in a two-column grid, the action at its foot. */
+.publish-form {
+  gap: var(--space-5);
+  max-width: var(--publish-form-max-width);
+  padding: var(--space-5);
+}
+
+.publish-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.publish-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.publish-section + .publish-section {
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+.publish-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.publish-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.publish-field-wide {
+  grid-column: 1 / -1;
+}
+
+.publish-label {
+  color: var(--text);
+  font-size: var(--type-label-large);
+  font-weight: var(--type-label-large-weight);
+}
+
+.publish-label-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.publish-field .input {
+  width: 100%;
+}
+
+.publish-textarea {
+  height: auto;
+  min-height: var(--publish-textarea-min-height);
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.publish-field .input[aria-invalid='true'],
+.publish-file-invalid {
+  border-color: var(--danger-border);
+}
+
+.publish-hint {
+  font-size: var(--type-body-small);
+}
+
+.publish-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  color: var(--danger-text);
+  font-size: var(--type-body-small);
+}
+
+.publish-error .icon {
+  flex: none;
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
+  margin-top: 2px;
+}
+
+/* File picker: a read-only well showing the chosen file name, the picker button at its end. */
+.publish-file {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: var(--control-height);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+}
+
+.publish-file > .icon,
+.publish-shot > .icon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.publish-file-name,
+.publish-shot-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.publish-shots {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.publish-shot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--control-height);
+  padding: 0 var(--space-1) 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.publish-check {
+  padding: 0;
+}
+
+.publish-check:hover {
+  background: transparent;
+}
+
+.publish-fieldset:disabled .publish-check {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* Foot: the progress (or the "fix N fields" summary) on the left, the one main action on the right. */
+.publish-footer {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.publish-footer > .btn {
+  flex: none;
+  margin-left: auto;
+}
+
+.publish-footer-status {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.publish-progress {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.publish-summary {
+  color: var(--danger-text);
+  font-size: var(--type-body-small);
+}
+
+.publish-done {
+  max-width: var(--publish-form-max-width);
+}
+
+.publish-done-icon {
+  background: var(--success-bg);
+  color: var(--success-fg);
+}
+
+.publish-done .empty-title:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+/* My mods: a card per mod, its versions as dense rows (label, meta, status badge). */
+.publish-toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.my-mods-panel,
+.my-mods {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.my-mod {
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+}
+
+.my-mod-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.my-mod-title {
+  font-size: var(--type-title-medium);
+  font-weight: 600;
+}
+
+.my-mod-id {
+  color: var(--text-muted);
+}
+
+.my-mod-versions {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+}
+
+.my-mod-version {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  align-items: center;
+  gap: var(--space-1) var(--space-4);
+  min-height: var(--control-height);
+  padding: var(--space-2) var(--space-3);
+}
+
+.my-mod-version + .my-mod-version {
+  border-top: 1px solid var(--border);
+}
+
+.my-mod-version-label {
+  font-weight: 500;
+}
+
+.my-mod-version-meta,
+.my-mod-file {
+  min-width: 0;
+}
+
+.my-mod-file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.my-mod-reason {
+  grid-column: 2 / -1;
+  color: var(--danger-text);
+  font-size: var(--type-body-small);
+}
+
+.badge-error {
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error-fg);
+}
+
+.my-mod-status .icon {
+  width: var(--icon-size-sm);
+  height: var(--icon-size-sm);
 }

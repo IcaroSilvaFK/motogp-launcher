@@ -7,20 +7,23 @@ use crate::ads_fallback::{NullAdBeacon, NullAdSource};
 use crate::{
     compose, configure, run_recovery, MemoryCredentialStore, UnavailableCatalogSource,
     UnavailableCommunityApi, UnavailableDownloadStats, UnavailableModStatsApi,
-    COMMUNITY_SERVER_URL,
+    UnavailablePublishApi, COMMUNITY_SERVER_URL,
 };
 use motogp_application::{
     AdBeaconSink, AdSource, AvatarFetcher, CatalogSource, CommunityApi, CommunityAuthService,
-    CommunityCommentsApi, CommunityCommentsService, CommunityStarsService, CredentialStore,
-    DownloadStatsApi, DownloadStatsService, InstanceGuard, InstanceLock, ModStatsApi,
+    CommunityCommentsApi, CommunityCommentsService, CommunityPublishService, CommunityStarsService,
+    CredentialStore, DownloadStatsApi, DownloadStatsService, InstanceGuard, InstanceLock,
+    MergedCatalogSource, ModPublishApi, ModStatsApi,
 };
 use motogp_infrastructure::{
-    bundled_catalog, DataDir, FileInstanceLock, FsInstallIdStore, HttpAdBeaconSink, HttpAdConfig,
-    HttpAdSource, HttpAvatarFetcher, HttpCatalogConfig, HttpCatalogSource, HttpCommunityApi,
-    HttpCommunityConfig, HttpDownloadStats, HttpModStatsApi, OsPkce, SteamArtwork, SteamLibraries,
-    SysinfoProcesses, SystemClock, TcpLoopbackReceiver, ThreadRunner, WindowsCredentialStore,
+    bundled_catalog, DataDir, FileInstanceLock, FsInstallIdStore, FsPublishFiles, HttpAdBeaconSink,
+    HttpAdConfig, HttpAdSource, HttpAvatarFetcher, HttpCatalogConfig, HttpCatalogSource,
+    HttpCommunityApi, HttpCommunityCatalogSource, HttpCommunityConfig, HttpDownloadStats,
+    HttpModPublishApi, HttpModStatsApi, OsPkce, SteamArtwork, SteamLibraries, SysinfoProcesses,
+    SystemClock, TcpLoopbackReceiver, ThreadRunner, WindowsCredentialStore,
 };
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use tauri::Manager;
 
 #[cfg(windows)]
@@ -46,13 +49,27 @@ fn steam_artwork() -> SteamArtwork {
 /// The HTTPS catalog source; if its client cannot be built the catalog is
 /// served from the offline cache only and the app still starts.
 fn catalog_source() -> Arc<dyn CatalogSource> {
-    match HttpCatalogSource::new(HttpCatalogConfig::github(env!("CARGO_PKG_VERSION"))) {
+    let version = env!("CARGO_PKG_VERSION");
+    let github: Arc<dyn CatalogSource> =
+        match HttpCatalogSource::new(HttpCatalogConfig::github(version)) {
+            Ok(source) => Arc::new(source),
+            Err(error) => {
+                eprintln!("catalog source unavailable: {error}");
+                Arc::new(UnavailableCatalogSource::new(error.to_string()))
+            }
+        };
+    // The community server's catalog (#130) is merged in: its entries win, and
+    // when it is down the catalog is the GitHub one alone.
+    let community: Arc<dyn CatalogSource> = match HttpCommunityCatalogSource::new(
+        HttpCommunityConfig::new(COMMUNITY_SERVER_URL, version),
+    ) {
         Ok(source) => Arc::new(source),
         Err(error) => {
-            eprintln!("catalog source unavailable: {error}");
+            eprintln!("community catalog unavailable: {error}");
             Arc::new(UnavailableCatalogSource::new(error.to_string()))
         }
-    }
+    };
+    Arc::new(MergedCatalogSource::new(github, community))
 }
 
 /// The HTTPS ad source and beacon, built from one config. If either client
@@ -91,6 +108,7 @@ fn community_services(
     Arc<CommunityAuthService>,
     Arc<CommunityStarsService>,
     Arc<CommunityCommentsService>,
+    Arc<CommunityPublishService>,
 ) {
     let version = env!("CARGO_PKG_VERSION");
     let (api, comments_api): (Arc<dyn CommunityApi>, Arc<dyn CommunityCommentsApi>) =
@@ -133,6 +151,21 @@ fn community_services(
         store.clone(),
         avatars.clone(),
     ));
+    // One request is a whole 8 MiB chunk: give it far more than the account calls get.
+    let mut publish_config = HttpCommunityConfig::new(COMMUNITY_SERVER_URL, version);
+    publish_config.timeout = Duration::from_secs(120);
+    let publish_api: Arc<dyn ModPublishApi> = match HttpModPublishApi::new(publish_config) {
+        Ok(api) => Arc::new(api),
+        Err(error) => {
+            eprintln!("community publish client unavailable: {error}");
+            Arc::new(UnavailablePublishApi::new(error.to_string()))
+        }
+    };
+    let publish = Arc::new(CommunityPublishService::new(
+        publish_api,
+        Arc::new(FsPublishFiles),
+        store.clone(),
+    ));
     let auth = Arc::new(CommunityAuthService::new(
         api,
         store,
@@ -141,7 +174,7 @@ fn community_services(
         Arc::new(TauriWebOpener::community(handle)),
         avatars,
     ));
-    (auth, stars, comments)
+    (auth, stars, comments, publish)
 }
 
 /// Anonymous download counts (#120): HTTP client plus the install id file. If the
@@ -199,7 +232,7 @@ pub fn run() {
         }
         let handle = app.handle().clone();
         let handle_for_community = handle.clone();
-        let (community, stars, comments) = community_services(handle_for_community);
+        let (community, stars, comments, publish) = community_services(handle_for_community);
         let (ad_source, ad_beacon) = ad_adapters();
         let state = compose(
             &data,
@@ -222,7 +255,8 @@ pub fn run() {
         )
         .with_stars(stars)
         .with_comments(comments)
-        .with_downloads(download_stats(&data));
+        .with_downloads(download_stats(&data))
+        .with_publish(publish);
         // Recovery finishes before the state exists, so no command can run
         // `play` earlier. A failure is already on the error channel and blocks
         // new deploys; it must not stop the app from starting.

@@ -3,20 +3,22 @@
 //! background execution, events) is injected.
 use crate::catalog_install_support::production_downloader;
 use crate::comments_fallback::offline_comments;
-use crate::{MemoryCredentialStore, UnavailableDownloadStats, UnavailableModStatsApi};
+use crate::{
+    MemoryCredentialStore, UnavailableDownloadStats, UnavailableModStatsApi, UnavailablePublishApi,
+};
 use motogp_application::{
     AdBeaconSink, AdCache, AdService, AdSource, ArtworkService, BackgroundRunner, CancelFlag,
     CatalogInstaller, CatalogService, CatalogSource, CommunityAuthService,
-    CommunityCommentsService, CommunityStarsService, DeployService, DownloadStatsService,
-    FolderOpener, GameService, GameSettings, ModDownloader, PlayService, ProcessInspector,
-    ProfileModPlanner, ProfileService, RawCatalog, SessionPublisher, SessionService,
-    StorageService, UrlOpener, WebPageOpener,
+    CommunityCommentsService, CommunityPublishService, CommunityStarsService, DeployService,
+    DownloadStatsService, FolderOpener, GameService, GameSettings, ModDownloader, PlayService,
+    ProcessInspector, ProfileModPlanner, ProfileService, RawCatalog, SessionPublisher,
+    SessionService, StorageService, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{
     mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsDownloadStaging, FsGameFiles,
-    FsInstallIdStore, FsStorageScanner, JsonAdCache, JsonCatalogCache, JsonConfigStore,
-    JsonDeployedRepository, JsonModRepository, JsonProfileStore, ModLibrary, MonotonicClock,
-    Sha256Hasher, SteamArtwork, SteamLibraries, SystemClock,
+    FsInstallIdStore, FsPublishFiles, FsStorageScanner, JsonAdCache, JsonCatalogCache,
+    JsonConfigStore, JsonDeployedRepository, JsonModRepository, JsonProfileStore, ModLibrary,
+    MonotonicClock, Sha256Hasher, SteamArtwork, SteamLibraries, SystemClock,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -61,6 +63,10 @@ pub struct AppState {
     pub stars: Arc<CommunityStarsService>,
     /// Mod comments (#118): same blocking-I/O rules as `community`; the token never leaves it.
     pub comments: Arc<CommunityCommentsService>,
+    /// Publishing mods to the community server (#130): reads the session itself.
+    pub publish: Arc<CommunityPublishService>,
+    /// Cancel flag of the publish in flight (one at a time).
+    pub publish_cancel: Arc<Mutex<Option<CancelFlag>>>,
     /// Catalog installs (#74): downloads run off the runtime without `write_lock`.
     pub installer: Arc<Installer>,
     /// Cancel flags of the installs in flight, by catalog entry id.
@@ -213,6 +219,12 @@ where
             Arc::new(MemoryCredentialStore::default()),
         )),
         comments: offline_comments(),
+        publish: Arc::new(CommunityPublishService::new(
+            Arc::new(UnavailablePublishApi::new("not configured")),
+            Arc::new(FsPublishFiles),
+            Arc::new(MemoryCredentialStore::default()),
+        )),
+        publish_cancel: Arc::default(),
         ads: Arc::new(AdService::new(
             ad_source,
             Arc::new(JsonAdCache::new(data.ad_cache_file())) as Arc<dyn AdCache>,
@@ -226,6 +238,11 @@ impl AppState {
     /// Replaces the stars service (bootstrap and tests).
     pub fn with_stars(self, stars: Arc<CommunityStarsService>) -> Self {
         Self { stars, ..self }
+    }
+
+    /// Replaces the publish service (bootstrap and tests).
+    pub fn with_publish(self, publish: Arc<CommunityPublishService>) -> Self {
+        Self { publish, ..self }
     }
 
     /// Replaces the community service (tests).

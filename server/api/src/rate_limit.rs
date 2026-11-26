@@ -138,6 +138,10 @@ pub async fn ip_rate_limit(
         .extensions()
         .get::<ConnectInfo<SocketAddr>>()
         .map(|info| info.0);
+    // Big uploads send many chunks; they are limited per user by the auth extractor instead.
+    if crate::uploads::is_chunk_request(request.method(), request.uri().path()) {
+        return next.run(request).await;
+    }
     let ip = client_ip(request.headers(), connection, state.trust_proxy_headers);
     let path = request.uri().path();
     let limiter = if path == "/auth" || path.starts_with("/auth/") {

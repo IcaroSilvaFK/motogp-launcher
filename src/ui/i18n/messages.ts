@@ -1,4 +1,12 @@
-import type { ErrorCode, Locale, StorageCategory, UpdateErrorKind } from '../../domain';
+import type {
+  ErrorCode,
+  Locale,
+  PublishErrorCode,
+  PublishFormErrorKey,
+  StorageCategory,
+  UpdateErrorKind,
+  VersionStatus,
+} from '../../domain';
 
 export interface Messages {
   appName: string;
@@ -374,6 +382,72 @@ export interface Messages {
     confirmPrompt: string;
     confirm: string;
     cancel: string;
+  };
+  /** Publishing a mod (#130): translations for the typed publish error codes and the form rules. */
+  publish: {
+    errors: Record<PublishErrorCode, string>;
+    validation: Record<PublishFormErrorKey, string>;
+    /** The Discover header button and the publish page title. */
+    open: string;
+    subtitle: (name: string) => string;
+    back: string;
+    backTo: string;
+    tabsLabel: string;
+    tabPublish: string;
+    tabMyMods: string;
+    sectionDetails: string;
+    sectionFiles: string;
+    title: string;
+    modId: string;
+    modIdHint: string;
+    description: string;
+    descriptionHint: string;
+    longDescription: string;
+    longDescriptionHint: string;
+    category: string;
+    game: string;
+    version: string;
+    versionHint: string;
+    file: string;
+    fileHint: string;
+    noFile: string;
+    chooseFile: string;
+    changeFile: string;
+    screenshots: string;
+    screenshotsHint: string;
+    addScreenshots: string;
+    screenshotCount: (count: number, max: number) => string;
+    removeScreenshot: (name: string) => string;
+    ownership: string;
+    submit: string;
+    submitting: string;
+    fixErrors: (count: number) => string;
+    progressLabel: string;
+    preparing: string;
+    hashing: string;
+    uploading: (sent: string, total: string) => string;
+    finishing: string;
+    cancel: string;
+    cancelled: string;
+    retry: string;
+    dismiss: string;
+    doneTitle: string;
+    doneBody: (title: string, version: string) => string;
+    viewMyMods: string;
+    publishAnother: string;
+    myMods: {
+      loading: string;
+      emptyTitle: string;
+      emptyHint: string;
+      refresh: string;
+      refreshing: string;
+      retry: string;
+      versionLabel: (version: string) => string;
+      versions: (count: number) => string;
+      uploaded: (date: string) => string;
+      reason: (reason: string) => string;
+      status: Record<VersionStatus, string>;
+    };
   };
   notices: {
     modInstalled: (name: string) => string;

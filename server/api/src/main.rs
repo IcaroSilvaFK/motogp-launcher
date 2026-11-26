@@ -5,9 +5,10 @@ use community_api::comments::CommentsState;
 use community_api::downloads::DownloadsState;
 use community_api::{build_router, AppState, RateLimits};
 use community_application::comments::CommentsService;
-use community_application::{AuthService, DownloadService, StarService};
+use community_application::mods::ModLimits;
+use community_application::{AuthService, DownloadService, ModHostingService, StarService};
 use community_infrastructure::{
-    Config, DiscordHttp, OsTokenGenerator, Sha256Hasher, SqliteStore, SystemClock,
+    Config, DiscordHttp, LocalModStorage, OsTokenGenerator, Sha256Hasher, SqliteStore, SystemClock,
 };
 use tracing_subscriber::EnvFilter;
 
@@ -56,6 +57,21 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }),
         clock.clone(),
     );
+    let mod_storage = LocalModStorage::new(&config.mod_storage_dir);
+    mod_storage.ensure_dirs().await?;
+    let files_dir = mod_storage.public_dir();
+    let mods = ModHostingService {
+        clock: clock.clone(),
+        tokens: Arc::new(OsTokenGenerator),
+        repo: store.clone(),
+        storage: Arc::new(mod_storage),
+        admin_discord_ids: config.admin_discord_ids.clone(),
+        limits: ModLimits {
+            max_upload_bytes: config.mod_max_upload_bytes,
+            user_quota_bytes: config.mod_user_quota_bytes,
+            uploads_per_day: config.mod_uploads_per_day,
+        },
+    };
     let state = AppState {
         clock: clock.clone(),
         health: store.clone(),
@@ -72,6 +88,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         limits: RateLimits::new(clock),
         comments,
         trust_proxy_headers: config.trust_proxy_headers,
+        mods: community_api::mods::ModHosting {
+            service: Arc::new(mods),
+            public_base_url: config.public_base_url.clone(),
+            files_dir,
+        },
     };
 
     let listener = tokio::net::TcpListener::bind(config.bind_addr).await?;

@@ -8,6 +8,7 @@ import {
   selectEntries,
   sortEntries,
   useCatalogState,
+  useCommunityAccount,
   useModStats,
 } from '../application';
 import type { CatalogController, CatalogSort, DiscoverView, DiscoverViewStore } from '../application';
@@ -22,6 +23,7 @@ import { formatDay, formatInstantDate, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 import { ModPage } from './ModPage';
 import { stagger } from './motion';
+import { PublishScreen } from './PublishScreen';
 import { StarCount } from './StarButton';
 
 type View = DiscoverView;
@@ -36,6 +38,13 @@ type ReturnPoint = {
 };
 
 const SKELETON_CARDS = [0, 1, 2, 3, 4, 5];
+
+/** The catalog's games, most used first: suggestions for the publish form (the first one prefills it). */
+function gamesByUse(entries: { game: string }[]): string[] {
+  const counts = new Map<string, number>();
+  for (const entry of entries) counts.set(entry.game, (counts.get(entry.game) ?? 0) + 1);
+  return [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([game]) => game);
+}
 
 /** Two-option segmented button (Material 3), icon only, each option named for screen readers. */
 function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => void }) {
@@ -118,10 +127,17 @@ export function DiscoverScreen({
   const [openId, setOpenId] = useState<string | null>(null);
   const returnPoint = useRef<ReturnPoint | null>(null);
   // Community stars (#119): one cached load per visit; offline or unwired, no counts are shown.
-  const { stars: starsStore } = useCommunity();
+  const { stars: starsStore, account, publisher } = useCommunity();
   const starStats = useModStats(starsStore);
   const showStars = starStats.stats.size > 0;
   const starsOf = (id: string) => starStats.stats.get(id)?.stars ?? 0;
+  // Mod hosting (#130): "Publish a mod" needs a signed-in creator and the publisher port.
+  const community = useCommunityAccount(account);
+  const creator = community.state === 'signedIn' ? (community.profile?.displayName ?? null) : null;
+  const canPublish = publisher !== undefined && creator !== null;
+  const [publishing, setPublishing] = useState(false);
+  const publishButton = useRef<HTMLButtonElement>(null);
+  const wasPublishing = useRef(false);
 
   useEffect(() => {
     void catalog.load();
@@ -143,6 +159,12 @@ export function DiscoverScreen({
     );
     card?.focus({ preventScroll: point.restoreScroll });
   }, [openId]);
+
+  // Leaving the publish page puts focus back on the button that opened it.
+  useLayoutEffect(() => {
+    if (wasPublishing.current && !publishing) publishButton.current?.focus();
+    wasPublishing.current = publishing;
+  }, [publishing]);
 
   const openEntry = (entryId: string, event: MouseEvent<HTMLElement>) => {
     // `scrollingElement` is missing in some environments (jsdom), hence the last fallback.
@@ -176,12 +198,20 @@ export function DiscoverScreen({
           </p>
         )}
       </div>
-      {actions && (
+      {(actions || canPublish) && (
         <div className="page-actions">
-          <button type="button" className="btn" disabled={busy} onClick={() => void catalog.refresh()}>
-            <Icon name="refresh" />
-            {state.refreshing ? t.discover.refreshing : t.discover.refresh}
-          </button>
+          {actions && (
+            <button type="button" className="btn" disabled={busy} onClick={() => void catalog.refresh()}>
+              <Icon name="refresh" />
+              {state.refreshing ? t.discover.refreshing : t.discover.refresh}
+            </button>
+          )}
+          {canPublish && (
+            <button ref={publishButton} type="button" className="btn" onClick={() => setPublishing(true)}>
+              <Icon name="upload" />
+              {t.publish.open}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -193,6 +223,17 @@ export function DiscoverScreen({
       {body}
     </section>
   );
+
+  if (publishing && creator !== null) {
+    return (
+      <PublishScreen
+        creator={creator}
+        categories={categoryCounts(entries).map((item) => item.category)}
+        games={gamesByUse(entries)}
+        onBack={() => setPublishing(false)}
+      />
+    );
+  }
 
   if (loading) return page(false, <LoadingCatalog />);
 

@@ -5,6 +5,7 @@ pub use stars::ModId;
 pub mod comments;
 pub mod downloads;
 pub use downloads::{InstallId, ModSlug};
+pub mod mods;
 
 use std::fmt;
 
