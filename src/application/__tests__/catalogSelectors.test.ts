@@ -13,6 +13,8 @@ function entry(patch: Partial<CatalogEntry> & { id: string }): CatalogEntry {
     updatedAt: '2026-01-01',
     pageUrl: 'https://overtake.gg/downloads/x/',
     thumbnailUrl: null,
+    screenshots: [],
+    longDescription: null,
     download: null,
     ...patch,
   };

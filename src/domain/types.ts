@@ -179,6 +179,10 @@ export interface CatalogEntry {
   /** https page where the mod lives. */
   pageUrl: string;
   thumbnailUrl: string | null;
+  /** Gallery images (https, at most 8). Empty when the entry has none. */
+  screenshots: string[];
+  /** Plain text or safe Markdown subset; null falls back to `description`. */
+  longDescription: string | null;
   /** Present only when the author allows redistribution. */
   download: CatalogDownload | null;
 }

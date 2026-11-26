@@ -12,6 +12,9 @@ pub const SUPPORTED_CATALOG_SCHEMA: u32 = 1;
 /// Longest accepted entry id.
 const MAX_ID_LEN: usize = 64;
 
+/// Most screenshots an entry may carry.
+pub const MAX_SCREENSHOTS: usize = 8;
+
 /// Unvalidated download fields as read from the catalog file.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct CatalogDownloadDraft {
@@ -34,6 +37,10 @@ pub struct CatalogEntryDraft {
     pub updated_at: String,
     pub page_url: String,
     pub thumbnail_url: Option<String>,
+    /// Gallery image URLs (at most 8, https). Empty means none.
+    pub screenshots: Vec<String>,
+    /// Optional long text: plain text or a safe Markdown subset.
+    pub long_description: Option<String>,
     pub download: Option<CatalogDownloadDraft>,
 }
 
@@ -60,6 +67,8 @@ pub struct CatalogEntry {
     pub updated_at: String,
     pub page_url: String,
     pub thumbnail_url: Option<String>,
+    pub screenshots: Vec<String>,
+    pub long_description: Option<String>,
     pub download: Option<CatalogDownload>,
 }
 
@@ -80,6 +89,8 @@ pub enum CatalogEntryError {
     InvalidSize,
     /// A download needs url, size and sha256 together.
     IncompleteDownload,
+    /// More than [`MAX_SCREENSHOTS`] screenshots.
+    TooManyScreenshots { max: usize },
 }
 
 impl fmt::Display for CatalogEntryError {
@@ -102,6 +113,9 @@ impl fmt::Display for CatalogEntryError {
             CatalogEntryError::InvalidSize => write!(f, "download size must be greater than zero"),
             CatalogEntryError::IncompleteDownload => {
                 write!(f, "download needs url, size and sha256")
+            }
+            CatalogEntryError::TooManyScreenshots { max } => {
+                write!(f, "screenshots allows at most {max} images")
             }
         }
     }
@@ -132,6 +146,24 @@ impl CatalogEntry {
             .as_deref()
             .map(|url| https_url("thumbnailUrl", url))
             .transpose()?;
+        if draft.screenshots.len() > MAX_SCREENSHOTS {
+            return Err(CatalogEntryError::TooManyScreenshots {
+                max: MAX_SCREENSHOTS,
+            });
+        }
+        let mut screenshots: Vec<String> = Vec::with_capacity(draft.screenshots.len());
+        for url in &draft.screenshots {
+            let url = https_url("screenshots", url)?;
+            if !screenshots.contains(&url) {
+                screenshots.push(url);
+            }
+        }
+        let long_description = draft
+            .long_description
+            .as_deref()
+            .map(str::trim)
+            .filter(|text| !text.is_empty())
+            .map(String::from);
         let download = draft.download.map(validate_download).transpose()?;
         Ok(CatalogEntry {
             id,
@@ -144,6 +176,8 @@ impl CatalogEntry {
             updated_at,
             page_url,
             thumbnail_url,
+            screenshots,
+            long_description,
             download,
         })
     }
@@ -258,6 +292,8 @@ mod tests {
             updated_at: "2026-11-20".into(),
             page_url: "https://example.com/mod".into(),
             thumbnail_url: None,
+            screenshots: Vec::new(),
+            long_description: None,
             download: None,
         }
     }
@@ -290,6 +326,83 @@ mod tests {
     fn entry_without_optional_fields_is_valid() {
         let e = CatalogEntry::from_draft(draft()).unwrap();
         assert!(e.thumbnail_url.is_none() && e.download.is_none());
+    }
+
+    #[test]
+    fn screenshots_and_long_description_are_kept_in_order() {
+        let mut d = draft();
+        d.screenshots = vec![
+            " https://example.com/a.png ".into(),
+            "https://example.com/b.png".into(),
+            "https://example.com/c.png".into(),
+        ];
+        d.long_description = Some("  # Title\n\nBody  ".into());
+        let e = CatalogEntry::from_draft(d).unwrap();
+        assert_eq!(
+            e.screenshots,
+            vec![
+                "https://example.com/a.png",
+                "https://example.com/b.png",
+                "https://example.com/c.png"
+            ]
+        );
+        assert_eq!(e.long_description.as_deref(), Some("# Title\n\nBody"));
+    }
+
+    #[test]
+    fn missing_screenshots_and_blank_long_description_are_empty() {
+        let e = CatalogEntry::from_draft(draft()).unwrap();
+        assert!(e.screenshots.is_empty() && e.long_description.is_none());
+        let mut d = draft();
+        d.long_description = Some("  \n\t ".into());
+        assert_eq!(CatalogEntry::from_draft(d).unwrap().long_description, None);
+    }
+
+    #[test]
+    fn insecure_screenshot_names_the_field() {
+        for bad in ["http://example.com/a.png", "", "https://", "ftp://x/a.png"] {
+            let mut d = draft();
+            d.screenshots = vec!["https://example.com/ok.png".into(), bad.into()];
+            assert_eq!(
+                CatalogEntry::from_draft(d),
+                Err(CatalogEntryError::InsecureUrl {
+                    field: "screenshots"
+                }),
+                "{bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn more_than_eight_screenshots_are_refused() {
+        let urls = |n: usize| -> Vec<String> {
+            (0..n)
+                .map(|i| format!("https://example.com/{i}.png"))
+                .collect()
+        };
+        let mut d = draft();
+        d.screenshots = urls(8);
+        assert_eq!(CatalogEntry::from_draft(d).unwrap().screenshots.len(), 8);
+        let mut d = draft();
+        d.screenshots = urls(9);
+        let err = CatalogEntry::from_draft(d).unwrap_err();
+        assert_eq!(err, CatalogEntryError::TooManyScreenshots { max: 8 });
+        assert_eq!(err.to_string(), "screenshots allows at most 8 images");
+    }
+
+    #[test]
+    fn duplicate_screenshots_are_dropped_keeping_the_first() {
+        let mut d = draft();
+        d.screenshots = vec![
+            "https://example.com/a.png".into(),
+            "https://example.com/b.png".into(),
+            " https://example.com/a.png".into(),
+        ];
+        let e = CatalogEntry::from_draft(d).unwrap();
+        assert_eq!(
+            e.screenshots,
+            vec!["https://example.com/a.png", "https://example.com/b.png"]
+        );
     }
 
     #[test]

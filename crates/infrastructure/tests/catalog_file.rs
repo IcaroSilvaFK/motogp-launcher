@@ -51,7 +51,7 @@ fn schema_requires_the_fields_the_rust_rules_require() {
     ] {
         assert!(required.contains(&field), "{field} must be required");
     }
-    for optional in ["thumbnailUrl", "download"] {
+    for optional in ["thumbnailUrl", "screenshots", "longDescription", "download"] {
         assert!(!required.contains(&optional), "{optional} is optional");
         assert!(entry["properties"].get(optional).is_some());
     }
@@ -70,6 +70,14 @@ fn schema_url_and_hash_patterns_match_the_rust_rules() {
     let entry = &defs["entry"]["properties"];
     assert_eq!(entry["pageUrl"]["$ref"], "#/$defs/httpsUrl");
     assert_eq!(entry["thumbnailUrl"]["$ref"], "#/$defs/httpsUrl");
+    let shots = &entry["screenshots"];
+    assert_eq!(shots["items"]["$ref"], "#/$defs/httpsUrl");
+    assert_eq!(
+        (shots["minItems"].as_u64(), shots["maxItems"].as_u64()),
+        (Some(1), Some(8))
+    );
+    assert_eq!(shots["uniqueItems"], Value::Bool(true));
+    assert_eq!(entry["longDescription"]["maxLength"], 20000);
     assert_eq!(
         defs["download"]["properties"]["url"]["$ref"],
         "#/$defs/httpsUrl"

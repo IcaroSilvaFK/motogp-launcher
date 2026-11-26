@@ -18,3 +18,23 @@ Feature: Catalog entries (domain)
     Given a draft whose title is "   "
     When it is validated
     Then it is rejected
+
+  Scenario: An entry with screenshots and a long description is accepted
+    Given a catalog entry with 3 https screenshots and a long description
+    When it is validated
+    Then it keeps the 3 screenshots in order and the long description
+
+  Scenario: Older entries stay valid
+    Given a catalog entry without screenshots or long description
+    When it is validated
+    Then it has no screenshots and no long description
+
+  Scenario: A non-https screenshot is refused
+    Given a catalog entry with the screenshot "http://example.com/a.png"
+    When it is validated
+    Then it is refused naming the field "screenshots"
+
+  Scenario: More than 8 screenshots are refused
+    Given a catalog entry with 9 screenshots
+    When it is validated
+    Then it is refused because at most 8 screenshots are allowed

@@ -35,14 +35,14 @@ Feature: Discover tab
     When I switch to the list view
     Then entries are shown as rows
 
-  Scenario: Entry detail and Open page
+  Scenario: Entry page and Open page
     Given the catalog has 2 "Physics" entries and 1 "Liveries" entry
     When I open the entry "Rebalanced AI"
-    Then its description, version, author and updated date are shown
+    Then its page shows the description, version, author and updated date
     When I click "Open page"
     Then openCatalogPage is called with the entry id
     When I press Escape
-    Then the entry detail is closed
+    Then the Discover list is shown again with focus on the entry
 
   Scenario: Install is offered only for entries with a download
     Given an entry with a download block

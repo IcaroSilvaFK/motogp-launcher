@@ -21,6 +21,8 @@ fn complete_draft() -> CatalogEntryDraft {
         updated_at: "2026-11-20".into(),
         page_url: "https://example.com/mods/rebalanced-ai".into(),
         thumbnail_url: None,
+        screenshots: Vec::new(),
+        long_description: None,
         download: None,
     }
 }
@@ -61,6 +63,39 @@ fn blank_title(w: &mut CatalogWorld, title: String) {
     w.draft = Some(draft);
 }
 
+fn shots(count: usize) -> Vec<String> {
+    (1..=count)
+        .map(|i| format!("https://example.com/shot-{i}.png"))
+        .collect()
+}
+
+#[given(expr = "a catalog entry with {int} https screenshots and a long description")]
+fn with_screenshots(w: &mut CatalogWorld, count: usize) {
+    let mut draft = complete_draft();
+    draft.screenshots = shots(count);
+    draft.long_description = Some("A longer text.".into());
+    w.draft = Some(draft);
+}
+
+#[given("a catalog entry without screenshots or long description")]
+fn without_screenshots(w: &mut CatalogWorld) {
+    w.draft = Some(complete_draft());
+}
+
+#[given(expr = "a catalog entry with the screenshot {string}")]
+fn one_screenshot(w: &mut CatalogWorld, url: String) {
+    let mut draft = complete_draft();
+    draft.screenshots = vec![url];
+    w.draft = Some(draft);
+}
+
+#[given(expr = "a catalog entry with {int} screenshots")]
+fn many_screenshots(w: &mut CatalogWorld, count: usize) {
+    let mut draft = complete_draft();
+    draft.screenshots = shots(count);
+    w.draft = Some(draft);
+}
+
 #[when("it is validated")]
 fn validate(w: &mut CatalogWorld) {
     let draft = w.draft_mut().clone();
@@ -87,6 +122,35 @@ fn rejected_with(w: &mut CatalogWorld, reason: String) {
         ),
         other => panic!("unknown reason {other}"),
     }
+}
+
+#[then(expr = "it keeps the {int} screenshots in order and the long description")]
+fn keeps_screenshots(w: &mut CatalogWorld, count: usize) {
+    let entry = result(w).as_ref().expect("expected a valid entry");
+    assert_eq!(entry.screenshots, shots(count));
+    assert_eq!(entry.long_description.as_deref(), Some("A longer text."));
+}
+
+#[then("it has no screenshots and no long description")]
+fn has_none(w: &mut CatalogWorld) {
+    let entry = result(w).as_ref().expect("expected a valid entry");
+    assert!(entry.screenshots.is_empty());
+    assert_eq!(entry.long_description, None);
+}
+
+#[then(expr = "it is refused naming the field {string}")]
+fn refused_naming(w: &mut CatalogWorld, field: String) {
+    let error = result(w).as_ref().expect_err("expected a rejection");
+    assert!(
+        matches!(error, CatalogEntryError::InsecureUrl { field: f } if *f == field),
+        "got: {error:?}"
+    );
+}
+
+#[then("it is refused because at most 8 screenshots are allowed")]
+fn refused_too_many(w: &mut CatalogWorld) {
+    let error = result(w).as_ref().expect_err("expected a rejection");
+    assert_eq!(error, &CatalogEntryError::TooManyScreenshots { max: 8 });
 }
 
 #[then("it is rejected")]

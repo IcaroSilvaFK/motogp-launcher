@@ -204,6 +204,8 @@ pub fn draft(id: &str) -> CatalogEntryDraft {
         updated_at: "2026-11-20".into(),
         page_url: format!("https://example.com/{id}"),
         thumbnail_url: None,
+        screenshots: Vec::new(),
+        long_description: None,
         download: None,
     }
 }

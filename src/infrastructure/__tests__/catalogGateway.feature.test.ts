@@ -20,6 +20,8 @@ const catalog: Catalog = {
       updatedAt: '2026-11-01',
       pageUrl: 'https://example.com/rebalanced-ai',
       thumbnailUrl: null,
+      screenshots: [],
+      longDescription: null,
       download: null,
     },
   ],
