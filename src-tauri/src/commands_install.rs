@@ -4,7 +4,11 @@
 use crate::commands::{mutate, read_blocking};
 use crate::dto::ModDto;
 use crate::{AppState, CommandError};
-use motogp_application::{CancelFlag, CatalogInstallError, InstallPhase, InstallProgress};
+use motogp_application::{
+    CancelFlag, CatalogInstallError, ConfigRepository, InstallOutcome, InstallPhase,
+    InstallProgress,
+};
+use motogp_domain::VANILLA_ID;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Runtime, State};
 
@@ -51,6 +55,30 @@ fn emit<R: Runtime>(app: &AppHandle<R>, payload: CatalogInstallProgressDto) {
     }
 }
 
+/// Result of [`install_catalog_entry`] (#129): the imported mods and whether
+/// the first one was enabled in the active profile.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CatalogInstallResultDto {
+    pub mods: Vec<ModDto>,
+    pub mod_id: String,
+    pub enabled: bool,
+    /// Name of the enabled mod that blocked enabling, when there was a conflict.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conflict_with: Option<String>,
+}
+
+impl From<InstallOutcome> for CatalogInstallResultDto {
+    fn from(outcome: InstallOutcome) -> Self {
+        Self {
+            mods: outcome.mods.into_iter().map(Into::into).collect(),
+            mod_id: outcome.mod_id,
+            enabled: outcome.enabled,
+            conflict_with: outcome.conflict_with,
+        }
+    }
+}
+
 /// Removes the cancel flag of an install when it ends, however it ends.
 struct CancelRegistration<'a> {
     state: &'a AppState,
@@ -86,13 +114,16 @@ impl Drop for CancelRegistration<'_> {
 }
 
 /// Downloads, verifies and imports the catalog entry `id`. The frontend only
-/// names the entry: the URL always comes from the catalog.
+/// names the entry: the URL always comes from the catalog. With
+/// `enable_after_install` the new mod is also enabled in the active profile
+/// (unless it conflicts with an enabled mod).
 #[tauri::command]
 pub async fn install_catalog_entry<R: Runtime>(
     app: AppHandle<R>,
     state: State<'_, AppState>,
     id: String,
-) -> Result<Vec<ModDto>, CommandError> {
+    enable_after_install: Option<bool>,
+) -> Result<CatalogInstallResultDto, CommandError> {
     let cancel = CancelFlag::new();
     let _registration = CancelRegistration::register(state.inner(), &id, &cancel)
         .ok_or_else(|| CatalogInstallError::InstallInProgress { id: id.clone() })?;
@@ -121,10 +152,22 @@ pub async fn install_catalog_entry<R: Runtime>(
             &app,
             CatalogInstallProgressDto::importing(&id, staged.size()),
         );
-        let entries = state
-            .installer
-            .install(&state.library, &state.profiles, staged)?;
-        Ok(entries.into_iter().map(Into::into).collect())
+        let target = match enable_after_install {
+            Some(true) => Some(
+                state
+                    .config
+                    .load()
+                    .ok()
+                    .and_then(|config| config.active_profile)
+                    .unwrap_or_else(|| VANILLA_ID.to_string()),
+            ),
+            _ => None,
+        };
+        let outcome =
+            state
+                .installer
+                .install(&state.library, &state.profiles, staged, target.as_deref())?;
+        Ok(outcome.into())
     })
     .await
 }

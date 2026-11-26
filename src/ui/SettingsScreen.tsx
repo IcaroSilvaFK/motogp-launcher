@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { MouseEvent } from 'react';
 import { AboutSection } from './AboutSection';
 import { useAdPreference } from './AdPreferenceContext';
+import { useAutoEnablePreference } from './AutoEnablePreferenceContext';
 import { CommunityAccountSection } from './CommunityAccountSection';
 import { useCommunity } from './CommunityContext';
 import { Icon } from './Icon';
@@ -26,6 +27,7 @@ export function SettingsScreen() {
   const { t, locale, setLocale } = useI18n();
   const { controller, state } = useLauncher();
   const { preference: adPreference, setPreference: setAdPreference } = useAdPreference();
+  const { enabled: autoEnable, setEnabled: setAutoEnable } = useAutoEnablePreference();
   // Without a community port (tests, builds without the community) the section and its link are absent.
   const hasCommunity = useCommunity().account !== undefined;
   const sections = SECTIONS.filter(({ id }) => id !== 'community' || hasCommunity);
@@ -190,6 +192,22 @@ export function SettingsScreen() {
                     <option value="on">{t.settings.adShow}</option>
                     <option value="off">{t.settings.adOff}</option>
                   </select>
+                </div>
+              </div>
+              <div className="setting-row">
+                <div className="setting-text">
+                  <label htmlFor="auto-enable-checkbox" className="setting-label">
+                    {t.settings.autoEnable}
+                  </label>
+                  <p className="hint">{t.settings.autoEnableHint}</p>
+                </div>
+                <div className="setting-control">
+                  <input
+                    id="auto-enable-checkbox"
+                    type="checkbox"
+                    checked={autoEnable}
+                    onChange={(event) => setAutoEnable(event.target.checked)}
+                  />
                 </div>
               </div>
             </div>

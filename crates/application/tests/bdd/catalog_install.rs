@@ -77,7 +77,9 @@ impl InstallWorld {
             let content = rig.disk.lock().unwrap().files[staged.path()].clone();
             put_file(&lib, &staged.path().to_string_lossy(), &content);
             let mods: ModService<_, _, _, _> = service(&lib);
-            rig.installer.install(&mods, &rig.profiles(), staged)
+            rig.installer
+                .install(&mods, &rig.profiles(), staged, None)
+                .map(|o| o.mods)
         });
         self.result = Some(result);
     }

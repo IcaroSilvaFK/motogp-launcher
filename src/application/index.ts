@@ -8,6 +8,7 @@ export type {
 } from './controller';
 export type {
   AdPreferenceStore,
+  AutoEnablePreferenceStore,
   DiscoverView,
   DiscoverViewStore,
   DropEvents,
@@ -22,6 +23,7 @@ export { loadLocale, saveLocale } from './localePreference';
 export { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarPreference';
 export { loadDiscoverView, saveDiscoverView } from './discoverViewPreference';
 export { loadAdPreference, saveAdPreference } from './adPreference';
+export { loadAutoEnablePreference, saveAutoEnablePreference } from './autoEnablePreference';
 export { createLauncherController } from './createLauncherController';
 export { selectCanPlay } from './selectCanPlay';
 export { selectCanStop } from './selectCanStop';

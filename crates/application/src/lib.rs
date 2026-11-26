@@ -51,7 +51,8 @@ pub use artwork_ports::{Artwork, GameArtworkSource, ImageMime};
 pub use artwork_service::ArtworkService;
 pub use catalog_error::{CatalogCacheError, CatalogError, CatalogSourceError};
 pub use catalog_install::{
-    CatalogInstallError, CatalogInstaller, InstallPhase, InstallProgress, StagedDownload,
+    CatalogInstallError, CatalogInstaller, InstallOutcome, InstallPhase, InstallProgress,
+    StagedDownload,
 };
 pub use catalog_ports::{
     CachedCatalog, CatalogCache, CatalogSource, RawCatalog, RawEntry, SourceFetch, WebPageOpener,

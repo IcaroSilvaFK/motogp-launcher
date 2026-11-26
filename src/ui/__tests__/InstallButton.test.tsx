@@ -75,11 +75,16 @@ describe('InstallButton', () => {
   });
 
   it('installed_shows_a_confirmed_state_that_is_not_clickable', () => {
-    renderButton({ status: 'installed' });
+    renderButton({ status: 'installed', enabled: false });
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('Installed');
     expect(status).toHaveClass('badge', 'badge-on');
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('installed_and_enabled_says_so', () => {
+    renderButton({ status: 'installed', enabled: true });
+    expect(screen.getByRole('status')).toHaveTextContent('Installed and enabled');
   });
 
   it('failed_shows_the_translated_error_and_retry', async () => {
@@ -123,7 +128,7 @@ describe('CatalogInstallButton', () => {
       </I18nProvider>,
     );
     await userEvent.click(screen.getByRole('button', { name: 'Install' }));
-    expect(controller.installCatalogEntry).toHaveBeenCalledWith('rebalanced-ai');
+    expect(controller.installCatalogEntry).toHaveBeenCalledWith('rebalanced-ai', { enable: true });
 
     act(() =>
       controller.setState({

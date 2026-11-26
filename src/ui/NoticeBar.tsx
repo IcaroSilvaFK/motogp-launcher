@@ -25,6 +25,9 @@ function noticeText(t: Messages, notice: Notice): string {
       return t.notices.staleForgotten;
     case 'stale-cleaned':
       return t.notices.staleCleaned(notice.cleaned);
+    case 'mod-installed':
+      if (notice.conflictWith !== undefined) return t.notices.modInstalledConflict(notice.name, notice.conflictWith);
+      return notice.enabled ? t.notices.modInstalledEnabled(notice.name) : t.notices.modInstalled(notice.name);
   }
 }
 
@@ -34,7 +37,7 @@ function errorText(t: Messages, code: string): string {
   return known[code] ?? t.errors.unknown;
 }
 
-export function NoticeBar() {
+export function NoticeBar({ onOpenLibrary }: { onOpenLibrary?: () => void } = {}) {
   const { t } = useI18n();
   const { controller, state } = useLauncher();
   // Each message stays mounted for its exit animation; an exiting one is inert (no focus, no clicks).
@@ -76,6 +79,30 @@ export function NoticeBar() {
         >
           <BannerIcon variant="success" />
           <p>{noticeText(t, notice)}</p>
+          {notice.kind === 'mod-installed' && notice.enabled && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                void controller.toggleModInActiveProfile(notice.modId);
+                controller.dismissNotice();
+              }}
+            >
+              {t.notices.undo}
+            </button>
+          )}
+          {notice.kind === 'mod-installed' && onOpenLibrary && (
+            <button
+              type="button"
+              className="btn btn-ghost"
+              onClick={() => {
+                onOpenLibrary();
+                controller.dismissNotice();
+              }}
+            >
+              {t.notices.openLibrary}
+            </button>
+          )}
           <button type="button" className="btn btn-ghost" onClick={() => controller.dismissNotice()}>
             {t.dismiss}
           </button>

@@ -12,6 +12,7 @@ import {
 } from './application';
 import {
   createLocalStorageAdPreferenceStore,
+  createLocalStorageAutoEnableStore,
   createLocalStorageDiscoverViewStore,
   createTauriAdProvider,
   createTauriCommunityAccount,
@@ -72,6 +73,7 @@ createRoot(container).render(
       catalog={catalog}
       discoverViewStore={createLocalStorageDiscoverViewStore()}
       adPreferenceStore={createLocalStorageAdPreferenceStore()}
+      autoEnableStore={createLocalStorageAutoEnableStore()}
       // Sponsored placements (#104): slots render only while the preference above allows them.
       adProvider={createTauriAdProvider(() => activeLocale)}
       communityAccount={createTauriCommunityAccount()}

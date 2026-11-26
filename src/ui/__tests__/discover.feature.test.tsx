@@ -295,7 +295,7 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
     });
     Then('an Install button is shown', async () => {
       await user.click(within(modPage()).getByRole('button', { name: 'Install' }));
-      expect(launcher.installCatalogEntry).toHaveBeenCalledWith('rebalanced-ai');
+      expect(launcher.installCatalogEntry).toHaveBeenCalledWith('rebalanced-ai', { enable: true });
     });
   });
 

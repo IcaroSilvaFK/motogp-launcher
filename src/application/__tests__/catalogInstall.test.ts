@@ -56,7 +56,7 @@ describe('Given the catalog install state', () => {
     expect(controller.getState().catalogInstalls[ID]).toEqual({ status: 'importing' });
     open();
     await done;
-    expect(controller.getState().catalogInstalls[ID]).toEqual({ status: 'installed' });
+    expect(controller.getState().catalogInstalls[ID]).toEqual({ status: 'installed', enabled: false });
   });
 
   it('When the total is unknown or inconsistent Then percent stays within 0-100', async () => {
@@ -88,7 +88,7 @@ describe('Given the catalog install state', () => {
     const { gateway, controller } = await ready();
     gateway.listMods = () => Promise.reject({ code: 'read_failed', message: 'disk' });
     await controller.installCatalogEntry(ID);
-    expect(controller.getState().catalogInstalls[ID]).toEqual({ status: 'installed' });
+    expect(controller.getState().catalogInstalls[ID]).toEqual({ status: 'installed', enabled: false });
     expect(controller.getState().error?.code).toBe('read_failed');
   });
 
@@ -110,7 +110,7 @@ describe('Given the catalog install state', () => {
     await controller.installCatalogEntry(ID);
     await controller.installCatalogEntry(ID);
     expect(gateway.callsOf('installCatalogEntry')).toHaveLength(2);
-    expect(controller.getState().catalogInstalls[ID]).toEqual({ status: 'installed' });
+    expect(controller.getState().catalogInstalls[ID]).toEqual({ status: 'installed', enabled: false });
   });
 
   it('When the install is cancelled Then the entry returns to idle, not failed', async () => {

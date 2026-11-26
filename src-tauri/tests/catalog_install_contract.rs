@@ -147,10 +147,11 @@ fn a_downloadable_entry_is_installed_into_the_library() {
 
     let installed = install(&h).unwrap();
 
-    assert_eq!(installed.as_array().unwrap().len(), 1);
-    assert_eq!(installed[0]["name"], "Rebalanced");
-    assert_eq!(h.invoke("list_mods", json!({})).unwrap(), installed);
-    assert!(downloads_dir_is_clean(&h));
+    assert_eq!(installed["mods"].as_array().unwrap().len(), 1);
+    assert_eq!(installed["mods"][0]["name"], "Rebalanced");
+    assert_eq!(installed["enabled"], false, "enabling is opt-in");
+    assert!(installed.get("conflictWith").is_none());
+    assert_eq!(h.invoke("list_mods", json!({})).unwrap(), installed["mods"]);
     assert_eq!(downloader.requested(), vec![URL.to_string()]);
 
     // Progress events: camelCase payload, phases in order.
@@ -344,4 +345,34 @@ fn cancelling_stops_the_install_and_a_second_request_is_refused_meanwhile() {
         Value::Null,
         "cancelling with nothing in flight is a no-op"
     );
+}
+
+#[test]
+fn enable_after_install_adds_the_mod_to_the_active_profile() {
+    let downloader = FakeDownloader::new(Behavior::Serve);
+    let h = harness(vec![matching()], &downloader);
+    let profile = h
+        .invoke("create_profile", json!({ "name": "Race" }))
+        .unwrap();
+    let profile_id = profile["id"].as_str().unwrap().to_string();
+    h.invoke("set_active_profile", json!({ "id": profile_id }))
+        .unwrap();
+
+    let installed = h
+        .invoke(
+            "install_catalog_entry",
+            json!({ "id": "rebalanced-ai", "enableAfterInstall": true }),
+        )
+        .unwrap();
+
+    assert_eq!(installed["enabled"], true);
+    assert_eq!(installed["modId"], installed["mods"][0]["id"]);
+    let profiles = h.invoke("list_profiles", json!({})).unwrap();
+    let race = profiles
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|p| p["id"] == profile_id)
+        .unwrap();
+    assert_eq!(race["mod_ids"], json!([installed["modId"]]));
 }

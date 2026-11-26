@@ -75,12 +75,13 @@ fn install_imports_the_staged_file_and_clears_staging() {
     let lib = new_state();
     let staged = prepare(&rig, "rebalanced-ai").unwrap();
     mirror(&rig, &lib, &staged);
-    let entries = rig
+    let outcome = rig
         .installer
-        .install(&service(&lib), &rig.profiles(), staged)
+        .install(&service(&lib), &rig.profiles(), staged, None)
         .unwrap();
-    assert_eq!(entries.len(), 1);
-    assert_eq!(lib.borrow().index, entries);
+    assert_eq!(outcome.mods.len(), 1);
+    assert_eq!(lib.borrow().index, outcome.mods);
+    assert!(!outcome.enabled && outcome.conflict_with.is_none());
     assert!(rig.disk_is_empty());
 }
 
@@ -100,7 +101,7 @@ fn install_failure_still_clears_staging() {
     let staged = prepare(&rig, "rebalanced-ai").unwrap();
     let result = rig
         .installer
-        .install(&service(&lib), &rig.profiles(), staged);
+        .install(&service(&lib), &rig.profiles(), staged, None);
     assert!(matches!(result, Err(CatalogInstallError::Library(_))));
     assert!(rig.disk_is_empty());
 }
@@ -114,7 +115,7 @@ fn install_rechecks_the_session_lock_and_clears_staging() {
     rig.session.set_active(true);
     let result = rig
         .installer
-        .install(&service(&lib), &rig.profiles(), staged);
+        .install(&service(&lib), &rig.profiles(), staged, None);
     assert_eq!(result, Err(CatalogInstallError::SessionActive));
     assert!(lib.borrow().index.is_empty());
     assert!(rig.disk_is_empty());
@@ -328,4 +329,102 @@ fn a_url_without_a_file_name_falls_back_to_the_entry_id() {
         .path()
         .to_string_lossy()
         .ends_with("rebalanced-ai.zip"));
+}
+
+// --- Auto-enable after install (#129) ---
+
+use config_fakes::{FakeProfiles, FixedClock};
+use motogp_application::ProfileService;
+use motogp_domain::{ModEntry, Profile};
+use std::sync::Arc;
+
+/// Profile service over `profiles`, locked by the rig's session like the real one.
+fn profile_service_for(
+    rig: &Rig,
+    profiles: Vec<Profile>,
+) -> ProfileService<FakeProfiles, FixedClock> {
+    let store = FakeProfiles::default();
+    *store.0.borrow_mut() = profiles;
+    ProfileService::new(store, FixedClock(1_000)).with_session(Arc::new(rig.session.clone()))
+}
+
+fn profile_with(id: &str, mods: &[&str]) -> Profile {
+    let mut profile = Profile::new(id, id).unwrap();
+    profile.mod_ids = mods.iter().map(|m| m.to_string()).collect();
+    profile
+}
+
+fn install_enabling(
+    rig: &Rig,
+    lib: &Shared,
+    profiles: &ProfileService<FakeProfiles, FixedClock>,
+    target: Option<&str>,
+) -> motogp_application::InstallOutcome {
+    let staged = prepare(rig, "rebalanced-ai").unwrap();
+    mirror(rig, lib, &staged);
+    rig.installer
+        .install(&service(lib), profiles, staged, target)
+        .unwrap()
+}
+
+#[test]
+fn install_enables_the_mod_in_the_active_profile() {
+    let rig = Rig::matching(PAK);
+    let lib = new_state();
+    let profiles = profile_service_for(&rig, vec![profile_with("default", &["other"])]);
+    let outcome = install_enabling(&rig, &lib, &profiles, Some("default"));
+    assert!(outcome.enabled);
+    assert_eq!(outcome.conflict_with, None);
+    assert_eq!(outcome.mod_id, outcome.mods[0].id);
+    let order = profiles.get("default").unwrap().mod_ids;
+    assert_eq!(order, ["other".to_string(), outcome.mod_id]);
+}
+
+#[test]
+fn a_conflicting_mod_stays_installed_but_disabled_and_names_the_blocker() {
+    let rig = Rig::matching(PAK);
+    let lib = new_state();
+    // An enabled mod already ships the same file name.
+    lib.borrow_mut().index.push(ModEntry {
+        id: "existing".into(),
+        name: "Existing Pack".into(),
+        files: vec!["rebalanced.pak".into()],
+        size_bytes: 1,
+    });
+    let profiles = profile_service_for(&rig, vec![profile_with("default", &["existing"])]);
+    let outcome = install_enabling(&rig, &lib, &profiles, Some("default"));
+    assert_eq!(lib.borrow().index.len(), 2);
+    assert!(!outcome.enabled);
+    assert_eq!(outcome.conflict_with.as_deref(), Some("Existing Pack"));
+    assert_eq!(profiles.get("default").unwrap().mod_ids, ["existing"]);
+}
+
+#[test]
+fn without_a_target_profile_the_mod_is_only_installed() {
+    let rig = Rig::matching(PAK);
+    let lib = new_state();
+    let profiles = profile_service_for(&rig, vec![profile_with("default", &[])]);
+    let outcome = install_enabling(&rig, &lib, &profiles, None);
+    assert!(!outcome.enabled);
+    assert!(profiles.get("default").unwrap().mod_ids.is_empty());
+}
+
+#[test]
+fn vanilla_never_receives_mods() {
+    let rig = Rig::matching(PAK);
+    let lib = new_state();
+    let profiles = profile_service_for(&rig, vec![Profile::vanilla()]);
+    let outcome = install_enabling(&rig, &lib, &profiles, Some("vanilla"));
+    assert!(!outcome.enabled);
+    assert!(profiles.get("vanilla").unwrap().mod_ids.is_empty());
+}
+
+#[test]
+fn an_unknown_target_profile_keeps_the_install_successful() {
+    let rig = Rig::matching(PAK);
+    let lib = new_state();
+    let profiles = profile_service_for(&rig, vec![profile_with("default", &[])]);
+    let outcome = install_enabling(&rig, &lib, &profiles, Some("missing"));
+    assert!(!outcome.enabled);
+    assert_eq!(lib.borrow().index.len(), 1);
 }

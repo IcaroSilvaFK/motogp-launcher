@@ -76,7 +76,7 @@ describe('DiscoverScreen', () => {
     // Install is the one main action; Open page steps down to an outlined secondary button.
     expect(within(page).getByRole('button', { name: 'Open page' })).not.toHaveClass('btn-accent-outline');
     await user.click(within(page).getByRole('button', { name: 'Install' }));
-    expect(launcher.installCatalogEntry).toHaveBeenCalledWith(entry.id);
+    expect(launcher.installCatalogEntry).toHaveBeenCalledWith(entry.id, { enable: true });
   });
 
   it('shows no install button for an entry without a download', async () => {

@@ -30,7 +30,8 @@ export type Notice =
   | { kind: 'recovered'; cleaned: number }
   | { kind: 'game-running' }
   | { kind: 'stale-forgotten' }
-  | { kind: 'stale-cleaned'; cleaned: number };
+  | { kind: 'stale-cleaned'; cleaned: number }
+  | { kind: 'mod-installed'; modId: string; name: string; enabled: boolean; conflictWith?: string };
 
 export interface LauncherState {
   status: 'loading' | 'ready';
@@ -106,9 +107,11 @@ export interface LauncherController {
   /**
    * Downloads and installs a catalog entry (also the retry from `failed`). Ignored while the entry is
    * already installing or while the library is locked by a session (`selectCanInstall`). Failures
-   * stay in `catalogInstalls[id]` (no global error); a cancelled install returns to idle.
+   * stay in `catalogInstalls[id]` (no global error); a cancelled install returns to idle. With `enable`
+   * the backend also enables the mod in the active profile (unless it conflicts). A `mod-installed`
+   * notice is always raised on success (#129).
    */
-  installCatalogEntry(id: string): Promise<void>;
+  installCatalogEntry(id: string, options?: { enable?: boolean }): Promise<void>;
   /** Cancels the entry's in-flight install; no-op otherwise. */
   cancelCatalogInstall(id: string): Promise<void>;
   dismissError(): void;
