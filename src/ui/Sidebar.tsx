@@ -1,4 +1,5 @@
 import { useId } from 'react';
+import { AdSlot } from './AdSlot';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
 import { SupportLink } from './SupportLink';
@@ -10,7 +11,8 @@ export const ALL_SCREENS: readonly ScreenId[] = ['library', 'discover', 'profile
 
 /**
  * Left sidebar: the main navigation (icon + label, `aria-current="page"` on the current screen)
- * and a footer pinned at the bottom: the "Support the project" entry (#94) and the collapse toggle. The custom title bar already shows the mark and the
+ * and a footer pinned at the bottom: the "Support the project" entry (#94) and the collapse toggle. The
+ * expanded footer also holds the sidebar sponsored card (#104). The custom title bar already shows the mark and the
  * app name, so the sidebar has no brand row (#71); the document's single h1 (the app name) stays
  * here, visually hidden. Collapsed, only the icons show: the labels stay in the DOM visually
  * hidden, and each item gets its label as a tooltip.
@@ -53,6 +55,9 @@ export function Sidebar({
         ))}
       </nav>
       <div className="sidebar-footer">
+        {/* Sponsored card (#104): only while expanded; it grows upward into the free space, so the
+            support entry and the toggle below never move. */}
+        {!collapsed && <AdSlot slot="sidebar" />}
         <SupportLink placement="sidebar" collapsed={collapsed} />
         <button
           type="button"

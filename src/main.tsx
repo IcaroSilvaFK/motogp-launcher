@@ -13,6 +13,7 @@ import {
 import {
   createLocalStorageAdPreferenceStore,
   createLocalStorageDiscoverViewStore,
+  createTauriAdProvider,
   createLocalStorageLocaleStore,
   createLocalStorageNavStore,
   createTauriAppInfo,
@@ -65,6 +66,8 @@ createRoot(container).render(
       catalog={catalog}
       discoverViewStore={createLocalStorageDiscoverViewStore()}
       adPreferenceStore={createLocalStorageAdPreferenceStore()}
+      // Sponsored placements (#104): slots render only while the preference above allows them.
+      adProvider={createTauriAdProvider()}
     />
   </StrictMode>,
 );

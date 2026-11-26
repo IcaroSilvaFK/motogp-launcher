@@ -12,6 +12,9 @@ export const ptBR: Messages = {
     consentText: 'O launcher mostra cards patrocinados. Eles não rastreiam você.',
     keep: 'Manter',
     turnOff: 'Desativar anúncios',
+    sponsored: 'Patrocinado',
+    learnMore: 'Saiba mais',
+    opensInBrowser: 'Abre no navegador',
   },
   nav: {
     label: 'Navegação principal',

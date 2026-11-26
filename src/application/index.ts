@@ -40,3 +40,6 @@ export { createCatalogController } from './useCases/catalog';
 export { useCatalogState } from './useCatalogState';
 export type { CatalogFilter, CatalogSort, CategoryCount } from './catalogSelectors';
 export { categoryCounts, inLibrary, normalizeTitle, pageHost, selectEntries, sortEntries } from './catalogSelectors';
+export type { AdProvider } from './ports/AdProvider';
+export type { AdHandle } from './useAd';
+export { useAd } from './useAd';

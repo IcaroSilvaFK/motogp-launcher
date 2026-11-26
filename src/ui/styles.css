@@ -2240,6 +2240,150 @@ button {
   color: var(--text);
 }
 
+/* ---------- Sponsored placements (#104) ---------- */
+
+/* Quiet by design: the card surface and border, muted label, no accent (reserved for Play). A slot
+   only exists once its creative loaded (no placeholder), and it fades in where it moves nothing:
+   after the Discover results, grown upward in the sidebar footer, as the last About row. */
+.ad-slot {
+  animation: fade-in var(--motion-enter) backwards;
+}
+
+.ad-slot-discover,
+.ad-slot-sidebar {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text);
+}
+
+.ad-image {
+  display: block;
+  flex: none;
+  aspect-ratio: 2 / 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.ad-content {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.ad-label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: var(--type-label-small);
+  font-weight: 500;
+}
+
+.ad-sponsor {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ad-slot-discover .ad-title,
+.ad-slot-sidebar .ad-title {
+  color: var(--text);
+  font-size: var(--type-body-medium);
+  font-weight: 500;
+}
+
+.ad-slot-discover .ad-text,
+.ad-slot-sidebar .ad-text {
+  color: var(--text-muted);
+  font-size: var(--type-body-small);
+}
+
+.ad-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+/* Discover: one slim banner after the results (64dp image), the body kept to one line. */
+.ad-slot-discover {
+  align-items: center;
+  margin-top: var(--space-5);
+}
+
+.ad-slot-discover .ad-image {
+  height: calc(2 * var(--space-6));
+}
+
+.ad-slot-discover .ad-title,
+.ad-slot-discover .ad-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Sidebar footer: stacked and never wider than the sidebar; the body is kept to two lines. */
+.ad-slot-sidebar {
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 100%;
+  margin-bottom: var(--space-2);
+  padding: var(--space-2);
+  white-space: normal;
+}
+
+.ad-slot-sidebar .ad-image {
+  width: 100%;
+}
+
+.ad-slot-sidebar .ad-text {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.ad-slot-sidebar .ad-action {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Short windows keep the navigation and the footer actions: the sidebar card steps aside. */
+@media (max-height: 680px) {
+  .ad-slot-sidebar {
+    display: none;
+  }
+}
+
+/* Settings > About: the quietest slot, one line (title · body) next to the action. */
+.ad-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.ad-slot-about .ad-title {
+  flex: none;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ad-slot-about .ad-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- Cards, lists, details ---------- */
 
 .card {

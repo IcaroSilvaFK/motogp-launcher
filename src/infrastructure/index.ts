@@ -9,3 +9,4 @@ export { createTauriDropEvents } from './tauriDropEvents';
 export { createTauriUpdateService } from './tauri/TauriUpdateService';
 export { createTauriAppInfo } from './tauri/TauriAppInfo';
 export { createTauriWindowControls } from './tauri/TauriWindowControls';
+export { createTauriAdProvider } from './tauri/TauriAdProvider';

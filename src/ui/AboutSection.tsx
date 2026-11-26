@@ -1,5 +1,6 @@
 import { useState, useSyncExternalStore } from 'react';
 import { selectSessionClean } from '../application';
+import { AdSlot } from './AdSlot';
 import type { UpdateController, UpdateState } from '../application';
 import { useAppInfo } from './AppInfoContext';
 import { Icon } from './Icon';
@@ -42,6 +43,7 @@ export function AboutSection() {
         </div>
         {updater && <UpdateCheckRow updater={updater} />}
         <SupportLink placement="settings" />
+        <AdSlot slot="about" />
       </div>
     </section>
   );

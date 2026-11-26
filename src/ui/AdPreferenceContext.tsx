@@ -33,7 +33,7 @@ export function useAdPreference(): AdPreferenceValue {
   return useContext(AdPreferenceContext);
 }
 
-/** Whether sponsored content may render; ad placements pass this as `adsEnabled`. */
+/** Whether sponsored content may render; every `AdSlot` reads it before requesting a creative. */
 export function useAdsEnabled(): boolean {
   return adsEnabledFor(useAdPreference().preference);
 }
