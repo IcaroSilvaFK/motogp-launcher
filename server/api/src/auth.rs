@@ -131,6 +131,8 @@ pub struct CallbackQuery {
 
 /// `GET /auth/discord/callback`: 302 to the app's loopback with the one-time
 /// code, or (for an admin web sign-in) the admin session page.
+// Both arms are axum responses; boxing the error would only add noise.
+#[allow(clippy::result_large_err)]
 async fn callback(
     State(app): State<AppState>,
     headers: HeaderMap,
