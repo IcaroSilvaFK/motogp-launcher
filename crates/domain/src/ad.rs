@@ -5,6 +5,7 @@
 //! into a trusted [`AdCreative`] or reject it.
 
 use crate::catalog::well_formed_https_url;
+use std::collections::BTreeMap;
 use std::fmt;
 
 const MAX_ID_LEN: usize = 64;
@@ -40,6 +41,18 @@ impl AdSlot {
     }
 }
 
+/// Localized text overrides of one creative for one locale. Missing fields
+/// fall back to the creative's default text.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct AdLocaleText {
+    pub title: Option<String>,
+    pub body: Option<String>,
+    pub sponsor_label: Option<String>,
+}
+
+/// Locales a creative may carry text for.
+pub const AD_LOCALES: [&str; 2] = ["pt-BR", "en"];
+
 /// Parsed feed fields, not yet validated. The adapter fills `image_data_uri`
 /// after downloading the image and converts the expiry to Unix milliseconds.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -53,6 +66,8 @@ pub struct AdCreativeDraft {
     pub sponsor_label: String,
     pub impression_url: Option<String>,
     pub expires_at_ms: Option<u64>,
+    /// Localized text by locale (`pt-BR`, `en`).
+    pub locales: BTreeMap<String, AdLocaleText>,
 }
 
 /// A validated creative: trimmed text, https URLs, a known slot and a safe
@@ -68,6 +83,15 @@ pub struct AdCreative {
     sponsor_label: String,
     impression_url: Option<String>,
     expires_at_ms: Option<u64>,
+    locales: BTreeMap<String, AdLocaleText>,
+}
+
+/// The text of a creative shown in one locale.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LocalizedAdText {
+    pub title: String,
+    pub body: String,
+    pub sponsor_label: String,
 }
 
 /// Why an [`AdCreativeDraft`] was rejected.
@@ -85,6 +109,8 @@ pub enum AdCreativeError {
     NotHttps(&'static str),
     /// The image is not a base64 `data:` URI of a PNG, JPEG or WebP (SVG is refused).
     InvalidImage,
+    /// A `locales` key is not one of the supported locales.
+    UnknownLocale(String),
 }
 
 impl fmt::Display for AdCreativeError {
@@ -100,6 +126,7 @@ impl fmt::Display for AdCreativeError {
                 write!(f, "{field} is longer than {max} characters")
             }
             AdCreativeError::NotHttps(field) => write!(f, "{field} must be a valid https URL"),
+            AdCreativeError::UnknownLocale(locale) => write!(f, "unknown locale {locale:?}"),
             AdCreativeError::InvalidImage => {
                 write!(f, "image must be a base64 PNG, JPEG or WebP data URI")
             }
@@ -145,6 +172,11 @@ impl AdCreative {
                 }
             })
             .transpose()?;
+        let locales = draft
+            .locales
+            .into_iter()
+            .map(|(locale, text)| validate_locale(locale, text))
+            .collect::<Result<BTreeMap<_, _>, _>>()?;
         Ok(AdCreative {
             id,
             slot,
@@ -155,7 +187,37 @@ impl AdCreative {
             sponsor_label,
             impression_url,
             expires_at_ms: draft.expires_at_ms,
+            locales,
         })
+    }
+
+    /// The text for `locale` (`pt-BR`, `pt`, `en-US`...): an exact match wins,
+    /// then the same language; every missing field falls back to the default.
+    pub fn localized(&self, locale: Option<&str>) -> LocalizedAdText {
+        let entry = locale.and_then(|wanted| {
+            let wanted = wanted.trim();
+            let language = |tag: &str| tag.split(['-', '_']).next().unwrap_or("").to_lowercase();
+            self.locales
+                .iter()
+                .find(|(key, _)| key.eq_ignore_ascii_case(wanted))
+                .or_else(|| {
+                    self.locales
+                        .iter()
+                        .find(|(key, _)| language(key) == language(wanted))
+                })
+                .map(|(_, text)| text)
+        });
+        let pick = |over: Option<&String>, default: &String| {
+            over.cloned().unwrap_or_else(|| default.clone())
+        };
+        LocalizedAdText {
+            title: pick(entry.and_then(|e| e.title.as_ref()), &self.title),
+            body: pick(entry.and_then(|e| e.body.as_ref()), &self.body),
+            sponsor_label: pick(
+                entry.and_then(|e| e.sponsor_label.as_ref()),
+                &self.sponsor_label,
+            ),
+        }
     }
 
     /// `true` when the creative expires at or before `now_ms`.
@@ -187,9 +249,30 @@ impl AdCreative {
     pub fn impression_url(&self) -> Option<&str> {
         self.impression_url.as_deref()
     }
+    pub fn locales(&self) -> &BTreeMap<String, AdLocaleText> {
+        &self.locales
+    }
     pub fn expires_at_ms(&self) -> Option<u64> {
         self.expires_at_ms
     }
+}
+
+fn validate_locale(
+    locale: String,
+    given: AdLocaleText,
+) -> Result<(String, AdLocaleText), AdCreativeError> {
+    if !AD_LOCALES.contains(&locale.as_str()) {
+        return Err(AdCreativeError::UnknownLocale(locale));
+    }
+    let field = |name: &'static str, value: Option<String>, max: usize| {
+        value.map(|v| text(name, &v, max, true)).transpose()
+    };
+    let validated = AdLocaleText {
+        title: field("title", given.title, MAX_TITLE_CHARS)?,
+        body: field("body", given.body, MAX_BODY_CHARS)?,
+        sponsor_label: field("sponsorLabel", given.sponsor_label, MAX_SPONSOR_CHARS)?,
+    };
+    Ok((locale, validated))
 }
 
 fn is_valid_id(id: &str) -> bool {
@@ -247,6 +330,7 @@ mod tests {
             sponsor_label: "Acme Racing".into(),
             impression_url: None,
             expires_at_ms: None,
+            ..Default::default()
         }
     }
 
@@ -426,6 +510,72 @@ mod tests {
             .is_expired(u64::MAX));
     }
 
+    fn with_pt(title: Option<&str>) -> AdCreative {
+        let mut d = draft();
+        d.locales.insert(
+            "pt-BR".into(),
+            AdLocaleText {
+                title: title.map(String::from),
+                body: Some(" Corpo ".into()),
+                sponsor_label: None,
+            },
+        );
+        AdCreative::from_draft(d).unwrap()
+    }
+
+    #[test]
+    fn localized_text_falls_back_to_the_defaults() {
+        let ad = with_pt(Some("Titulo"));
+        for wanted in [Some("pt-BR"), Some("pt-br"), Some("pt")] {
+            let text = ad.localized(wanted);
+            assert_eq!(
+                (text.title.as_str(), text.body.as_str()),
+                ("Titulo", "Corpo")
+            );
+            assert_eq!(text.sponsor_label, "Acme Racing");
+        }
+        for wanted in [None, Some("en"), Some("fr")] {
+            let text = ad.localized(wanted);
+            assert_eq!(
+                (text.title.as_str(), text.body.as_str()),
+                ("Acme tires", "Grip for every lap")
+            );
+        }
+    }
+
+    #[test]
+    fn only_known_locales_with_valid_text_are_accepted() {
+        let mut d = draft();
+        d.locales.insert("fr".into(), AdLocaleText::default());
+        assert_eq!(
+            AdCreative::from_draft(d),
+            Err(AdCreativeError::UnknownLocale("fr".into()))
+        );
+        let mut d = draft();
+        d.locales.insert(
+            "en".into(),
+            AdLocaleText {
+                title: Some("  ".into()),
+                ..Default::default()
+            },
+        );
+        assert_eq!(
+            AdCreative::from_draft(d),
+            Err(AdCreativeError::MissingField("title"))
+        );
+        let mut d = draft();
+        d.locales.insert(
+            "en".into(),
+            AdLocaleText {
+                body: Some("x".repeat(MAX_BODY_CHARS + 1)),
+                ..Default::default()
+            },
+        );
+        assert!(matches!(
+            AdCreative::from_draft(d),
+            Err(AdCreativeError::TooLong { field: "body", .. })
+        ));
+    }
     #[test]
     fn errors_have_readable_messages() {
         let all = [

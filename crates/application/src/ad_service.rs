@@ -82,9 +82,15 @@ impl<S: AdSource, C: AdCache, B: AdBeaconSink, K: Clock> AdService<S, C, B, K> {
     }
 
     /// The next creative of `slot`, or `None` when ads are off or nothing can
-    /// be shown. `ads_enabled = false` touches no port. Feed problems are never
+    /// be shown. `locale` (e.g. `pt-BR`) picks localized text with a fallback to
+    /// the default fields. `ads_enabled = false` touches no port. Feed problems are never
     /// errors.
-    pub fn get_ad(&self, slot: AdSlot, ads_enabled: bool) -> Result<Option<AdView>, AdError> {
+    pub fn get_ad(
+        &self,
+        slot: AdSlot,
+        ads_enabled: bool,
+        locale: Option<&str>,
+    ) -> Result<Option<AdView>, AdError> {
         if !ads_enabled {
             return Ok(None);
         }
@@ -97,13 +103,14 @@ impl<S: AdSource, C: AdCache, B: AdBeaconSink, K: Clock> AdService<S, C, B, K> {
         let cursor = state.cursors.entry(slot).or_insert(0);
         let creative = &candidates[*cursor % candidates.len()];
         *cursor = (*cursor + 1) % candidates.len();
+        let text = creative.localized(locale);
         Ok(Some(AdView {
             slot,
             creative_id: creative.id().to_string(),
-            title: creative.title().to_string(),
-            body: creative.body().to_string(),
+            title: text.title,
+            body: text.body,
             image_data_uri: creative.image_data_uri().map(String::from),
-            sponsor_label: creative.sponsor_label().to_string(),
+            sponsor_label: text.sponsor_label,
         }))
     }
 
@@ -331,6 +338,7 @@ mod tests {
             sponsor_label: "Acme".into(),
             impression_url: Some(format!("https://example.com/i/{id}")),
             expires_at_ms: None,
+            ..Default::default()
         }
     }
 
@@ -419,7 +427,7 @@ mod tests {
         let rig = Rig::serving(vec![draft("a", "discover")]);
         let view = rig
             .service()
-            .get_ad(AdSlot::Discover, true)
+            .get_ad(AdSlot::Discover, true, None)
             .unwrap()
             .unwrap();
         assert_eq!(
@@ -438,10 +446,34 @@ mod tests {
     }
 
     #[test]
+    fn the_view_uses_the_locale_text_with_a_fallback_to_the_defaults() {
+        let mut localized = draft("a", "discover");
+        localized.locales.insert(
+            "pt-BR".into(),
+            motogp_domain::AdLocaleText {
+                title: Some("Titulo".into()),
+                ..Default::default()
+            },
+        );
+        let rig = Rig::serving(vec![localized]);
+        let svc = rig.service();
+        let pt = svc
+            .get_ad(AdSlot::Discover, true, Some("pt-BR"))
+            .unwrap()
+            .unwrap();
+        assert_eq!((pt.title.as_str(), pt.body.as_str()), ("Titulo", "Body"));
+        let en = svc
+            .get_ad(AdSlot::Discover, true, Some("en"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(en.title, "Title a");
+    }
+
+    #[test]
     fn disabled_ads_touch_no_port() {
         let rig = Rig::serving(vec![draft("a", "discover")]);
         let svc = rig.service();
-        assert_eq!(svc.get_ad(AdSlot::Discover, false), Ok(None));
+        assert_eq!(svc.get_ad(AdSlot::Discover, false, None), Ok(None));
         assert_eq!(rig.fetches(), 0);
         assert_eq!(rig.cache.saves.load(Ordering::SeqCst), 0);
         assert!(rig.beacons().is_empty());
@@ -454,7 +486,7 @@ mod tests {
             Some(cached(NOW - HOUR, vec![draft("cached", "discover")]));
         let view = rig
             .service()
-            .get_ad(AdSlot::Discover, true)
+            .get_ad(AdSlot::Discover, true, None)
             .unwrap()
             .unwrap();
         assert_eq!(view.creative_id, "cached");
@@ -468,7 +500,7 @@ mod tests {
             Some(cached(NOW - 7 * HOUR, vec![draft("cached", "discover")]));
         let view = rig
             .service()
-            .get_ad(AdSlot::Discover, true)
+            .get_ad(AdSlot::Discover, true, None)
             .unwrap()
             .unwrap();
         assert_eq!(view.creative_id, "remote");
@@ -487,7 +519,7 @@ mod tests {
             rig.clock.clone(),
             Duration::from_secs(60),
         );
-        let view = svc.get_ad(AdSlot::Discover, true).unwrap().unwrap();
+        let view = svc.get_ad(AdSlot::Discover, true, None).unwrap().unwrap();
         assert_eq!(view.creative_id, "remote");
     }
 
@@ -498,7 +530,7 @@ mod tests {
             Some(cached(NOW - 100 * HOUR, vec![draft("cached", "discover")]));
         let view = rig
             .service()
-            .get_ad(AdSlot::Discover, true)
+            .get_ad(AdSlot::Discover, true, None)
             .unwrap()
             .unwrap();
         assert_eq!(view.creative_id, "cached");
@@ -515,7 +547,7 @@ mod tests {
             AdSourceError::Invalid("junk".into()),
         ] {
             let rig = Rig::answering(Err(failure));
-            assert_eq!(rig.service().get_ad(AdSlot::Discover, true), Ok(None));
+            assert_eq!(rig.service().get_ad(AdSlot::Discover, true, None), Ok(None));
         }
     }
 
@@ -524,7 +556,7 @@ mod tests {
         let rig = Rig::answering(Err(AdSourceError::Network("down".into())));
         let svc = rig.service();
         for _ in 0..3 {
-            assert_eq!(svc.get_ad(AdSlot::Discover, true), Ok(None));
+            assert_eq!(svc.get_ad(AdSlot::Discover, true, None), Ok(None));
         }
         assert_eq!(rig.fetches(), 1);
     }
@@ -534,7 +566,7 @@ mod tests {
     }
 
     fn shown_id(svc: &AdService<Src, Cache, Beacon, Clk>) -> String {
-        svc.get_ad(AdSlot::Discover, true)
+        svc.get_ad(AdSlot::Discover, true, None)
             .unwrap()
             .unwrap()
             .creative_id
@@ -544,10 +576,10 @@ mod tests {
     fn a_failed_fetch_is_retried_after_the_ttl() {
         let rig = Rig::answering(Err(AdSourceError::Network("down".into())));
         let svc = rig.service();
-        assert_eq!(svc.get_ad(AdSlot::Discover, true), Ok(None));
+        assert_eq!(svc.get_ad(AdSlot::Discover, true, None), Ok(None));
         *rig.src.answer.lock().unwrap() = Ok(payload(vec![draft("late", "discover")]));
         advance(&rig, 5 * HOUR);
-        assert_eq!(svc.get_ad(AdSlot::Discover, true), Ok(None));
+        assert_eq!(svc.get_ad(AdSlot::Discover, true, None), Ok(None));
         assert_eq!(rig.fetches(), 1);
         advance(&rig, 2 * HOUR);
         assert_eq!(shown_id(&svc), "late");
@@ -602,7 +634,7 @@ mod tests {
         let mut rig = Rig::serving(vec![draft("a", "discover")]);
         rig.cache.load_fails = true;
         rig.cache.save_fails = true;
-        let view = rig.service().get_ad(AdSlot::Discover, true).unwrap();
+        let view = rig.service().get_ad(AdSlot::Discover, true, None).unwrap();
         assert_eq!(view.unwrap().creative_id, "a");
     }
 
@@ -612,9 +644,9 @@ mod tests {
         expiring.expires_at_ms = Some(NOW + HOUR);
         let rig = Rig::serving(vec![expiring]);
         let svc = rig.service();
-        assert!(svc.get_ad(AdSlot::Sidebar, true).unwrap().is_some());
+        assert!(svc.get_ad(AdSlot::Sidebar, true, None).unwrap().is_some());
         rig.clock.0.store(NOW + HOUR, Ordering::SeqCst);
-        assert_eq!(svc.get_ad(AdSlot::Sidebar, true), Ok(None));
+        assert_eq!(svc.get_ad(AdSlot::Sidebar, true, None), Ok(None));
         assert!(matches!(
             svc.report_shown(AdSlot::Sidebar, "a"),
             Err(AdError::UnknownCreative { .. })
@@ -624,7 +656,7 @@ mod tests {
     #[test]
     fn only_creatives_of_the_requested_slot_are_offered() {
         let rig = Rig::serving(vec![draft("a", "discover")]);
-        assert_eq!(rig.service().get_ad(AdSlot::About, true), Ok(None));
+        assert_eq!(rig.service().get_ad(AdSlot::About, true, None), Ok(None));
     }
 
     #[test]
@@ -637,7 +669,7 @@ mod tests {
         let svc = rig.service();
         let ids: Vec<String> = (0..5)
             .map(|_| {
-                svc.get_ad(AdSlot::Discover, true)
+                svc.get_ad(AdSlot::Discover, true, None)
                     .unwrap()
                     .unwrap()
                     .creative_id
@@ -646,7 +678,7 @@ mod tests {
         assert_eq!(ids, ["a", "b", "a", "b", "a"]);
         // Another slot has its own cursor.
         assert_eq!(
-            svc.get_ad(AdSlot::About, true)
+            svc.get_ad(AdSlot::About, true, None)
                 .unwrap()
                 .unwrap()
                 .creative_id,

@@ -144,3 +144,27 @@ fn the_composed_state_caches_the_feed_on_disk() {
     h.invoke("get_ad", json!({ "slot": "discover" })).unwrap();
     assert!(cache.exists(), "the JSON ad cache was not written");
 }
+
+#[test]
+fn get_ad_localizes_the_text_and_falls_back_to_the_defaults() {
+    let mut localized = creative("acme-1", "discover");
+    localized.image_data_uri = None;
+    localized.locales.insert(
+        "pt-BR".into(),
+        motogp_domain::AdLocaleText {
+            title: Some("Pneus Acme".into()),
+            ..Default::default()
+        },
+    );
+    let h = Harness::with_ads(ads_over(Arc::new(FakeAdSource::serving(vec![localized]))));
+    let pt = h
+        .invoke("get_ad", json!({ "slot": "discover", "locale": "pt-BR" }))
+        .unwrap();
+    assert_eq!(pt["title"], "Pneus Acme");
+    assert_eq!(pt["body"], "Grip for every lap.");
+    assert_eq!(pt["imageDataUri"], serde_json::Value::Null);
+    let en = h
+        .invoke("get_ad", json!({ "slot": "discover", "locale": "en" }))
+        .unwrap();
+    assert_eq!(en["title"], "Acme tires");
+}

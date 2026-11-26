@@ -302,18 +302,22 @@ pub async fn open_support_page(state: State<'_, AppState>) -> CommandResult<()> 
 
 /// The sponsored creative for `slot`, or `null`. An unknown slot name, ads
 /// switched off or an empty feed all mean "no ad" and never an error. The
-/// frontend sends only `slot`; `adsEnabled` defaults to on.
+/// frontend sends `slot` and the UI `locale` (e.g. `pt-BR`, optional);
+/// `adsEnabled` defaults to on.
 #[tauri::command]
 pub async fn get_ad(
     state: State<'_, AppState>,
     slot: String,
     ads_enabled: Option<bool>,
+    locale: Option<String>,
 ) -> CommandResult<Option<AdDto>> {
     read_blocking(state, move |state| {
         let Some(slot) = AdSlot::parse(&slot) else {
             return Ok(None);
         };
-        let view = state.ads.get_ad(slot, ads_enabled.unwrap_or(true))?;
+        let view = state
+            .ads
+            .get_ad(slot, ads_enabled.unwrap_or(true), locale.as_deref())?;
         Ok(view.map(AdDto::from))
     })
     .await
