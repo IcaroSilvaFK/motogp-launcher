@@ -96,6 +96,13 @@ const GLYPHS = {
     </>
   ),
   close: <path d="M5.5 5.5l9 9M14.5 5.5l-9 9" />,
+  // Community account (#122): a generic person (no third-party brand mark).
+  account: (
+    <>
+      <circle cx="10" cy="7" r="3" />
+      <path d="M4.5 16c.8-2.9 3-4.5 5.5-4.5s4.7 1.6 5.5 4.5" />
+    </>
+  ),
   // Support the project (#94): an outlined heart, a generic glyph (no third-party brand mark).
   heart: (
     <path d="M10 16c-3.8-2.6-6.5-5.1-6.5-8 0-2 1.5-3.5 3.4-3.5 1.3 0 2.4.7 3.1 1.8.7-1.1 1.8-1.8 3.1-1.8 1.9 0 3.4 1.5 3.4 3.5 0 2.9-2.7 5.4-6.5 8z" />

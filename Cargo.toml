@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-exclude = ["src-tauri/tests/fixtures"]
+exclude = ["src-tauri/tests/fixtures", "server"]
 members = [
     "crates/domain",
     "crates/application",

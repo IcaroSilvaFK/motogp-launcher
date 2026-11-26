@@ -44,6 +44,45 @@ jobs:
             --ignore-filename-regex 'src-tauri[\\/]src[\\/](main|bootstrap)\.rs'
           node scripts/check-rust-coverage.mjs coverage-rust.json
 
+  # Community server (server/ is its own Cargo workspace). Not a required check.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      server: ${{ steps.filter.outputs.server }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            server:
+              - 'server/**'
+              - '.github/workflows/validacao.yml'
+
+  server:
+    name: Community server
+    needs: changes
+    if: needs.changes.outputs.server == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: server
+      - name: Formatting
+        working-directory: server
+        run: cargo fmt --all --check
+      - name: Lint
+        working-directory: server
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: Tests
+        working-directory: server
+        run: cargo test --workspace
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest

@@ -4,12 +4,19 @@
 //! through `compose`, `commands`, `adapters` and `startup`.
 use crate::adapters::{TauriEvents, TauriFolderOpener, TauriOpener, TauriWebOpener};
 use crate::ads_fallback::{NullAdBeacon, NullAdSource};
-use crate::{compose, configure, run_recovery, UnavailableCatalogSource};
-use motogp_application::{AdBeaconSink, AdSource, CatalogSource, InstanceGuard, InstanceLock};
+use crate::{
+    compose, configure, run_recovery, MemoryCredentialStore, UnavailableCatalogSource,
+    UnavailableCommunityApi, COMMUNITY_SERVER_URL,
+};
+use motogp_application::{
+    AdBeaconSink, AdSource, AvatarFetcher, CatalogSource, CommunityApi, CommunityAuthService,
+    CredentialStore, InstanceGuard, InstanceLock,
+};
 use motogp_infrastructure::{
     bundled_catalog, DataDir, FileInstanceLock, HttpAdBeaconSink, HttpAdConfig, HttpAdSource,
-    HttpCatalogConfig, HttpCatalogSource, SteamArtwork, SteamLibraries, SysinfoProcesses,
-    SystemClock, ThreadRunner,
+    HttpAvatarFetcher, HttpCatalogConfig, HttpCatalogSource, HttpCommunityApi, HttpCommunityConfig,
+    OsPkce, SteamArtwork, SteamLibraries, SysinfoProcesses, SystemClock, TcpLoopbackReceiver,
+    ThreadRunner, WindowsCredentialStore,
 };
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -73,6 +80,52 @@ fn ad_adapters() -> (Arc<dyn AdSource>, Arc<dyn AdBeaconSink>) {
     (source, beacon)
 }
 
+/// The community account: HTTP client, Windows Credential Manager, loopback
+/// listener and avatar fetcher. A piece that cannot be built degrades to an
+/// offline community (or an in-memory session) instead of stopping the app.
+fn community_service(handle: tauri::AppHandle) -> Arc<CommunityAuthService> {
+    let version = env!("CARGO_PKG_VERSION");
+    let api: Arc<dyn CommunityApi> =
+        match HttpCommunityApi::new(HttpCommunityConfig::new(COMMUNITY_SERVER_URL, version)) {
+            Ok(api) => Arc::new(api),
+            Err(error) => {
+                eprintln!("community server client unavailable: {error}");
+                Arc::new(UnavailableCommunityApi::new(error.to_string()))
+            }
+        };
+    let store: Arc<dyn CredentialStore> = match WindowsCredentialStore::new() {
+        Ok(store) => Arc::new(store),
+        Err(error) => {
+            eprintln!("credential store unavailable: {error}");
+            Arc::new(MemoryCredentialStore::default())
+        }
+    };
+    let avatars: Arc<dyn AvatarFetcher> = match HttpAvatarFetcher::new(version) {
+        Ok(fetcher) => Arc::new(fetcher),
+        Err(error) => {
+            eprintln!("avatar fetcher unavailable: {error}");
+            Arc::new(NoAvatars)
+        }
+    };
+    Arc::new(CommunityAuthService::new(
+        api,
+        store,
+        Arc::new(TcpLoopbackReceiver),
+        Arc::new(OsPkce),
+        Arc::new(TauriWebOpener::community(handle)),
+        avatars,
+    ))
+}
+
+/// Avatar fetcher used when the HTTP client cannot be built: initials only.
+struct NoAvatars;
+
+impl AvatarFetcher for NoAvatars {
+    fn fetch(&self, _url: &str) -> Option<String> {
+        None
+    }
+}
+
 /// Keeps the single-instance lock alive in the managed state.
 struct InstanceHold(#[allow(dead_code)] Mutex<Option<InstanceGuard>>);
 
@@ -101,6 +154,7 @@ pub fn run() {
             }
         }
         let handle = app.handle().clone();
+        let handle_for_community = handle.clone();
         let (ad_source, ad_beacon) = ad_adapters();
         let state = compose(
             &data,
@@ -116,6 +170,7 @@ pub fn run() {
             catalog_source(),
             ad_source,
             ad_beacon,
+            community_service(handle_for_community),
             bundled_catalog()
                 .map_err(|error| eprintln!("bundled catalog unavailable: {error}"))
                 .ok(),

@@ -7,8 +7,8 @@
 //! blocking pool, never on the main thread, and mutations are serialized
 //! through `AppState::write_lock` so they cannot lose each other's updates.
 use crate::dto::{
-    AdDto, CatalogDto, ConfigDto, ConflictDto, CurrentSessionDto, DeploySessionDto, GameInfoDto,
-    ModDto, ProfileDto, RecoveryStatusDto, StorageUsageDto,
+    AdDto, CatalogDto, CommunityStatusDto, ConfigDto, ConflictDto, CurrentSessionDto,
+    DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto, StorageUsageDto,
 };
 use crate::error_ads::unknown_creative;
 use crate::{AppState, CommandError};
@@ -354,6 +354,26 @@ pub async fn ad_shown(
     .await
 }
 
+/// The community sign-in state. An unreachable server is `offline` (never an
+/// error) and a rejected session is `signed_out`. The token never crosses IPC.
+#[tauri::command]
+pub async fn community_me(state: State<'_, AppState>) -> CommandResult<CommunityStatusDto> {
+    read_blocking(state, |state| Ok(state.community.status()?.into())).await
+}
+
+/// Signs in with Discord through the system browser (up to 2 minutes). Runs on
+/// the blocking pool and never under `write_lock`.
+#[tauri::command]
+pub async fn community_sign_in(state: State<'_, AppState>) -> CommandResult<CommunityStatusDto> {
+    read_blocking(state, |state| Ok(state.community.sign_in()?.into())).await
+}
+
+/// Revokes the session (best effort when offline) and forgets it locally.
+#[tauri::command]
+pub async fn community_sign_out(state: State<'_, AppState>) -> CommandResult<()> {
+    read_blocking(state, |state| Ok(state.community.sign_out()?)).await
+}
+
 /// Registers every command on the builder; shared by the real app and the
 /// contract tests.
 pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
@@ -389,6 +409,9 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         get_ad,
         ad_clicked,
         ad_shown,
+        community_me,
+        community_sign_in,
+        community_sign_out,
         crate::commands_install::install_catalog_entry,
         crate::commands_install::cancel_catalog_install
     ])

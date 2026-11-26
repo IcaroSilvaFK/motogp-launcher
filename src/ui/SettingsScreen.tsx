@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { MouseEvent } from 'react';
 import { AboutSection } from './AboutSection';
 import { useAdPreference } from './AdPreferenceContext';
+import { CommunityAccountSection } from './CommunityAccountSection';
+import { useCommunity } from './CommunityContext';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { LOCALES, useI18n } from './i18n';
@@ -10,11 +12,12 @@ import { useLauncher } from './LauncherContext';
 import { stagger } from './motion';
 import { StorageSection } from './StorageSection';
 
-type SectionId = 'game' | 'preferences' | 'storage' | 'about';
+type SectionId = 'game' | 'preferences' | 'community' | 'storage' | 'about';
 
 const SECTIONS: readonly { id: SectionId; icon: IconName }[] = [
   { id: 'game', icon: 'game' },
   { id: 'preferences', icon: 'language' },
+  { id: 'community', icon: 'account' },
   { id: 'storage', icon: 'storage' },
   { id: 'about', icon: 'info' },
 ];
@@ -23,11 +26,15 @@ export function SettingsScreen() {
   const { t, locale, setLocale } = useI18n();
   const { controller, state } = useLauncher();
   const { preference: adPreference, setPreference: setAdPreference } = useAdPreference();
+  // Without a community port (tests, builds without the community) the section and its link are absent.
+  const hasCommunity = useCommunity().account !== undefined;
+  const sections = SECTIONS.filter(({ id }) => id !== 'community' || hasCommunity);
   const { game, detected } = state;
   const [current, setCurrent] = useState<SectionId>('game');
   const sectionTitle: Record<SectionId, string> = {
     game: t.settings.game,
     preferences: t.settings.preferences,
+    community: t.community.title,
     storage: t.storage.title,
     about: t.about.title,
   };
@@ -49,7 +56,7 @@ export function SettingsScreen() {
 
       <div className="split">
         <nav aria-label={t.settings.sectionsLabel} className="section-nav split-rail">
-          {SECTIONS.map(({ id, icon }) => (
+          {sections.map(({ id, icon }) => (
             <a
               key={id}
               href={`#settings-${id}`}
@@ -206,6 +213,8 @@ export function SettingsScreen() {
               </div>
             </div>
           </section>
+
+          <CommunityAccountSection />
 
           <StorageSection />
 

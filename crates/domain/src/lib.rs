@@ -6,6 +6,7 @@
 mod ad;
 mod catalog;
 mod catalog_page;
+mod community;
 mod config;
 mod conflict;
 mod deploy;
@@ -27,6 +28,7 @@ pub use catalog::{
 pub use catalog_page::{
     check_https_url, check_https_url_on_hosts, check_page_url, PageUrlError, ALLOWED_PAGE_HOSTS,
 };
+pub use community::{CommunityProfile, CommunityStatus, SessionToken};
 pub use config::Config;
 pub use conflict::{detect_conflicts, FileConflict};
 pub use deploy::{deployed_name, is_mods_dir, is_safe_file_name, Deployed, DeployedFile};
