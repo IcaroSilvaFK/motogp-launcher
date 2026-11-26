@@ -12,6 +12,9 @@ export const en: Messages = {
     consentText: 'The launcher shows sponsored cards. They do not track you.',
     keep: 'Keep',
     turnOff: 'Turn off ads',
+    sponsored: 'Sponsored',
+    learnMore: 'Learn more',
+    opensInBrowser: 'Opens in your browser',
   },
   nav: {
     label: 'Main navigation',

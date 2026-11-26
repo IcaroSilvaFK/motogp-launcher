@@ -13,6 +13,7 @@ import {
 } from '../application';
 import type { CatalogController, CatalogSort, DiscoverView, DiscoverViewStore } from '../application';
 import type { CatalogEntry, CommandError } from '../domain';
+import { AdSlot } from './AdSlot';
 import { BannerIcon } from './BannerIcon';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
@@ -460,6 +461,10 @@ export function DiscoverScreen({
           })}
         </ul>
       )}
+
+      {/* Sponsored card (#104): after the results, outside the list, the tiles and the counts, so it
+          is never counted or matched by search, and inserting it after load moves nothing above it. */}
+      <AdSlot slot="discover" />
 
       {open !== undefined && (
         <EntryDetail

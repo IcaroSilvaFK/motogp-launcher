@@ -9,6 +9,11 @@ export interface Messages {
     consentText: string;
     keep: string;
     turnOff: string;
+    /** Visible on every sponsored card and row; also the slot's accessible name (#104). */
+    sponsored: string;
+    learnMore: string;
+    /** Accessible description of the action: the page opens outside the launcher. */
+    opensInBrowser: string;
   };
   nav: {
     label: string;
@@ -234,6 +239,7 @@ export interface Messages {
     button: string;
     openFailed: string;
   };
+  /** Sponsored placements (#104): the visible label, the single action and its description. */
   about: {
     title: string;
     versionLabel: string;

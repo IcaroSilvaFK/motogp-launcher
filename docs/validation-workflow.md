@@ -573,3 +573,20 @@ Bundled catalog fallback and "not published" handling. Gherkin: `crates/applicat
 | A refresh failure keeps the catalog on screen | `discover.feature.test.tsx`; `DiscoverScreen.test.tsx` |
 
 Note: the bundled snapshot is the repository `catalog/catalog.json` embedded with `include_str!` (it is never written to the cache); the content of that file is not part of this issue.
+
+### Issue #104: scenario traceability
+
+Sponsored placements (frontend only; the `get_ad`, `ad_clicked` and `ad_shown` commands are #103, the preference and consent UI #105). Gherkin: `tests/features/frontend/ads.feature`, bound strictly by `src/ui/__tests__/ads.feature.test.tsx` (the real `App` over `createFakeController()`, the real catalog controller over a scripted gateway, and a fake `AdProvider`; ads show only while a fake `AdPreferenceStore` returns "on", because `useAdsEnabled()` from #105 is false without a store). Component details are in `src/ui/__tests__/AdSlot.test.tsx`, the hook in `src/application/__tests__/useAd.test.tsx`, the payload validation in `src/domain/__tests__/ads.test.ts` and the Tauri adapter in `src/infrastructure/__tests__/tauriAdProvider.test.ts`.
+
+| Scenario | Tests |
+|----------|-------|
+| Discover shows a labeled sponsored card | `ads.feature.test.tsx` (region "Sponsored" inside Discover, outside the results list, tiles and toolbar; "2 results", the subtitle and the "All" count unchanged; a search for the ad title finds 0 results); `AdSlot.test.tsx` (image `alt=""`, title, body, sponsor label, one outlined action) |
+| The sidebar card hides when collapsed | `ads.feature.test.tsx` (card in the expanded sidebar, gone after Collapse sidebar); `AdSlot.test.tsx` ("never makes the sidebar card wider than the sidebar") |
+| Settings About shows a quiet sponsored row | `ads.feature.test.tsx` (a `setting-row` region in the About card, not `btn-primary`); `AdSlot.test.tsx` (About row has no image) |
+| No ads while a game session is active (starting, running, stopping, cleaning up) | `ads.feature.test.tsx` (no region in the sidebar, Discover or Settings, nothing requested; ads return once the session ends) |
+| Play is never blocked | `ads.feature.test.tsx` (Play enabled while the ad is pending, the same node and an unchanged status bar after it loads, no `.ad-slot`, placeholder or status while loading); `AdSlot.test.tsx` ("renders nothing while the ad loads", "while the launcher is loading") |
+| Clicking an ad sends only its id | `ads.feature.test.tsx` (keyboard activation, `click("discover", id)` with no other argument); `useAd.test.tsx` (click failures swallowed); `tauriAdProvider.test.ts` (`ad_clicked { slot, creativeId }`) |
+| A shown ad is reported once | `ads.feature.test.tsx` (one `reportShown("discover", id)` across re-renders); `useAd.test.tsx` ("reports a creative as shown once per mount"); `tauriAdProvider.test.ts` (`ad_shown`) |
+| No ad means no slot | `ads.feature.test.tsx` (null, a rejection and "command get_ad not found": no slot, no alert, no error text); `tauriAdProvider.test.ts` (missing command, rejection, synchronous throw and malformed payload map to `null`); `ads.test.ts` (`toAdViewModel` refuses SVG, remote URLs and incomplete payloads) |
+| Ads disabled renders nothing | `ads.feature.test.tsx` (stored preference "off" in a fake `AdPreferenceStore`: no region in the sidebar, Discover or Settings > About, no `get`, no `reportShown`); `AdSlot.test.tsx` ("renders nothing and requests nothing without a preference store", the "off" case); `useAd.test.tsx` ("requests nothing without a provider or when disabled") |
+| Turning sponsored content off in Settings removes the slots | `ads.feature.test.tsx` (sidebar and About cards shown with "on"; selecting "Off" in Settings > Preferences stores "off", removes every region and Discover then requests nothing) |
