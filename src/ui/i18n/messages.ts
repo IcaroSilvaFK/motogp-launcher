@@ -138,6 +138,42 @@ export interface Messages {
       openPageHint: (host: string) => string;
       install: string;
     };
+    /** Full mod page inside Discover (#115). */
+    modPage: {
+      /** Visible label of the back button. */
+      back: string;
+      /** Accessible name of the back button. */
+      backTo: string;
+      breadcrumb: string;
+      /** Accessible name of the stats strip. */
+      stats: string;
+      size: string;
+      sha256: string;
+      details: string;
+      /** Name of the gallery region. */
+      gallery: string;
+      /** Name of the thumbnail group. */
+      thumbnails: string;
+      /** Alt text of a screenshot: the mod title plus its position. */
+      screenshotAlt: (title: string, index: number, total: number) => string;
+      /** Name of a thumbnail button. */
+      showScreenshot: (index: number, total: number) => string;
+      /** Tooltip of the main image, which opens the viewer. */
+      viewFullSize: string;
+      /** Name of the lightbox dialog. */
+      viewer: (title: string) => string;
+      previous: string;
+      next: string;
+      closeViewer: string;
+      /** Lightbox position, e.g. "2 / 3". */
+      counter: (index: number, total: number) => string;
+      /** Title of the author card. */
+      author: string;
+      /** Count of the author's mods in the catalog, this one included. */
+      authorMods: (count: number) => string;
+      /** Action of the author card: back to the list searched by the author. */
+      moreFromAuthor: (author: string) => string;
+    };
   };
   profiles: {
     title: string;

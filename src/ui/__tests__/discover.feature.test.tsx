@@ -23,6 +23,8 @@ function entry(patch: Partial<CatalogEntry> & { id: string; title: string }): Ca
     updatedAt: '2026-01-01',
     pageUrl: `https://overtake.gg/downloads/${patch.id}/`,
     thumbnailUrl: null,
+    screenshots: [],
+    longDescription: null,
     download: null,
     ...patch,
   };
@@ -101,7 +103,8 @@ const titles = () =>
   within(results())
     .getAllByRole('button')
     .map((card) => document.getElementById(card.getAttribute('aria-labelledby') ?? '')?.textContent);
-const dialog = () => screen.getByRole('dialog');
+/** The mod page of the open entry (a full page inside Discover since #115, not a dialog). */
+const modPage = () => screen.getByRole('region', { name: 'Rebalanced AI' });
 /** The list item of an entry card. */
 const cardOf = (title: string) => screen.getByRole('button', { name: title }).closest('li') as HTMLElement;
 
@@ -239,27 +242,31 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
     });
   });
 
-  Scenario('Entry detail and Open page', ({ Given, When, Then }) => {
+  Scenario('Entry page and Open page', ({ Given, When, Then }) => {
     let card: HTMLElement;
     Given('the catalog has 2 "Physics" entries and 1 "Liveries" entry', () => withSample());
     When('I open the entry "Rebalanced AI"', async () => {
       card = screen.getByRole('button', { name: 'Rebalanced AI' });
       await user.click(card);
     });
-    Then('its description, version, author and updated date are shown', () => {
-      const detail = within(dialog());
-      expect(dialog()).toHaveAttribute('aria-modal', 'true');
-      expect(detail.getByRole('heading', { name: 'Rebalanced AI' })).toBeVisible();
+    Then('its page shows the description, version, author and updated date', () => {
+      const detail = within(modPage());
+      // The page replaces the list: no dialog, and the Discover title is gone.
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(screen.queryByRole('list', { name: /results/i })).not.toBeInTheDocument();
+      expect(detail.getByRole('heading', { level: 2, name: 'Rebalanced AI' })).toBeVisible();
       expect(detail.getByText('Smarter and fairer AI riders.')).toBeVisible();
       expect(detail.getByText('2.3.1')).toBeVisible();
-      expect(detail.getByText('Ana Rider')).toBeVisible();
+      expect(detail.getByText('by Ana Rider')).toBeVisible();
       expect(detail.getByText('Nov 10, 2026')).toBeVisible();
-      expect(detail.getByText('MotoGP 25')).toBeVisible();
-      expect(detail.getByText('overtake.gg')).toBeVisible();
-      expect(detail.getByRole('button', { name: 'Close' })).toHaveFocus();
+      const details = within(detail.getByRole('region', { name: 'Details' }));
+      expect(details.getByText('Ana Rider')).toBeVisible();
+      expect(details.getByText('MotoGP 25')).toBeVisible();
+      expect(details.getByText('overtake.gg')).toBeVisible();
+      expect(detail.getByRole('button', { name: 'Back to Discover' })).toHaveFocus();
     });
     When('I click "Open page"', async () => {
-      await user.click(within(dialog()).getByRole('button', { name: 'Open page' }));
+      await user.click(within(modPage()).getByRole('button', { name: 'Open page' }));
     });
     Then('openCatalogPage is called with the entry id', () => {
       expect(gateway.openCatalogPage).toHaveBeenCalledWith('rebalanced-ai');
@@ -267,8 +274,11 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
     When('I press Escape', async () => {
       await user.keyboard('{Escape}');
     });
-    Then('the entry detail is closed', () => {
-      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    Then('the Discover list is shown again with focus on the entry', () => {
+      expect(screen.queryByRole('region', { name: 'Rebalanced AI' })).not.toBeInTheDocument();
+      expect(screen.getByRole('list', { name: /results/i })).toBeInTheDocument();
+      // The list re-mounts, so the card is a new element with the same name.
+      card = screen.getByRole('button', { name: 'Rebalanced AI' });
       expect(card).toHaveFocus();
     });
   });
@@ -284,7 +294,7 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
       await user.click(screen.getByRole('button', { name: 'Rebalanced AI' }));
     });
     Then('an Install button is shown', async () => {
-      await user.click(within(dialog()).getByRole('button', { name: 'Install' }));
+      await user.click(within(modPage()).getByRole('button', { name: 'Install' }));
       expect(launcher.installCatalogEntry).toHaveBeenCalledWith('rebalanced-ai');
     });
   });
@@ -299,7 +309,7 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
       await user.click(screen.getByRole('button', { name: 'Rebalanced AI' }));
     });
     Then('no Install button is shown', () => {
-      expect(within(dialog()).queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
+      expect(within(modPage()).queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
     });
   });
@@ -356,14 +366,14 @@ describeFeature(feature, ({ Scenario, BeforeEachScenario, AfterEachScenario }) =
       await user.click(screen.getByRole('button', { name: 'Rebalanced AI' }));
     });
     And('I click "Open page"', async () => {
-      await user.click(within(dialog()).getByRole('button', { name: 'Open page' }));
+      await user.click(within(modPage()).getByRole('button', { name: 'Open page' }));
     });
     Then('an error notice is shown', async () => {
-      expect(await within(dialog()).findByRole('alert')).toHaveTextContent(
+      expect(await within(modPage()).findByRole('alert')).toHaveTextContent(
         'The page of this mod cannot be opened because its address is not trusted.',
       );
-      await user.click(within(dialog()).getByRole('button', { name: 'Dismiss' }));
-      expect(within(dialog()).queryByRole('alert')).not.toBeInTheDocument();
+      await user.click(within(modPage()).getByRole('button', { name: 'Dismiss' }));
+      expect(within(modPage()).queryByRole('alert')).not.toBeInTheDocument();
     });
   });
 

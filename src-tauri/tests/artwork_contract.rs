@@ -39,7 +39,16 @@ fn get_game_artwork_returns_null_when_nothing_is_cached() {
 }
 
 #[test]
-fn csp_still_only_allows_self_and_data_images() {
+fn csp_allows_self_data_and_https_images_only() {
     let conf = include_str!("../tauri.conf.json");
-    assert!(conf.contains("img-src 'self' data:"), "CSP changed");
+    assert!(conf.contains("img-src 'self' data: https:"), "CSP changed");
+    for policy in ["\"csp\"", "\"devCsp\""] {
+        let line = conf.lines().find(|l| l.contains(policy)).expect(policy);
+        let img = line
+            .split(';')
+            .find(|d| d.trim_start().starts_with("img-src"))
+            .expect("an img-src directive")
+            .trim();
+        assert_eq!(img, "img-src 'self' data: https:", "{policy}");
+    }
 }

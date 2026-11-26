@@ -40,6 +40,8 @@ function entry(id: string, title: string): CatalogEntry {
     updatedAt: '2026-11-01',
     pageUrl: `https://overtake.gg/downloads/${id}/`,
     thumbnailUrl: null,
+    screenshots: [],
+    longDescription: null,
     download: null,
   };
 }

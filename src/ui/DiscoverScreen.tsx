@@ -1,44 +1,37 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import type { KeyboardEvent, ReactNode } from 'react';
-import { createPortal } from 'react-dom';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import type { MouseEvent, ReactNode } from 'react';
 import {
   categoryCounts,
   inLibrary,
   loadDiscoverView,
-  pageHost,
   saveDiscoverView,
   selectEntries,
   sortEntries,
   useCatalogState,
 } from '../application';
 import type { CatalogController, CatalogSort, DiscoverView, DiscoverViewStore } from '../application';
-import type { CatalogEntry, CommandError } from '../domain';
 import { AdSlot } from './AdSlot';
 import { BannerIcon } from './BannerIcon';
+import { CategoryCover, InlineError } from './CatalogParts';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { formatDay, formatInstantDate, useI18n } from './i18n';
-import { CatalogInstallButton } from './InstallButton';
 import { useLauncher } from './LauncherContext';
+import { ModPage } from './ModPage';
 import { stagger } from './motion';
 
 type View = DiscoverView;
 
-const SKELETON_CARDS = [0, 1, 2, 3, 4, 5];
+/** Where the list was when a mod page opened, so going back lands on the same spot (#115). */
+type ReturnPoint = {
+  entryId: string;
+  scroller: Element | null;
+  scrollTop: number;
+  /** False when going back changes the filters (breadcrumb category, author): the old position is meaningless. */
+  restoreScroll: boolean;
+};
 
-/** Inline error row (refresh or Open page failure) with a Dismiss action. */
-function InlineError({ error, onDismiss }: { error: CommandError; onDismiss: () => void }) {
-  const { t } = useI18n();
-  return (
-    <div role="alert" className="notice notice-error">
-      <BannerIcon variant="error" />
-      <p>{t.errors[error.code]}</p>
-      <button type="button" className="btn btn-ghost" onClick={onDismiss}>
-        {t.dismiss}
-      </button>
-    </div>
-  );
-}
+const SKELETON_CARDS = [0, 1, 2, 3, 4, 5];
 
 /** Two-option segmented button (Material 3), icon only, each option named for screen readers. */
 function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => void }) {
@@ -63,137 +56,6 @@ function ViewToggle({ view, onChange }: { view: View; onChange: (view: View) => 
         </button>
       ))}
     </div>
-  );
-}
-
-/** Thumbnails are left out on purpose (no remote images, CSP unchanged): a neutral category cover. */
-function CategoryCover({ category }: { category: string }) {
-  return (
-    <span className="catalog-cover" aria-hidden="true">
-      <Icon name="library" className="catalog-cover-icon" />
-      <span className="catalog-cover-label">{category}</span>
-    </span>
-  );
-}
-
-/** Modal side sheet with the entry details. Esc, the scrim and Close dismiss it; focus returns to the opener. */
-function EntryDetail({
-  entry,
-  owned,
-  pageError,
-  onOpenPage,
-  onDismissPageError,
-  onClose,
-}: {
-  entry: CatalogEntry;
-  owned: boolean;
-  pageError: CommandError | null;
-  onOpenPage: () => void;
-  onDismissPageError: () => void;
-  onClose: () => void;
-}) {
-  const { t, locale } = useI18n();
-  const titleId = useId();
-  const sheetRef = useRef<HTMLDivElement>(null);
-  const closeRef = useRef<HTMLButtonElement>(null);
-  const host = pageHost(entry);
-
-  useEffect(() => {
-    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    closeRef.current?.focus();
-    return () => opener?.focus();
-  }, []);
-
-  // Esc closes; Tab cycles inside the sheet, so focus never reaches the page behind the scrim.
-  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      onClose();
-      return;
-    }
-    if (event.key !== 'Tab' || sheetRef.current === null) return;
-    const focusable = [...sheetRef.current.querySelectorAll<HTMLElement>('button:not([disabled])')];
-    const first = focusable[0];
-    const last = focusable[focusable.length - 1];
-    if (event.shiftKey && document.activeElement === first) {
-      event.preventDefault();
-      last?.focus();
-    } else if (!event.shiftKey && document.activeElement === last) {
-      event.preventDefault();
-      first?.focus();
-    }
-  };
-
-  const facts: { label: string; value: ReactNode }[] = [
-    { label: t.discover.detail.version, value: <span className="num">{entry.version}</span> },
-    { label: t.discover.detail.author, value: entry.author },
-    { label: t.discover.detail.updated, value: formatDay(entry.updatedAt, locale) },
-    { label: t.discover.detail.category, value: entry.category },
-    { label: t.discover.detail.game, value: entry.game },
-  ];
-  if (host !== null) facts.push({ label: t.discover.detail.page, value: host });
-
-  return createPortal(
-    <div className="sheet-layer">
-      <div className="sheet-scrim" aria-hidden="true" onClick={onClose} />
-      <div
-        ref={sheetRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="sheet"
-        onKeyDown={onKeyDown}
-      >
-        <div className="sheet-head">
-          <div className="sheet-heading">
-            <p className="sheet-overline">{entry.category}</p>
-            <h2 id={titleId}>{entry.title}</h2>
-            <p className="page-subtitle">{t.discover.byAuthor(entry.author)}</p>
-          </div>
-          <button
-            ref={closeRef}
-            type="button"
-            className="btn btn-ghost btn-icon"
-            aria-label={t.discover.detail.close}
-            title={t.discover.detail.close}
-            onClick={onClose}
-          >
-            <Icon name="close" />
-          </button>
-        </div>
-        <div className="sheet-body">
-          {owned && (
-            <span className="badge badge-on" title={t.discover.inLibraryDetail}>
-              <Icon name="check" />
-              {t.discover.inLibrary}
-            </span>
-          )}
-          <section aria-label={t.discover.detail.description}>
-            <p className="sheet-description">{entry.description}</p>
-          </section>
-          <dl className="details sheet-facts">
-            {facts.map((fact) => (
-              <div key={fact.label}>
-                <dt>{fact.label}</dt>
-                <dd>{fact.value}</dd>
-              </div>
-            ))}
-          </dl>
-          {pageError !== null && <InlineError error={pageError} onDismiss={onDismissPageError} />}
-        </div>
-        <div className="sheet-actions">
-          {host !== null && <p className="hint">{t.discover.detail.openPageHint(host)}</p>}
-          <div className="sheet-buttons">
-            {entry.download !== null && <CatalogInstallButton entryId={entry.id} />}
-            <button type="button" className="btn btn-accent-outline" onClick={onOpenPage}>
-              <Icon name="external" />
-              {t.discover.detail.openPage}
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>,
-    document.body,
   );
 }
 
@@ -250,10 +112,46 @@ export function DiscoverScreen({
     if (viewStore) saveDiscoverView(viewStore, next);
   };
   const [openId, setOpenId] = useState<string | null>(null);
+  const returnPoint = useRef<ReturnPoint | null>(null);
 
   useEffect(() => {
     void catalog.load();
   }, [catalog]);
+
+  // Opening a mod page starts it at the top; going back restores the list's scroll position and
+  // puts focus back on the card that opened it. Layout effect: before paint, so nothing jumps.
+  useLayoutEffect(() => {
+    const point = returnPoint.current;
+    if (point === null) return;
+    if (openId !== null) {
+      if (point.scroller !== null) point.scroller.scrollTop = 0;
+      return;
+    }
+    returnPoint.current = null;
+    if (point.restoreScroll && point.scroller !== null) point.scroller.scrollTop = point.scrollTop;
+    const card = [...document.querySelectorAll<HTMLElement>('[data-entry-id]')].find(
+      (element) => element.dataset.entryId === point.entryId,
+    );
+    card?.focus({ preventScroll: point.restoreScroll });
+  }, [openId]);
+
+  const openEntry = (entryId: string, event: MouseEvent<HTMLElement>) => {
+    // `scrollingElement` is missing in some environments (jsdom), hence the last fallback.
+    const scroller = event.currentTarget.closest('main') ?? document.scrollingElement ?? null;
+    returnPoint.current = { entryId, scroller, scrollTop: scroller?.scrollTop ?? 0, restoreScroll: true };
+    setOpenId(entryId);
+  };
+
+  const closeEntry = (filters?: { category?: string; query?: string }) => {
+    catalog.dismissPageError();
+    if (filters !== undefined && returnPoint.current !== null) returnPoint.current.restoreScroll = false;
+    if (filters?.category !== undefined) setCategory(filters.category);
+    if (filters?.query !== undefined) {
+      setCategory(null);
+      setQuery(filters.query);
+    }
+    setOpenId(null);
+  };
 
   const loading = state.status === 'idle' || state.status === 'loading';
   const entries = state.catalog?.entries ?? [];
@@ -351,12 +249,29 @@ export function DiscoverScreen({
     );
   }
 
+  const open = openId === null ? undefined : entries.find((entry) => entry.id === openId);
+  if (open !== undefined) {
+    return (
+      <ModPage
+        key={open.id}
+        entry={open}
+        authorCount={entries.filter((entry) => entry.author === open.author).length}
+        owned={inLibrary(open, launcher.mods)}
+        pageError={state.pageError}
+        onOpenPage={() => void catalog.openPage(open.id)}
+        onDismissPageError={() => catalog.dismissPageError()}
+        onBack={() => closeEntry()}
+        onCategory={() => closeEntry({ category: open.category })}
+        onAuthor={() => closeEntry({ query: open.author })}
+      />
+    );
+  }
+
   const tiles: { category: string | null; label: string; count: number }[] = [
     { category: null, label: t.discover.all, count: entries.length },
     ...categoryCounts(entries).map((item) => ({ category: item.category, label: item.category, count: item.count })),
   ];
   const visible = sortEntries(selectEntries(entries, { category, query }), sort);
-  const open = openId === null ? undefined : entries.find((entry) => entry.id === openId);
 
   const clearFilters = () => {
     setCategory(null);
@@ -428,10 +343,10 @@ export function DiscoverScreen({
                 <button
                   type="button"
                   className="catalog-card"
-                  aria-haspopup="dialog"
+                  data-entry-id={entry.id}
                   aria-labelledby={`${key}-title`}
                   aria-describedby={`${key}-meta`}
-                  onClick={() => setOpenId(entry.id)}
+                  onClick={(event) => openEntry(entry.id, event)}
                 >
                   <CategoryCover category={entry.category} />
                   <span className="catalog-card-body">
@@ -465,20 +380,6 @@ export function DiscoverScreen({
       {/* Sponsored card (#104): after the results, outside the list, the tiles and the counts, so it
           is never counted or matched by search, and inserting it after load moves nothing above it. */}
       <AdSlot slot="discover" />
-
-      {open !== undefined && (
-        <EntryDetail
-          entry={open}
-          owned={inLibrary(open, launcher.mods)}
-          pageError={state.pageError}
-          onOpenPage={() => void catalog.openPage(open.id)}
-          onDismissPageError={() => catalog.dismissPageError()}
-          onClose={() => {
-            catalog.dismissPageError();
-            setOpenId(null);
-          }}
-        />
-      )}
     </>,
   );
 }

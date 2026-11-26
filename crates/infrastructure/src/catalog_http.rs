@@ -146,6 +146,9 @@ struct EntryWire {
     updated_at: Option<String>,
     page_url: Option<String>,
     thumbnail_url: Option<String>,
+    #[serde(default)]
+    screenshots: Vec<String>,
+    long_description: Option<String>,
     download: Option<DownloadWire>,
 }
 
@@ -180,6 +183,8 @@ impl EntryWire {
             updated_at: need(self.updated_at, "updatedAt")?,
             page_url: need(self.page_url, "pageUrl")?,
             thumbnail_url: self.thumbnail_url,
+            screenshots: self.screenshots,
+            long_description: self.long_description,
             download,
         })
     }
@@ -481,5 +486,18 @@ mod tests {
         };
         assert_eq!(draft.thumbnail_url.as_deref(), Some("https://e.com/t.png"));
         assert!(draft.download.is_none());
+    }
+
+    #[test]
+    fn parse_reads_screenshots_and_long_description() {
+        let body = catalog(
+            r#"{"id":"a","title":"t","author":"a","game":"g","category":"c","description":"d","version":"1","updatedAt":"2026-01-01","pageUrl":"https://e.com","screenshots":["https://e.com/1.png","https://e.com/2.png"],"longDescription":"Long"}"#,
+        );
+        let parsed = parse_catalog(body.as_bytes()).unwrap();
+        let RawEntry::Draft(draft) = &parsed.entries[0] else {
+            panic!("draft expected");
+        };
+        assert_eq!(draft.screenshots.len(), 2);
+        assert_eq!(draft.long_description.as_deref(), Some("Long"));
     }
 }

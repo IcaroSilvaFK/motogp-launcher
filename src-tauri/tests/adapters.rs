@@ -156,7 +156,7 @@ fn production_csp_is_strict_and_dev_csp_only_adds_what_vite_needs() {
         "default-src 'self'",
         "script-src 'self'",
         "style-src 'self'",
-        "img-src 'self' data:",
+        "img-src 'self' data: https:",
         "connect-src ipc: http://ipc.localhost",
         "object-src 'none'",
         "base-uri 'none'",
@@ -166,7 +166,18 @@ fn production_csp_is_strict_and_dev_csp_only_adds_what_vite_needs() {
     assert!(!csp.contains("unsafe-eval"));
     assert!(!csp.contains("unsafe-inline"));
     assert!(!csp.contains('*'));
+    let img_src = |policy: &str| {
+        policy
+            .split(';')
+            .map(str::trim)
+            .find(|d| d.starts_with("img-src"))
+            .expect("an img-src directive")
+            .to_string()
+    };
+    // Images: self, data: and https only; never plain http or a wildcard.
+    assert_eq!(img_src(csp), "img-src 'self' data: https:");
     let dev = security["devCsp"].as_str().expect("a dev CSP for Vite");
     assert!(dev.contains("ws://localhost:1420"), "HMR socket: {dev}");
     assert!(dev.contains("object-src 'none'"));
+    assert_eq!(img_src(dev), "img-src 'self' data: https:");
 }

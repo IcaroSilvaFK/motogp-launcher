@@ -1,6 +1,6 @@
 // DiscoverScreen details outside the Gherkin scenarios: the #74 Install slot, refresh failures,
-// the sheet's focus trap and scrim, and the pt-BR copy.
-import { act, cleanup, render, screen, within } from '@testing-library/react';
+// the mod page (#115) actions, back, author card and thumbnail fallback, and the pt-BR copy.
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createCatalogController } from '../../application';
@@ -23,6 +23,8 @@ const entry: CatalogEntry = {
   updatedAt: '2026-11-10',
   pageUrl: 'not a url',
   thumbnailUrl: null,
+  screenshots: [],
+  longDescription: null,
   download: { url: 'https://github.com/x/y.zip', size: 10, sha256: 'a'.repeat(64) },
 };
 
@@ -35,9 +37,15 @@ const catalogOf = (entries: CatalogEntry[]): Catalog => ({
 });
 
 function setup(
-  options: { locale?: Locale; download?: CatalogEntry['download']; refresh?: () => Promise<Catalog> } = {},
+  options: {
+    locale?: Locale;
+    download?: CatalogEntry['download'];
+    thumbnailUrl?: string;
+    refresh?: () => Promise<Catalog>;
+  } = {},
 ) {
-  const shown = options.download === undefined ? entry : { ...entry, download: options.download };
+  const withDownload = options.download === undefined ? entry : { ...entry, download: options.download };
+  const shown = { ...withDownload, thumbnailUrl: options.thumbnailUrl ?? null };
   const gateway: CatalogGateway = {
     getCatalog: () => Promise.resolve(catalogOf([shown])),
     refreshCatalog: options.refresh ?? (() => Promise.resolve(catalogOf([entry]))),
@@ -62,32 +70,51 @@ describe('DiscoverScreen', () => {
   it('shows the connected install button for a downloadable entry', async () => {
     const { user, launcher } = setup();
     await user.click(await screen.findByRole('button', { name: 'Rebalanced AI' }));
-    const dialog = screen.getByRole('dialog');
+    const page = screen.getByRole('region', { name: 'Rebalanced AI' });
     // An unparsable page URL hides the host line but keeps Open page.
-    expect(within(dialog).queryByText(/default browser/)).not.toBeInTheDocument();
-    await user.click(within(dialog).getByRole('button', { name: 'Install' }));
+    expect(within(page).queryByText(/default browser/)).not.toBeInTheDocument();
+    // Install is the one main action; Open page steps down to an outlined secondary button.
+    expect(within(page).getByRole('button', { name: 'Open page' })).not.toHaveClass('btn-accent-outline');
+    await user.click(within(page).getByRole('button', { name: 'Install' }));
     expect(launcher.installCatalogEntry).toHaveBeenCalledWith(entry.id);
   });
 
   it('shows no install button for an entry without a download', async () => {
     const { user } = setup({ download: null });
     await user.click(await screen.findByRole('button', { name: 'Rebalanced AI' }));
-    expect(within(screen.getByRole('dialog')).queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
+    const page = screen.getByRole('region', { name: 'Rebalanced AI' });
+    expect(within(page).queryByRole('button', { name: /install/i })).not.toBeInTheDocument();
+    expect(within(page).getByRole('button', { name: 'Open page' })).toHaveClass('btn-accent-outline');
   });
 
-  it('keeps focus inside the sheet and closes from the scrim', async () => {
+  it('goes back from the breadcrumb and renders the page without a dialog or portal', async () => {
     const { user } = setup();
     await user.click(await screen.findByRole('button', { name: 'Rebalanced AI' }));
-    const dialog = screen.getByRole('dialog');
-    const close = within(dialog).getByRole('button', { name: 'Close' });
-    const openPage = within(dialog).getByRole('button', { name: 'Open page' });
-    expect(close).toHaveFocus();
-    await user.tab({ shift: true });
-    expect(openPage).toHaveFocus();
-    await user.tab();
-    expect(close).toHaveFocus();
-    await user.click(document.querySelector('.sheet-scrim') as HTMLElement);
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    const crumbs = screen.getByRole('navigation', { name: 'Breadcrumb' });
+    await user.click(within(crumbs).getByRole('button', { name: 'Discover' }));
+    expect(screen.getByRole('heading', { level: 2, name: 'Discover' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Rebalanced AI' })).toHaveFocus();
+  });
+
+  it('shows the author card with a single mod and no "more from" action', async () => {
+    const { user } = setup();
+    await user.click(await screen.findByRole('button', { name: 'Rebalanced AI' }));
+    const author = screen.getByRole('region', { name: 'Author' });
+    expect(within(author).getByText('1 mod in the catalog')).toBeInTheDocument();
+    expect(within(author).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it('falls back to the category cover when the thumbnail fails', async () => {
+    const { user } = setup({ thumbnailUrl: 'https://img.test/thumb.png' });
+    await user.click(await screen.findByRole('button', { name: 'Rebalanced AI' }));
+    const page = screen.getByRole('region', { name: 'Rebalanced AI' });
+    const thumb = page.querySelector('.mod-cover-image') as HTMLImageElement;
+    expect(thumb).toHaveAttribute('src', 'https://img.test/thumb.png');
+    expect(thumb).toHaveAttribute('referrerpolicy', 'no-referrer');
+    fireEvent.error(thumb);
+    expect(page.querySelector('.mod-cover-image')).toBeNull();
+    expect(page.querySelector('.catalog-cover.mod-cover')).not.toBeNull();
   });
 
   it('keeps the catalog shown when a refresh fails, with a dismissible error', async () => {

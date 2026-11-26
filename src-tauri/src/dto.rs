@@ -260,7 +260,7 @@ impl From<StorageUsage> for StorageUsageDto {
 }
 
 /// Game artwork as a `data:<mime>;base64,<bytes>` URL, so the WebView can
-/// show it without a file or network permission (CSP `img-src 'self' data:`).
+/// show it without a file or network permission (CSP `img-src 'self' data:`; remote https images are also allowed since #115, used by catalog screenshots).
 pub fn artwork_data_url(artwork: &motogp_application::Artwork) -> String {
     use base64::engine::general_purpose::STANDARD;
     use base64::Engine as _;
@@ -304,6 +304,8 @@ pub struct CatalogEntryDto {
     pub updated_at: String,
     pub page_url: String,
     pub thumbnail_url: Option<String>,
+    pub screenshots: Vec<String>,
+    pub long_description: Option<String>,
     pub download: Option<CatalogDownloadDto>,
 }
 
@@ -320,6 +322,8 @@ impl From<CatalogEntry> for CatalogEntryDto {
             updated_at: entry.updated_at,
             page_url: entry.page_url,
             thumbnail_url: entry.thumbnail_url,
+            screenshots: entry.screenshots,
+            long_description: entry.long_description,
             download: entry.download.map(Into::into),
         }
     }
@@ -505,6 +509,8 @@ mod tests {
             updated_at: "2026-11-01".to_string(),
             page_url: "https://example.com/m".to_string(),
             thumbnail_url: None,
+            screenshots: Vec::new(),
+            long_description: None,
             download: Some(CatalogDownload {
                 url: "https://example.com/m.zip".to_string(),
                 size: 10,

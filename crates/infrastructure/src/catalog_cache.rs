@@ -32,6 +32,10 @@ struct EntryFile {
     updated_at: String,
     page_url: String,
     thumbnail_url: Option<String>,
+    #[serde(default)]
+    screenshots: Vec<String>,
+    #[serde(default)]
+    long_description: Option<String>,
     download: Option<DownloadFile>,
 }
 
@@ -55,6 +59,8 @@ impl From<&CatalogEntry> for EntryFile {
             updated_at: entry.updated_at.clone(),
             page_url: entry.page_url.clone(),
             thumbnail_url: entry.thumbnail_url.clone(),
+            screenshots: entry.screenshots.clone(),
+            long_description: entry.long_description.clone(),
             download: entry
                 .download
                 .as_ref()
@@ -81,6 +87,8 @@ impl EntryFile {
             updated_at: self.updated_at,
             page_url: self.page_url,
             thumbnail_url: self.thumbnail_url,
+            screenshots: self.screenshots,
+            long_description: self.long_description,
             download: self.download.map(|d| CatalogDownloadDraft {
                 url: d.url,
                 size: Some(d.size),
@@ -161,6 +169,8 @@ mod tests {
             updated_at: "2026-01-02".into(),
             page_url: "https://example.com/m".into(),
             thumbnail_url: Some("https://example.com/t.png".into()),
+            screenshots: vec!["https://example.com/s1.png".into()],
+            long_description: Some("Long text".into()),
             download: with_download.then(|| CatalogDownloadDraft {
                 url: "https://example.com/m.zip".into(),
                 size: Some(42),
@@ -195,6 +205,21 @@ mod tests {
         let raw = fs::read_to_string(dir.path().join("nested/catalog-cache.json")).unwrap();
         assert!(raw.contains("\"fetchedAtMs\""));
         assert!(raw.contains("\"version\": 1"));
+    }
+
+    #[test]
+    fn cache_written_before_screenshots_still_loads() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("catalog-cache.json");
+        fs::write(
+            &path,
+            r#"{"version":1,"fetchedAtMs":1,"etag":null,"skipped":0,"entries":[{"id":"old","title":"T","author":"A","game":"G","category":"C","description":"D","version":"1","updatedAt":"2026-01-02","pageUrl":"https://example.com/m","thumbnailUrl":null,"download":null}]}"#,
+        )
+        .unwrap();
+        let loaded = JsonCatalogCache::new(path).load().unwrap().unwrap();
+        assert_eq!(loaded.entries.len(), 1);
+        assert!(loaded.entries[0].screenshots.is_empty());
+        assert_eq!(loaded.entries[0].long_description, None);
     }
 
     #[test]

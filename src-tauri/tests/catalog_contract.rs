@@ -37,6 +37,8 @@ fn get_catalog_returns_camel_case_dtos() {
     );
     assert_eq!(catalog["entries"][0]["updatedAt"], "2026-11-01");
     assert_eq!(catalog["entries"][0]["thumbnailUrl"], Value::Null);
+    assert_eq!(catalog["entries"][0]["screenshots"], json!([]));
+    assert_eq!(catalog["entries"][0]["longDescription"], Value::Null);
     assert_eq!(catalog["entries"][0]["download"], Value::Null);
     assert!(catalog["fetchedAt"].as_u64().unwrap() > 0);
     assert_eq!(catalog["stale"], false);

@@ -232,6 +232,8 @@ fn save_and_load(w: &mut CatalogSourceWorld) {
         updated_at: "2026-01-02".into(),
         page_url: "https://example.com/rebalanced-ai".into(),
         thumbnail_url: None,
+        screenshots: Vec::new(),
+        long_description: None,
         download: None,
     })
     .unwrap();
