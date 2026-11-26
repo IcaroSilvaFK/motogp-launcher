@@ -71,6 +71,7 @@ impl AuthWorld {
                 health: store.clone(),
                 auth: auth_service(store.clone(), clock.clone(), discord.clone()),
                 stars: star_service(store.clone()),
+                downloads: community_api::testing::downloads_state(store.clone(), clock.clone()),
                 limits: RateLimits::new(clock.clone()),
                 comments: comments_state(store.clone(), clock.clone()),
                 trust_proxy_headers: false,

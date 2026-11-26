@@ -12,6 +12,8 @@ import type {
   AutoEnablePreferenceStore,
   AdProvider,
   CommunityAccount,
+  DownloadStats,
+  UsagePreferenceHandle,
   AppInfo,
   CatalogController,
   DiscoverViewStore,
@@ -27,6 +29,7 @@ import { AdPreferenceProvider } from './AdPreferenceContext';
 import { AutoEnablePreferenceProvider } from './AutoEnablePreferenceContext';
 import { AdsContext } from './AdsContext';
 import { CommunityContext } from './CommunityContext';
+import { DownloadStatsProvider } from './DownloadStatsContext';
 import { AppInfoContext } from './AppInfoContext';
 import { DiscoverScreen } from './DiscoverScreen';
 import { I18nProvider, useI18n } from './i18n';
@@ -82,12 +85,18 @@ function Shell({
   communityAccount,
   modStats,
   modComments,
+  downloadStats,
+  usagePreference,
 }: {
   controller: LauncherController;
   adProvider?: AdProvider;
   communityAccount?: CommunityAccount;
   modStats?: ModStatsSource;
   modComments?: ModComments;
+  /** Download counts and the 30-day chart (#120); absent means none render. */
+  downloadStats?: DownloadStats;
+  /** Anonymous usage sharing (#120); absent means no Settings row. */
+  usagePreference?: UsagePreferenceHandle;
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
@@ -150,45 +159,47 @@ function Shell({
           <AutoEnablePreferenceProvider store={autoEnableStore}>
             <AdsContext.Provider value={ads}>
               <CommunityContext.Provider value={community}>
-                <div className="app-shell">
-                  <TitleBar controls={windowControls} />
-                  <Sidebar
-                    screens={screens}
-                    current={screen}
-                    onSelect={setScreen}
-                    collapsed={collapsed}
-                    onToggle={toggleSidebar}
-                  />
-                  <div className="app-content">
-                    <div className="app-messages">
-                      <NoticeBar onOpenLibrary={() => setScreen('library')} />
-                      <div className="notices">
-                        <AdConsentBar />
+                <DownloadStatsProvider stats={downloadStats} usagePreference={usagePreference}>
+                  <div className="app-shell">
+                    <TitleBar controls={windowControls} />
+                    <Sidebar
+                      screens={screens}
+                      current={screen}
+                      onSelect={setScreen}
+                      collapsed={collapsed}
+                      onToggle={toggleSidebar}
+                    />
+                    <div className="app-content">
+                      <div className="app-messages">
+                        <NoticeBar onOpenLibrary={() => setScreen('library')} />
+                        <div className="notices">
+                          <AdConsentBar />
+                        </div>
+                        {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
                       </div>
-                      {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
+                      <main aria-busy={loading ? 'true' : undefined}>
+                        {loading ? (
+                          <LoadingState />
+                        ) : (
+                          // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
+                          <ScreenTransition key={screen}>
+                            {screen === 'library' && <LibraryScreen />}
+                            {screen === 'discover' && catalog && (
+                              <DiscoverScreen
+                                catalog={catalog}
+                                onGoToLibrary={() => setScreen('library')}
+                                viewStore={discoverViewStore}
+                              />
+                            )}
+                            {screen === 'profiles' && <ProfilesScreen />}
+                            {screen === 'settings' && <SettingsScreen />}
+                          </ScreenTransition>
+                        )}
+                      </main>
                     </div>
-                    <main aria-busy={loading ? 'true' : undefined}>
-                      {loading ? (
-                        <LoadingState />
-                      ) : (
-                        // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
-                        <ScreenTransition key={screen}>
-                          {screen === 'library' && <LibraryScreen />}
-                          {screen === 'discover' && catalog && (
-                            <DiscoverScreen
-                              catalog={catalog}
-                              onGoToLibrary={() => setScreen('library')}
-                              viewStore={discoverViewStore}
-                            />
-                          )}
-                          {screen === 'profiles' && <ProfilesScreen />}
-                          {screen === 'settings' && <SettingsScreen />}
-                        </ScreenTransition>
-                      )}
-                    </main>
+                    <StatusBar onSetUpGame={() => setScreen('settings')} />
                   </div>
-                  <StatusBar onSetUpGame={() => setScreen('settings')} />
-                </div>
+                </DownloadStatsProvider>
               </CommunityContext.Provider>
             </AdsContext.Provider>
           </AutoEnablePreferenceProvider>
@@ -214,6 +225,8 @@ export function App({
   communityAccount,
   modStats,
   modComments,
+  downloadStats,
+  usagePreference,
 }: {
   controller: LauncherController;
   locale?: Locale;
@@ -235,6 +248,10 @@ export function App({
   /** Community stars (#119); absent means no counts and no star button. */
   modStats?: ModStatsSource;
   modComments?: ModComments;
+  /** Download counts and the 30-day chart (#120); absent means none render. */
+  downloadStats?: DownloadStats;
+  /** Anonymous usage sharing (#120); absent means no Settings row. */
+  usagePreference?: UsagePreferenceHandle;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
@@ -252,6 +269,8 @@ export function App({
         communityAccount={communityAccount}
         modStats={modStats}
         modComments={modComments}
+        downloadStats={downloadStats}
+        usagePreference={usagePreference}
       />
     </I18nProvider>
   );

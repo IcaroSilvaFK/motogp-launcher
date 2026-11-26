@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod comments;
+pub mod downloads;
 pub mod error;
 pub mod rate_limit;
 pub mod routes;
@@ -40,6 +41,8 @@ pub struct AppState {
     pub comments: comments::CommentsState,
     /// Trust the right-most `X-Forwarded-For` (only behind our own proxy).
     pub trust_proxy_headers: bool,
+    /// Download counts: service and its report limiter.
+    pub downloads: downloads::DownloadsState,
 }
 
 /// One limiter per route group.

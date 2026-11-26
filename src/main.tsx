@@ -6,7 +6,9 @@ import {
   createCatalogController,
   createLauncherController,
   createUpdateController,
+  createUsagePreference,
   loadLocale,
+  reportCatalogDownload,
   saveLocale,
   selectSessionClean,
 } from './application';
@@ -20,6 +22,8 @@ import {
   createTauriModComments,
   createLocalStorageLocaleStore,
   createLocalStorageNavStore,
+  createLocalStorageUsagePreferenceStore,
+  createTauriDownloadStats,
   createTauriAppInfo,
   createTauriDropEvents,
   createTauriGateway,
@@ -37,11 +41,18 @@ if (!container) {
 
 const gateway = createTauriGateway();
 
+// Download counts (#120): one port for the counts and the install report, and the live usage choice
+// shared by the Settings switch and the report (an opt-out applies at once, even if it cannot be saved).
+const downloadStats = createTauriDownloadStats();
+const usagePreference = createUsagePreference(createLocalStorageUsagePreferenceStore());
+
 const controller = createLauncherController({
   gateway,
   picker: createTauriPicker(),
   session: createTauriSessionEvents(),
   drop: createTauriDropEvents(),
+  // Fire-and-forget after a successful catalog install only; never awaited, failures are silent.
+  onCatalogInstalled: (id) => reportCatalogDownload({ stats: downloadStats, preference: usagePreference }, id),
 });
 
 // Discover tab (#73): loads the catalog on the first visit only.
@@ -82,6 +93,8 @@ createRoot(container).render(
       // Community stars (#119): one cached store per app, shared by Discover and the mod page.
       modStats={createTauriModStats()}
       modComments={createTauriModComments()}
+      downloadStats={downloadStats}
+      usagePreference={usagePreference}
     />
   </StrictMode>,
 );

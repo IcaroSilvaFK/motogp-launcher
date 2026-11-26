@@ -36,6 +36,10 @@ impl DataDir {
         self.root.join("catalog-cache.json")
     }
 
+    pub fn install_id_file(&self) -> PathBuf {
+        self.root.join("install-id")
+    }
+
     pub fn ad_cache_file(&self) -> PathBuf {
         self.root.join("ad-cache.json")
     }
@@ -64,6 +68,7 @@ mod tests {
         assert_eq!(data.library_file(), root.join("library.json"));
         assert_eq!(data.deployed_file(), root.join("deployed.json"));
         assert_eq!(data.library_dir(), root.join("library"));
+        assert_eq!(data.install_id_file(), root.join("install-id"));
         assert_eq!(data.downloads_dir(), root.join("downloads"));
         assert_eq!(data.catalog_cache_file(), root.join("catalog-cache.json"));
         assert_eq!(data.ad_cache_file(), root.join("ad-cache.json"));

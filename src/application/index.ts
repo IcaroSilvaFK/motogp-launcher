@@ -18,6 +18,7 @@ export type {
   NavPreferenceStore,
   SessionEvents,
   Unsubscribe,
+  UsagePreferenceStore,
 } from './ports';
 export { loadLocale, saveLocale } from './localePreference';
 export { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarPreference';
@@ -54,3 +55,9 @@ export { useCommunityAccount } from './useCommunityAccount';
 export type { ModComments } from './ports/ModComments';
 export type { ModCommentsHandle, ModCommentsStatus } from './useModComments';
 export { useModComments } from './useModComments';
+export type { DownloadStats } from './ports/DownloadStats';
+export type { UsagePreferenceHandle } from './usagePreference';
+export { createUsagePreference, loadUsagePreference, saveUsagePreference } from './usagePreference';
+export type { ReportCatalogDownloadDeps } from './useCases/reportCatalogDownload';
+export { reportCatalogDownload } from './useCases/reportCatalogDownload';
+export { useDownloadDaily, useDownloadTotals } from './useDownloadStats';

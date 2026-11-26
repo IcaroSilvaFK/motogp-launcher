@@ -53,6 +53,8 @@
   --meter-track: #232830;
   --meter-fill: #9aa2ad;
   --meter-height: 6px;
+  /* Download chart (#120): same neutral meter pair; equals the plot's viewBox height (1:1 px) */
+  --chart-height: 64px;
 
   /* Linear progress (catalog install, #74): Material 3 4dp track; the fill is the info tone,
      not the accent, so Play stays the only accented filled element */
@@ -3333,6 +3335,70 @@ button {
   margin: 0;
   font-size: var(--type-body-large);
   font-weight: 500;
+}
+
+/* Download counts (#120): the Downloads cell keeps the total as its value, the 30-day count below. */
+.mod-stat-secondary {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--type-body-small);
+  font-weight: 400;
+}
+
+/* The 30-day chart: neutral meter bars (never the accent), a faint baseline for every day. */
+.download-chart-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.download-chart-figure figcaption {
+  margin: 0;
+}
+
+.download-chart-plot {
+  display: block;
+  width: 100%;
+  height: var(--chart-height);
+}
+
+.download-chart-hit {
+  fill: transparent;
+}
+
+.download-chart-baseline {
+  fill: var(--meter-track);
+  transition: fill var(--transition);
+}
+
+.download-chart-bar {
+  fill: var(--meter-fill);
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: chart-grow var(--motion-enter) both;
+  transition: fill var(--transition);
+}
+
+.download-chart-day:hover .download-chart-bar {
+  fill: var(--text);
+}
+
+.download-chart-day:hover .download-chart-baseline {
+  fill: var(--border-strong);
+}
+
+.download-chart-axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text-muted);
+  font-size: var(--type-label-small);
+}
+
+@keyframes chart-grow {
+  from {
+    transform: scaleY(0);
+  }
 }
 
 /* The full hash stays in the text (one click selects all of it); only the box truncates it. */

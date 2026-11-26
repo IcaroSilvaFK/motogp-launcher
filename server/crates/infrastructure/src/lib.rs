@@ -4,6 +4,7 @@ pub mod config;
 pub mod discord;
 pub mod sqlite;
 mod sqlite_comments;
+pub mod sqlite_downloads;
 pub mod sqlite_stars;
 pub mod system;
 

@@ -26,6 +26,7 @@ tracing-subscriber = { version = "=0.3.23", features = ["env-filter"] }
 http-body-util = "=0.1.5"
 tower = { version = "=0.5.3", features = ["util"] }
 cucumber = "=0.21.1"
+sha2 = "=0.10.9"
 sqlx = { version = "=0.8.6", default-features = false, features = ["sqlite"] }
 
 # BDD runner (cucumber) without the default libtest harness.
@@ -39,4 +40,8 @@ harness = false
 
 [[test]]
 name = "comments_features"
+harness = false
+
+[[test]]
+name = "downloads_features"
 harness = false

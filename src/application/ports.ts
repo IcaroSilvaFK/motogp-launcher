@@ -117,3 +117,9 @@ export interface AutoEnablePreferenceStore {
   load(): boolean | null;
   save(value: boolean): void;
 }
+
+/** The anonymous usage choice (#120). `null` means never chosen (sharing is on); `load` may throw. */
+export interface UsagePreferenceStore {
+  load(): 'on' | 'off' | null;
+  save(value: 'on' | 'off'): void;
+}

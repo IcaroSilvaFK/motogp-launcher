@@ -155,3 +155,16 @@ pub fn auth_service(
 pub fn star_service(store: Arc<SqliteStore>) -> Arc<StarService> {
     Arc::new(StarService::new(store))
 }
+
+/// Download counts over the SQLite store (real hasher, default 20/minute limiter).
+pub fn downloads_state(
+    store: Arc<SqliteStore>,
+    clock: Arc<dyn Clock>,
+) -> crate::downloads::DownloadsState {
+    let service = Arc::new(community_application::DownloadService {
+        clock: clock.clone(),
+        hasher: Arc::new(Sha256Hasher),
+        downloads: store,
+    });
+    crate::downloads::DownloadsState::new(service, clock)
+}

@@ -3,6 +3,8 @@
 pub mod stars;
 pub use stars::ModId;
 pub mod comments;
+pub mod downloads;
+pub use downloads::{InstallId, ModSlug};
 
 use std::fmt;
 

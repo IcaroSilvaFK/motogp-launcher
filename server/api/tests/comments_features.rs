@@ -14,7 +14,8 @@ use axum::http::{header, Method, Request};
 use axum::Router;
 use chrono::Duration;
 use community_api::testing::{
-    auth_service, comments_state, sign_in_user, star_service, FakeClock, FakeDiscord,
+    auth_service, comments_state, downloads_state, sign_in_user, star_service, FakeClock,
+    FakeDiscord,
 };
 use community_api::{build_router, AppState, RateLimits};
 use community_application::comments::CommentRepository;
@@ -179,6 +180,7 @@ async fn community_server(world: &mut CommentsWorld, first: String, second: Stri
             Arc::new(FakeDiscord::new("x")),
         ),
         stars: star_service(store.clone()),
+        downloads: downloads_state(store.clone(), clock.clone()),
         limits: RateLimits::new(clock.clone()),
         comments: comments_state(store.clone(), clock.clone()),
         trust_proxy_headers: false,

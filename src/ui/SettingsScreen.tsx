@@ -12,6 +12,7 @@ import type { Locale } from './i18n';
 import { useLauncher } from './LauncherContext';
 import { stagger } from './motion';
 import { StorageSection } from './StorageSection';
+import { UsageSharingRow } from './UsageSharingRow';
 
 type SectionId = 'game' | 'preferences' | 'community' | 'storage' | 'about';
 
@@ -210,6 +211,7 @@ export function SettingsScreen() {
                   />
                 </div>
               </div>
+              <UsageSharingRow />
             </div>
           </section>
 

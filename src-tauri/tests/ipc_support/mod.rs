@@ -429,6 +429,27 @@ impl Harness {
         }
     }
 
+    /// The default composed state with the download-stats service replaced (#120):
+    /// the app is rebuilt around a clone of the state.
+    pub fn with_downloads(downloads: Arc<motogp_application::DownloadStatsService>) -> Harness {
+        let mut harness = Harness::new();
+        let state = harness
+            .app
+            .state::<AppState>()
+            .inner()
+            .clone()
+            .with_downloads(downloads);
+        let app = configure(tauri::test::mock_builder())
+            .manage(state)
+            .build(mock_context(noop_assets()))
+            .expect("mock app");
+        harness.webview = WebviewWindowBuilder::new(&app, "main", Default::default())
+            .build()
+            .expect("mock webview");
+        harness.app = app;
+        harness
+    }
+
     /// Records the payloads of an app event, parsed as JSON, from now on.
     pub fn capture_events(&self, event: &str) -> Arc<Mutex<Vec<Value>>> {
         let seen = Arc::new(Mutex::new(Vec::new()));
