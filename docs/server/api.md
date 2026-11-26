@@ -32,6 +32,7 @@ In-memory token buckets (burst = the per-minute limit, refilled continuously), k
 | All routes | client IP | 60 / minute |
 | `/auth/*` | client IP | 10 / minute |
 | Authenticated routes | user id | 120 / minute |
+| Comment writes (`POST`, `PATCH`, `DELETE` under `/mods/{mod_id}/comments`) | user id | 5 / minute (own bucket, on top of the 120 / minute user limit) |
 
 When a bucket is empty the server answers `429 rate_limited` with `Retry-After: <seconds>`. Idle buckets are evicted.
 The client IP is the connection address; with `TRUST_PROXY_HEADERS=true` it is the right-most `X-Forwarded-For`
@@ -182,6 +183,58 @@ Optional authentication. Lists only mods with at least one star, ordered by id.
 `starredByMe` is present only when a valid bearer token is sent (that call also pays the per-user rate limit).
 A missing, unknown, expired or revoked token is answered anonymously (no `starredByMe`, never `401`), so counts
 keep working when a session goes stale.
+
+### Mod comments
+
+Comments are plain text attached to a mod by its catalog slug. The server does not know the catalog, so any valid
+`mod_id` is accepted. Storage is the `comments` table, created by migration `0002_comments.sql`
+(`id`, `mod_id`, `user_id` -> `users` with `ON DELETE CASCADE`, `body`, `created_at` and `edited_at` in epoch
+milliseconds; index on `(mod_id, created_at, id)`).
+
+**Limits**
+
+| What | Rule |
+|------|------|
+| `mod_id` | 1 to 100 characters of `a-z 0-9 -`; anything else is `400 bad_request` (on every method) |
+| Body | 1 to 2000 characters (counted in `char`s) after trimming; `\r\n` is normalized to `\n`; control characters other than `\n` and `\t` are rejected |
+| Page size | `limit` 1 to 50, default 20 |
+| Writes | 5 per minute per user (`POST`, `PATCH` and `DELETE` share one bucket); the 6th answers `429 rate_limited` with `Retry-After` |
+| Request body | JSON, at most 16 KiB; larger or malformed bodies answer `400 bad_request` |
+
+Bodies are stored and returned verbatim: HTML is never interpreted or escaped by the server. Clients must render
+the body as text (the launcher uses its safe Markdown renderer).
+
+**The `Comment` shape**
+
+```json
+{
+  "id": "q3Zk...",
+  "body": "Great livery",
+  "created_at": "2026-11-26T10:15:30.123Z",
+  "edited_at": null,
+  "author": { "id": "...", "display_name": "Ada", "avatar_url": "https://cdn.discordapp.com/avatars/.../....png?size=64" },
+  "own": false
+}
+```
+
+`created_at` and `edited_at` are RFC 3339 UTC with millisecond precision (`edited_at` is `null` until the first edit).
+`author.avatar_url` is `null` when the user has no avatar. The Discord id and username are never exposed. `own` is
+`true` only when the caller presented a valid token and wrote the comment.
+
+| Method and path | Auth | Success | Errors |
+|-----------------|------|---------|--------|
+| `GET /mods/{mod_id}/comments?cursor=&limit=` | Optional bearer: it only sets `own`; a missing, bad or expired token is ignored and never answers 401 | `200 {"comments":[Comment...],"next_cursor":string\|null}`, oldest first (newest last) | `400` bad mod id, cursor or limit |
+| `POST /mods/{mod_id}/comments` with `{"body"}` | Required | `201` with the `Comment` | `400`, `401`, `429` |
+| `PATCH /mods/{mod_id}/comments/{comment_id}` with `{"body"}` | Required, author only | `200` with the `Comment` (`edited_at` set) | `400`, `401`, `404`, `429` |
+| `DELETE /mods/{mod_id}/comments/{comment_id}` | Required, author only | `204` with no body (hard delete) | `400` (bad mod id), `401`, `404`, `429` |
+
+**Pagination.** Pages are keyset-based on `(created_at, id)` ascending, so posting a comment never shifts a page.
+`next_cursor` is opaque and present only when more comments follow; pass it back unchanged as `cursor`. A malformed
+cursor is `400 bad_request`. Comments created in the same millisecond are ordered by id.
+
+**Ownership.** A comment that does not exist, belongs to another mod, or belongs to another user answers the same
+`404 not_found` for `PATCH` and `DELETE`, so callers cannot probe which ids exist. Writes check the per-user write
+limit before the body is validated, so rejected writes also count.
 
 ## Adding routes in later issues
 

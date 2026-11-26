@@ -12,6 +12,8 @@ mod catalog_error;
 mod catalog_install;
 mod catalog_ports;
 mod catalog_service;
+mod community_comments;
+mod community_comments_service;
 mod community_error;
 mod community_ports;
 mod community_service;
@@ -62,6 +64,10 @@ pub use catalog_service::{
     validate_catalog, validate_catalog_strict, CatalogOrigin, CatalogService, CatalogSnapshot,
     CatalogWarning, DEFAULT_CATALOG_TTL,
 };
+pub use community_comments::{
+    ApiComment, ApiCommentsPage, CommentsApiError, CommentsError, CommunityCommentsApi,
+};
+pub use community_comments_service::{CommunityCommentsService, AVATAR_CACHE_CAPACITY};
 pub use community_error::{CommunityApiError, CommunityError, CredentialError, LoopbackError};
 pub use community_ports::{
     AvatarFetcher, CallbackParams, CommunityApi, CredentialStore, LoopbackReceiver,

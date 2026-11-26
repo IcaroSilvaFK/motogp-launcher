@@ -1,7 +1,9 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use community_api::comments::CommentsState;
 use community_api::{build_router, AppState, RateLimits};
+use community_application::comments::CommentsService;
 use community_application::{AuthService, StarService};
 use community_infrastructure::{
     Config, DiscordHttp, OsTokenGenerator, Sha256Hasher, SqliteStore, SystemClock,
@@ -45,12 +47,21 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         codes: store.clone(),
         discord: Arc::new(discord),
     };
+    let comments = CommentsState::new(
+        Arc::new(CommentsService {
+            clock: clock.clone(),
+            tokens: Arc::new(OsTokenGenerator),
+            comments: store.clone(),
+        }),
+        clock.clone(),
+    );
     let state = AppState {
         clock: clock.clone(),
         health: store.clone(),
         auth: Arc::new(auth),
         stars: Arc::new(StarService::new(store.clone())),
         limits: RateLimits::new(clock),
+        comments,
         trust_proxy_headers: config.trust_proxy_headers,
     };
 

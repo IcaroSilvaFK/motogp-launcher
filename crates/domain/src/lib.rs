@@ -6,6 +6,7 @@
 mod ad;
 mod catalog;
 mod catalog_page;
+mod comments;
 mod community;
 mod config;
 mod conflict;
@@ -27,6 +28,10 @@ pub use catalog::{
 };
 pub use catalog_page::{
     check_https_url, check_https_url_on_hosts, check_page_url, PageUrlError, ALLOWED_PAGE_HOSTS,
+};
+pub use comments::{
+    is_valid_catalog_slug, CommentDraft, CommentDraftError, CommentsPage, ModComment,
+    MAX_COMMENT_CHARS,
 };
 pub use community::{CommunityProfile, CommunityStatus, SessionToken};
 pub use config::Config;

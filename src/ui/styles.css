@@ -63,6 +63,10 @@
   --install-control-width: 240px;
   /* Community account avatar in Settings (#122): 40dp, a Material list-item leading avatar */
   --avatar-size: 40px;
+  /* Mod comments (#118): a 32dp leading avatar (dense list) and a three-line composer */
+  --comment-avatar-size: 32px;
+  --comment-input-min-height: 88px;
+  --comment-skeleton-meta-width: 120px;
   --icon-size-sm: 14px;
   /* Small status mark on an icon (the collapsed support entry's failure dot, #94) */
   --status-dot-size: 6px;
@@ -3675,5 +3679,239 @@ button {
 .star-prompt-actions {
   display: flex;
   flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---------- Mod page > Comments (#118) ---------- */
+/* A dense Material list: 32dp leading avatar, label-large name, body-medium text on the page surface.
+   Own comments get quiet text buttons; the composer is an outlined text field with a counter. */
+
+.mod-comments-title {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.mod-comments-count {
+  color: var(--text-muted);
+  font-size: var(--type-label-large);
+  font-weight: 500;
+}
+
+.comment-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-1);
+}
+
+.comment {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.comment + .comment {
+  border-top: 1px solid var(--border);
+}
+
+.comment-avatar {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: var(--comment-avatar-size);
+  height: var(--comment-avatar-size);
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-3);
+  object-fit: cover;
+}
+
+.comment-avatar-initials {
+  color: var(--text);
+  font-size: var(--type-label-medium);
+  font-weight: 600;
+}
+
+.comment-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.comment-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--type-body-small);
+}
+
+.comment-author {
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text);
+  font-size: var(--type-label-large);
+  font-weight: var(--type-label-large-weight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comment-chip {
+  align-self: center;
+}
+
+.comment-edited::before {
+  content: '·';
+  margin-right: var(--space-2);
+}
+
+.comment-body {
+  font-size: var(--type-body-medium);
+}
+
+.comment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-left: calc(-1 * var(--space-2));
+}
+
+.comment-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--danger-border);
+  border-radius: var(--radius-md);
+  background: var(--danger-bg);
+}
+
+.comment-confirm .comment-actions {
+  margin-left: auto;
+}
+
+.comment-confirm-text {
+  font-size: var(--type-body-medium);
+}
+
+.comment-skeleton {
+  align-items: center;
+}
+
+.comment-skeleton .comment-main {
+  gap: var(--space-2);
+}
+
+.comment-skeleton-meta {
+  max-width: var(--comment-skeleton-meta-width);
+}
+
+.comment-more {
+  align-self: center;
+}
+
+.comments-offline {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  color: var(--text-muted);
+  font-size: var(--type-body-medium);
+}
+
+.comments-offline > .icon {
+  flex: none;
+}
+
+.comments-offline-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.comment-alert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--danger-text);
+  font-size: var(--type-body-medium);
+}
+
+.comment-alert > .icon {
+  flex: none;
+}
+
+.comment-error-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--danger-text);
+  font-size: var(--type-body-small);
+}
+
+.comment-alert .comment-error-text {
+  font-size: var(--type-body-medium);
+}
+
+.comment-draft {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.comment-input {
+  width: 100%;
+  height: auto;
+  min-height: var(--comment-input-min-height);
+  max-width: var(--measure);
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.comment-input[aria-invalid='true'] {
+  border-color: var(--danger-border);
+}
+
+.comment-draft-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  max-width: var(--measure);
+}
+
+.comment-counter {
+  color: var(--text-muted);
+  font-size: var(--type-body-small);
+}
+
+.comment-counter-over {
+  color: var(--danger-text);
+}
+
+.comment-draft-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.comment-invite {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--space-2);
 }

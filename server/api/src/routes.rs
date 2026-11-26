@@ -13,6 +13,7 @@ pub fn extra_routes() -> Router<AppState> {
     Router::new()
         .merge(crate::auth::routes())
         .merge(crate::stars::routes())
+        .merge(crate::comments::routes())
 }
 
 /// `GET /health`: 200 when the database answers.

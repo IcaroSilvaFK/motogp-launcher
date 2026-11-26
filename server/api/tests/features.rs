@@ -12,7 +12,7 @@ use axum::extract::ConnectInfo;
 use axum::http::{header, Method, Request};
 use axum::Router;
 use chrono::Duration;
-use community_api::testing::{auth_service, star_service, FakeClock, FakeDiscord};
+use community_api::testing::{auth_service, comments_state, star_service, FakeClock, FakeDiscord};
 use community_api::{build_router, AppState, RateLimits};
 use community_domain::pkce;
 use community_infrastructure::SqliteStore;
@@ -72,6 +72,7 @@ impl AuthWorld {
                 auth: auth_service(store.clone(), clock.clone(), discord.clone()),
                 stars: star_service(store.clone()),
                 limits: RateLimits::new(clock.clone()),
+                comments: comments_state(store.clone(), clock.clone()),
                 trust_proxy_headers: false,
             };
             self.harness = Some(Harness {

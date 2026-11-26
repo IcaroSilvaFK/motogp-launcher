@@ -51,3 +51,6 @@ export type { ModStatsSnapshot, ModStatsStore, ToggleStarResult } from './modSta
 export { createModStatsStore, MOD_STATS_TTL_MS, useModStats } from './modStatsStore';
 export type { CommunityAccountHandle, CommunityAccountState } from './useCommunityAccount';
 export { useCommunityAccount } from './useCommunityAccount';
+export type { ModComments } from './ports/ModComments';
+export type { ModCommentsHandle, ModCommentsStatus } from './useModComments';
+export { useModComments } from './useModComments';

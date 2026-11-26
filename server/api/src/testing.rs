@@ -3,8 +3,15 @@
 use std::sync::{Arc, Mutex};
 
 use chrono::{DateTime, Duration, Utc};
-use community_application::ports::{AccessToken, Clock, DiscordOAuth, DiscordUser, PortResult};
+use community_application::comments::CommentsService;
+use community_application::ports::{
+    AccessToken, Clock, DiscordOAuth, DiscordUser, Hasher, PortResult, SessionRepository,
+    UserRepository, UserUpsert,
+};
 use community_application::{AppError, AuthService, StarService};
+use community_domain::{DiscordId, Session, User, UserId};
+
+use crate::comments::CommentsState;
 use community_infrastructure::{OsTokenGenerator, Sha256Hasher, SqliteStore};
 
 /// A clock that only moves when told to.
@@ -77,6 +84,53 @@ impl DiscordOAuth for FakeDiscord {
     async fn fetch_user(&self, _token: &AccessToken) -> PortResult<DiscordUser> {
         Ok(self.user.lock().unwrap().clone())
     }
+}
+
+/// Builds the comments state (real service and write limiter) over the store.
+pub fn comments_state(store: Arc<SqliteStore>, clock: Arc<dyn Clock>) -> CommentsState {
+    CommentsState::new(
+        Arc::new(CommentsService {
+            clock: clock.clone(),
+            tokens: Arc::new(OsTokenGenerator),
+            comments: store,
+        }),
+        clock,
+    )
+}
+
+/// Creates (or refreshes) a user and an active session; returns the user and
+/// the bearer token. `display_name` becomes the Discord global name.
+pub async fn sign_in_user(
+    store: &SqliteStore,
+    clock: &dyn Clock,
+    discord_id: &str,
+    display_name: &str,
+) -> (User, String) {
+    let now = clock.now();
+    let user = store
+        .upsert(&UserUpsert {
+            new_id: UserId(format!("user-{discord_id}")),
+            discord_id: DiscordId::parse(discord_id).expect("a numeric discord id"),
+            username: format!("{display_name}-username"),
+            global_name: Some(display_name.to_owned()),
+            avatar_hash: None,
+            now,
+        })
+        .await
+        .unwrap();
+    let token = format!("test-token-{discord_id}");
+    store
+        .create(&Session {
+            id: format!("session-{discord_id}"),
+            user_id: user.id.clone(),
+            token_hash: Sha256Hasher.hash(&token),
+            created_at: now,
+            expires_at: Session::expiry_from(now),
+            revoked_at: None,
+        })
+        .await
+        .unwrap();
+    (user, token)
 }
 
 /// Builds the real [`AuthService`] over the SQLite store with the given fakes.

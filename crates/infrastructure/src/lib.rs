@@ -9,6 +9,7 @@ mod avatar_http;
 mod bundled_catalog;
 mod catalog_cache;
 mod catalog_http;
+mod community_comments_http;
 mod community_http;
 mod community_stars_http;
 mod credential_store;

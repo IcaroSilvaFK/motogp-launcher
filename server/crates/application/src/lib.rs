@@ -2,6 +2,7 @@
 //! No IO and no database types here (so SQLite can be replaced later).
 
 pub mod auth;
+pub mod comments;
 pub mod error;
 pub mod ports;
 pub mod stars;

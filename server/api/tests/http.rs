@@ -8,7 +8,7 @@ use axum::extract::ConnectInfo;
 use axum::http::{header, Request, StatusCode};
 use axum::Router;
 use chrono::Duration;
-use community_api::testing::{auth_service, star_service, FakeClock, FakeDiscord};
+use community_api::testing::{auth_service, comments_state, star_service, FakeClock, FakeDiscord};
 use community_api::{build_router, AppState, RateLimits};
 use community_application::ports::{HealthProbe, PortResult};
 use community_application::AppError;
@@ -40,8 +40,9 @@ async fn state_with(health: Arc<dyn HealthProbe>, clock: Arc<FakeClock>, trust: 
         clock: clock.clone(),
         health,
         auth,
-        stars: star_service(store),
-        limits: RateLimits::new(clock),
+        stars: star_service(store.clone()),
+        limits: RateLimits::new(clock.clone()),
+        comments: comments_state(store, clock),
         trust_proxy_headers: trust,
     }
 }

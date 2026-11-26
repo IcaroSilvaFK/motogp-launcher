@@ -14,7 +14,7 @@ use std::io::Read;
 use std::time::Duration;
 
 /// Largest accepted server answer, in bytes.
-const MAX_BODY_BYTES: u64 = 64 * 1024;
+pub(crate) const MAX_BODY_BYTES: u64 = 64 * 1024;
 
 /// Settings of [`HttpCommunityApi`]. The base URL is configurable so tests can
 /// point at a local `http://127.0.0.1:<port>` server.
@@ -76,7 +76,7 @@ pub(crate) fn percent_encode(value: &str) -> String {
 /// [`CommunityApi`] over HTTP(S).
 #[derive(Debug)]
 pub struct HttpCommunityApi {
-    client: Client,
+    pub(crate) client: Client,
     base_url: String,
 }
 
@@ -98,7 +98,7 @@ impl HttpCommunityApi {
         })
     }
 
-    fn url(&self, path: &str) -> String {
+    pub(crate) fn url(&self, path: &str) -> String {
         format!("{}{path}", self.base_url)
     }
 
@@ -204,7 +204,7 @@ impl CommunityApi for HttpCommunityApi {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use std::io::Write;
     use std::net::TcpListener;
@@ -212,7 +212,7 @@ mod tests {
     use std::thread;
 
     /// Serves one canned response on 127.0.0.1 and reports the raw request.
-    fn serve_once(status_line: &str, body: &str) -> (String, mpsc::Receiver<String>) {
+    pub(crate) fn serve_once(status_line: &str, body: &str) -> (String, mpsc::Receiver<String>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let base = format!("http://{}", listener.local_addr().unwrap());
         let (tx, rx) = mpsc::channel();
