@@ -300,6 +300,7 @@ export const ptBR: Messages = {
     signInPrompt: 'Entre com o Discord para dar estrelas aos mods.',
     notNow: 'Agora não',
     failed: 'Não foi possível atualizar a estrela. Tente novamente.',
+    banned: 'Sua conta da comunidade está suspensa, então você não pode dar estrelas aos mods.',
   },
   comments: {
     title: 'Comentários',
@@ -329,6 +330,22 @@ export const ptBR: Messages = {
     delete: 'Excluir',
     confirmDelete: 'Excluir este comentário? Não dá para desfazer.',
     dismiss: 'Dispensar',
+    report: 'Denunciar',
+    reportTitle: 'Denunciar este comentário',
+    reportReasonsLegend: 'Qual é o problema?',
+    reportReasons: {
+      spam: 'Spam',
+      abuse: 'Abuso ou assédio',
+      off_topic: 'Fora do assunto',
+      other: 'Outro',
+    },
+    reportDetails: 'Detalhes (opcional)',
+    reportDetailsPlaceholder: 'Qualquer coisa que ajude a moderação a entender.',
+    reportSend: 'Enviar denúncia',
+    reported: 'Denunciado',
+    reportedStatus: 'Obrigado. A moderação vai analisar este comentário.',
+    reportInvalid: 'Este comentário não pode ser denunciado.',
+    suspendedTitle: 'Conta suspensa',
     errors: {
       offline: 'Não foi possível falar com a comunidade. Tente novamente em instantes.',
       signed_out: 'Sua sessão terminou. Entre com o Discord de novo para comentar.',
@@ -336,6 +353,8 @@ export const ptBR: Messages = {
         `Calma: você poderá comentar de novo em ${seconds} ${seconds === 1 ? 'segundo' : 'segundos'}.`,
       invalid: 'Um comentário não pode ficar vazio nem passar de 2.000 caracteres.',
       not_found: 'Esse comentário não existe mais.',
+      banned:
+        'Sua conta da comunidade está suspensa, então você não pode comentar, editar nem denunciar comentários. Você ainda pode lê-los.',
       failed: 'Algo deu errado. Tente novamente.',
     },
   },
@@ -368,6 +387,7 @@ export const ptBR: Messages = {
       invalid_request: 'Alguns dados do mod foram recusados. Revise o formulário e tente novamente.',
       server_error: 'O servidor da comunidade teve um problema. Tente novamente mais tarde.',
       forbidden: 'Você não tem permissão para fazer isso.',
+      banned: 'Sua conta da comunidade está suspensa, então você não pode publicar mods.',
     },
     validation: {
       modIdRequired: 'Informe o id do mod.',

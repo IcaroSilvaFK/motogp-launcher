@@ -37,6 +37,8 @@ pub enum PublishError {
     Offline,
     /// The creator is not allowed (the mod id or the upload is somebody else's).
     Forbidden,
+    /// The community account is suspended from writes.
+    Banned,
     FileTooLarge,
     QuotaExceeded,
     RateLimited {
@@ -63,6 +65,7 @@ impl fmt::Display for PublishError {
             PublishError::SessionExpired => write!(f, "the community session expired"),
             PublishError::Offline => write!(f, "the community server is offline"),
             PublishError::Forbidden => write!(f, "not allowed to publish this mod"),
+            PublishError::Banned => write!(f, "the community account is banned"),
             PublishError::FileTooLarge => write!(f, "the file is too large"),
             PublishError::QuotaExceeded => write!(f, "the storage quota is exceeded"),
             PublishError::RateLimited {
@@ -98,6 +101,7 @@ impl From<PublishApiError> for PublishError {
             PublishApiError::Network(_) => PublishError::Offline,
             PublishApiError::Server(detail) => PublishError::Server(detail),
             PublishApiError::Forbidden => PublishError::Forbidden,
+            PublishApiError::Banned => PublishError::Banned,
             PublishApiError::FileTooLarge => PublishError::FileTooLarge,
             PublishApiError::QuotaExceeded => PublishError::QuotaExceeded,
             PublishApiError::RateLimited { retry_after_secs } => {
@@ -1144,6 +1148,7 @@ mod tests {
                 PublishError::UnsupportedFile,
             ),
             (PublishApiError::Forbidden, PublishError::Forbidden),
+            (PublishApiError::Banned, PublishError::Banned),
             (PublishApiError::Unauthorized, PublishError::SessionExpired),
             (
                 PublishApiError::RateLimited {
@@ -1310,6 +1315,7 @@ mod tests {
             PublishError::Cancelled,
             PublishError::InvalidRequest("x".into()),
             PublishError::Server("y".into()),
+            PublishError::Banned,
             PublishError::from(CredentialError("locked".into())),
         ];
         assert!(all.iter().all(|e| !e.to_string().is_empty()));
@@ -1319,6 +1325,7 @@ mod tests {
             PublishApiError::Unauthorized,
             PublishApiError::Network("n".into()),
             PublishApiError::Server("s".into()),
+            PublishApiError::Banned,
             PublishApiError::Forbidden,
             PublishApiError::FileTooLarge,
             PublishApiError::QuotaExceeded,

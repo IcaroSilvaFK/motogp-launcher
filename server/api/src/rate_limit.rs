@@ -144,7 +144,7 @@ pub async fn ip_rate_limit(
     }
     let ip = client_ip(request.headers(), connection, state.trust_proxy_headers);
     let path = request.uri().path();
-    let limiter = if path == "/auth" || path.starts_with("/auth/") {
+    let limiter = if path == "/auth" || path.starts_with("/auth/") || path == "/admin/login" {
         &state.limits.auth
     } else {
         &state.limits.ip

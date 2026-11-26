@@ -470,14 +470,17 @@ export function PublishModForm({
       </fieldset>
 
       {state.status === 'failed' && (
-        <div role="alert" className="notice notice-error">
-          <BannerIcon variant="error" />
+        // A suspended account (#121) is a calm warning without Retry: trying again cannot help.
+        <div role="alert" className={`notice ${state.code === 'banned' ? 'notice-warning' : 'notice-error'}`}>
+          <BannerIcon variant={state.code === 'banned' ? 'warning' : 'error'} />
           <p>{p.errors[state.code]}</p>
           <div className="notice-actions">
-            <button type="button" className="btn btn-sm" onClick={() => void submit()}>
-              <Icon name="refresh" />
-              {p.retry}
-            </button>
+            {state.code !== 'banned' && (
+              <button type="button" className="btn btn-sm" onClick={() => void submit()}>
+                <Icon name="refresh" />
+                {p.retry}
+              </button>
+            )}
             <button type="button" className="btn btn-ghost btn-sm" onClick={publish.reset}>
               {p.dismiss}
             </button>

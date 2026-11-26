@@ -4,8 +4,8 @@ use std::sync::Arc;
 
 use chrono::Duration;
 use community_domain::{
-    is_url_safe_token, pkce, DiscordId, LoopbackRedirect, OAuthFlow, OneTimeCode, Session,
-    SessionToken, User, UserId,
+    is_url_safe_token, pkce, DiscordId, FlowPurpose, LoopbackRedirect, OAuthFlow, OneTimeCode,
+    Session, SessionToken, User, UserId,
 };
 
 use crate::ports::{
@@ -31,6 +31,34 @@ pub struct CallbackParams {
     pub code: Option<String>,
     pub error: Option<String>,
     pub state: Option<String>,
+}
+
+/// How long an admin web session lasts.
+pub const ADMIN_SESSION_HOURS: i64 = 12;
+
+/// What Discord's redirect resolved to.
+#[derive(Debug, Clone)]
+pub enum CallbackOutcome {
+    /// An app flow: send the browser to the launcher's loopback URL.
+    App { location: String },
+    /// An admin flow: the user signed in (not yet checked against the admin list).
+    Admin { user: User },
+}
+
+/// The result of opening an admin session.
+#[derive(Debug, Clone)]
+pub enum AdminLogin {
+    Granted(IssuedSession),
+    NotAdmin(User),
+}
+
+/// Equality that does not stop at the first differing byte.
+pub fn constant_time_eq(a: &str, b: &str) -> bool {
+    let (a, b) = (a.as_bytes(), b.as_bytes());
+    if a.len() != b.len() {
+        return false;
+    }
+    a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 /// What a successful token exchange returns.
@@ -89,6 +117,7 @@ impl AuthService {
         let discord_challenge = pkce::challenge_for(&discord_verifier);
         self.flows
             .save(&OAuthFlow {
+                purpose: FlowPurpose::App,
                 state: state.clone(),
                 discord_verifier,
                 redirect: redirect.as_url(),
@@ -100,8 +129,49 @@ impl AuthService {
         Ok(self.discord.authorize_url(&state, &discord_challenge))
     }
 
-    /// Handles Discord's redirect and returns the loopback URL to send the browser to.
+    /// Handles Discord's redirect for an app flow and returns the loopback URL
+    /// to send the browser to. An admin flow is refused here: it needs the
+    /// `admin_login` cookie, so it goes through [`Self::finish_callback`].
     pub async fn callback(&self, params: CallbackParams) -> PortResult<String> {
+        match self.finish_callback(params, None).await? {
+            CallbackOutcome::App { location } => Ok(location),
+            CallbackOutcome::Admin { .. } => Err(AppError::BadRequest(
+                "The sign-in is unknown or expired.".into(),
+            )),
+        }
+    }
+
+    /// Starts an admin web sign-in: returns the `state` (also kept in the
+    /// `admin_login` cookie) and Discord's authorize URL.
+    pub async fn start_admin(&self) -> PortResult<(String, String)> {
+        let now = self.clock.now();
+        let _ = self.flows.delete_expired(now).await;
+        let state = self.tokens.generate(SECRET_BYTES);
+        let discord_verifier = self.tokens.generate(SECRET_BYTES);
+        let discord_challenge = pkce::challenge_for(&discord_verifier);
+        self.flows
+            .save(&OAuthFlow {
+                purpose: FlowPurpose::Admin,
+                state: state.clone(),
+                discord_verifier,
+                redirect: String::new(),
+                app_state: String::new(),
+                app_challenge: String::new(),
+                expires_at: now + Duration::minutes(FLOW_LIFETIME_MINUTES),
+            })
+            .await?;
+        let url = self.discord.authorize_url(&state, &discord_challenge);
+        Ok((state, url))
+    }
+
+    /// Handles Discord's redirect for any flow. An admin flow requires
+    /// `admin_login_cookie` to equal the `state` (login CSRF); otherwise it is
+    /// a bad request. App flows behave exactly as before.
+    pub async fn finish_callback(
+        &self,
+        params: CallbackParams,
+        admin_login_cookie: Option<&str>,
+    ) -> PortResult<CallbackOutcome> {
         let state = params
             .state
             .as_deref()
@@ -120,16 +190,25 @@ impl AuthService {
             .await?
             .ok_or_else(|| AppError::BadRequest("The sign-in is unknown or expired.".into()))?;
 
-        if let Some(error) = &params.error {
+        if flow.purpose == FlowPurpose::Admin {
+            let matches = admin_login_cookie.is_some_and(|c| constant_time_eq(c, state));
+            if !matches {
+                return Err(AppError::BadRequest(
+                    "The sign-in was not started in this browser.".into(),
+                ));
+            }
+            if denied {
+                return Err(AppError::BadRequest("The sign-in was cancelled.".into()));
+            }
+        } else if let Some(error) = &params.error {
             let reason = if error == "access_denied" {
                 "access_denied"
             } else {
                 "sign_in_failed"
             };
-            return Ok(format!(
-                "{}?error={reason}&state={}",
-                flow.redirect, flow.app_state
-            ));
+            return Ok(CallbackOutcome::App {
+                location: format!("{}?error={reason}&state={}", flow.redirect, flow.app_state),
+            });
         }
         let code = code.expect("checked above");
 
@@ -150,6 +229,9 @@ impl AuthService {
                 now,
             })
             .await?;
+        if flow.purpose == FlowPurpose::Admin {
+            return Ok(CallbackOutcome::Admin { user });
+        }
 
         let one_time = self.tokens.generate(SECRET_BYTES);
         self.codes
@@ -160,10 +242,65 @@ impl AuthService {
                 expires_at: now + Duration::seconds(ONE_TIME_CODE_LIFETIME_SECS),
             })
             .await?;
-        Ok(format!(
-            "{}?code={one_time}&state={}",
-            flow.redirect, flow.app_state
-        ))
+        Ok(CallbackOutcome::App {
+            location: format!("{}?code={one_time}&state={}", flow.redirect, flow.app_state),
+        })
+    }
+
+    /// Opens a 12 h admin web session for a user that just signed in; a user
+    /// whose Discord id is not in `admin_ids` gets none.
+    pub async fn open_admin_session(
+        &self,
+        user: User,
+        admin_ids: &[DiscordId],
+    ) -> PortResult<AdminLogin> {
+        if !admin_ids.contains(&user.discord_id) {
+            return Ok(AdminLogin::NotAdmin(user));
+        }
+        let now = self.clock.now();
+        let token = SessionToken::new(self.tokens.generate(SECRET_BYTES));
+        let expires_at = now + Duration::hours(ADMIN_SESSION_HOURS);
+        self.sessions
+            .create(&Session {
+                id: self.tokens.generate(16),
+                user_id: user.id.clone(),
+                token_hash: self.hasher.hash(token.expose()),
+                created_at: now,
+                expires_at,
+                revoked_at: None,
+            })
+            .await?;
+        Ok(AdminLogin::Granted(IssuedSession {
+            token,
+            expires_at,
+            user,
+        }))
+    }
+
+    /// Resolves the admin cookie. `Unauthorized` for an unknown, expired or
+    /// revoked session; `Forbidden` when the user is not (or no longer) in
+    /// `admin_ids` (checked on every request).
+    pub async fn authenticate_admin(
+        &self,
+        cookie_token: &str,
+        admin_ids: &[DiscordId],
+    ) -> PortResult<User> {
+        let user = self.authenticate(cookie_token).await?;
+        if admin_ids.contains(&user.discord_id) {
+            Ok(user)
+        } else {
+            Err(AppError::Forbidden)
+        }
+    }
+
+    /// The CSRF token bound to an admin session token.
+    pub fn csrf_token(&self, session_token: &str) -> String {
+        self.hasher.hash(&format!("csrf:{session_token}"))
+    }
+
+    /// Constant-time check of a submitted CSRF token.
+    pub fn verify_csrf(&self, session_token: &str, submitted: &str) -> bool {
+        constant_time_eq(&self.csrf_token(session_token), submitted)
     }
 
     /// Trades a one-time code plus the app's PKCE verifier for a session.
@@ -521,6 +658,7 @@ mod tests {
         f.memory.flows.lock().unwrap().insert(
             "old".into(),
             OAuthFlow {
+                purpose: FlowPurpose::App,
                 state: "old".into(),
                 discord_verifier: "v".into(),
                 redirect: REDIRECT.into(),
@@ -826,5 +964,206 @@ mod tests {
             f.service.logout("unknown").await.unwrap_err(),
             AppError::Unauthorized
         );
+    }
+
+    fn admin_ids() -> Vec<DiscordId> {
+        vec![DiscordId::parse("42").unwrap()]
+    }
+
+    fn state_of(url: &str) -> String {
+        url.split("state=")
+            .nth(1)
+            .unwrap()
+            .split('&')
+            .next()
+            .unwrap()
+            .to_owned()
+    }
+
+    fn params(state: &str) -> CallbackParams {
+        CallbackParams {
+            code: Some("discord-code".into()),
+            error: None,
+            state: Some(state.into()),
+        }
+    }
+
+    #[tokio::test]
+    async fn start_admin_saves_an_admin_flow_with_empty_app_fields() {
+        let f = fixture();
+        let (state, url) = f.service.start_admin().await.unwrap();
+        assert_eq!(state_of(&url), state);
+        let flows = f.memory.flows.lock().unwrap();
+        let flow = flows.get(&state).unwrap();
+        assert_eq!(flow.purpose, FlowPurpose::Admin);
+        assert!(flow.redirect.is_empty());
+        assert!(flow.app_state.is_empty());
+        assert!(flow.app_challenge.is_empty());
+        assert_eq!(
+            flow.expires_at,
+            f.clock.now() + Duration::minutes(FLOW_LIFETIME_MINUTES)
+        );
+    }
+
+    #[tokio::test]
+    async fn an_admin_callback_needs_the_matching_login_cookie() {
+        let f = fixture();
+        let (state, _) = f.service.start_admin().await.unwrap();
+        for cookie in [None, Some("other")] {
+            let (state, _) = f.service.start_admin().await.unwrap();
+            assert!(matches!(
+                f.service.finish_callback(params(&state), cookie).await,
+                Err(AppError::BadRequest(_))
+            ));
+        }
+        let outcome = f
+            .service
+            .finish_callback(params(&state), Some(&state))
+            .await
+            .unwrap();
+        assert!(matches!(outcome, CallbackOutcome::Admin { user } if user.username == "rider"));
+        // No one-time code is minted for an admin flow.
+        assert!(f.memory.codes.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_cancelled_admin_sign_in_is_a_bad_request() {
+        let f = fixture();
+        let (state, _) = f.service.start_admin().await.unwrap();
+        let denied = CallbackParams {
+            code: None,
+            error: Some("access_denied".into()),
+            state: Some(state.clone()),
+        };
+        assert!(matches!(
+            f.service.finish_callback(denied, Some(&state)).await,
+            Err(AppError::BadRequest(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn the_app_callback_refuses_an_admin_flow() {
+        let f = fixture();
+        let (state, _) = f.service.start_admin().await.unwrap();
+        assert!(matches!(
+            f.service.callback(params(&state)).await,
+            Err(AppError::BadRequest(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn finish_callback_keeps_the_app_flow_behaviour() {
+        let f = fixture();
+        let url = f
+            .service
+            .start(REDIRECT, "appstate", CHALLENGE)
+            .await
+            .unwrap();
+        let outcome = f
+            .service
+            .finish_callback(params(&state_of(&url)), Some("ignored"))
+            .await
+            .unwrap();
+        assert!(matches!(outcome, CallbackOutcome::App { location }
+            if location.starts_with("http://127.0.0.1:5000/callback?code=")));
+    }
+
+    #[tokio::test]
+    async fn only_admins_get_a_twelve_hour_session() {
+        let f = fixture();
+        let user = f
+            .service
+            .users
+            .upsert(&UserUpsert {
+                new_id: UserId("u".into()),
+                discord_id: DiscordId::parse("42").unwrap(),
+                username: "rider".into(),
+                global_name: None,
+                avatar_hash: None,
+                now: f.clock.now(),
+            })
+            .await
+            .unwrap();
+        let AdminLogin::Granted(issued) = f
+            .service
+            .open_admin_session(user.clone(), &admin_ids())
+            .await
+            .unwrap()
+        else {
+            panic!("expected a session");
+        };
+        assert_eq!(issued.expires_at, f.clock.now() + Duration::hours(12));
+        assert_eq!(
+            f.service
+                .authenticate_admin(issued.token.expose(), &admin_ids())
+                .await
+                .unwrap()
+                .id,
+            user.id
+        );
+        assert!(matches!(
+            f.service.open_admin_session(user, &[]).await.unwrap(),
+            AdminLogin::NotAdmin(_)
+        ));
+    }
+
+    #[tokio::test]
+    async fn authenticate_admin_rechecks_the_admin_list_and_expiry() {
+        let f = fixture();
+        let user = f
+            .service
+            .users
+            .upsert(&UserUpsert {
+                new_id: UserId("u".into()),
+                discord_id: DiscordId::parse("42").unwrap(),
+                username: "rider".into(),
+                global_name: None,
+                avatar_hash: None,
+                now: f.clock.now(),
+            })
+            .await
+            .unwrap();
+        let AdminLogin::Granted(issued) = f
+            .service
+            .open_admin_session(user, &admin_ids())
+            .await
+            .unwrap()
+        else {
+            panic!("expected a session");
+        };
+        let token = issued.token.expose();
+        // Removed from the list: locked out at once.
+        assert_eq!(
+            f.service.authenticate_admin(token, &[]).await.unwrap_err(),
+            AppError::Forbidden
+        );
+        assert_eq!(
+            f.service
+                .authenticate_admin("unknown", &admin_ids())
+                .await
+                .unwrap_err(),
+            AppError::Unauthorized
+        );
+        f.clock.advance(Duration::hours(12));
+        assert_eq!(
+            f.service
+                .authenticate_admin(token, &admin_ids())
+                .await
+                .unwrap_err(),
+            AppError::Unauthorized
+        );
+    }
+
+    #[tokio::test]
+    async fn csrf_tokens_are_bound_to_the_session() {
+        let f = fixture();
+        let token = f.service.csrf_token("session-a");
+        assert_eq!(token, "h:csrf:session-a");
+        assert!(f.service.verify_csrf("session-a", &token));
+        assert!(!f.service.verify_csrf("session-b", &token));
+        assert!(!f.service.verify_csrf("session-a", ""));
+        assert!(!f.service.verify_csrf("session-a", "h:csrf:session-"));
+        assert!(constant_time_eq("abc", "abc"));
+        assert!(!constant_time_eq("abc", "abd"));
     }
 }

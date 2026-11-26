@@ -58,6 +58,11 @@ impl Harness {
             mods: unused_mod_hosting(store.clone(), clock.clone()),
             // Generous per-IP limits: these tests are not about them.
             limits: RateLimits::with_limits(clock.clone(), 10_000, 10_000, user_per_minute),
+            moderation: community_api::testing::moderation_service(
+                store.clone(),
+                clock.clone(),
+                Vec::new(),
+            ),
             comments: comments_state(store, clock.clone()),
             trust_proxy_headers: false,
         };

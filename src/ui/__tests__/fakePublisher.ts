@@ -31,8 +31,11 @@ export class FakeModPublisher implements ModPublisher {
   private holding = false;
   private pending: { resolve: () => void; reject: (error: unknown) => void } | null = null;
   offline = false;
+  /** A suspended community account: `publish` answers `banned` (#121). */
+  banned = false;
 
   readonly publish = vi.fn((request: PublishRequest): Promise<ModVersion> => {
+    if (this.banned) return Promise.reject(new PublishError('banned'));
     const versions = this.stored.get(request.modId) ?? [];
     if (versions.some((v) => v.version === request.version)) {
       return Promise.reject(new PublishError('version_exists', 'version exists'));

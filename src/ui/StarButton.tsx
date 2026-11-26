@@ -35,7 +35,7 @@ export function StarButton({ modId }: { modId: string }) {
   const community = useCommunityAccount(account);
   const [prompt, setPrompt] = useState(false);
   const [wantStar, setWantStar] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [failure, setFailure] = useState<'failed' | 'banned' | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const signInRef = useRef<HTMLButtonElement>(null);
   const countId = useId();
@@ -44,11 +44,11 @@ export function StarButton({ modId }: { modId: string }) {
   // Bumped when a sign-in started from the prompt succeeds; the effect below then applies the star.
   const [applyAfterSignIn, setApplyAfterSignIn] = useState(0);
 
-  /** Shows what a finished toggle means: the sign-in prompt, a failure line, or nothing. */
+  /** Shows what a finished toggle means: the sign-in prompt, a failure or suspension line, or nothing. */
   const report = (result: ToggleStarResult) => {
     if (result === 'busy') return;
     const offerSignIn = result === 'signedOut' && community.available;
-    setFailed(result !== 'ok' && !offerSignIn);
+    setFailure(result === 'ok' || offerSignIn ? null : result === 'banned' ? 'banned' : 'failed');
     if (offerSignIn) setPrompt(true);
   };
 
@@ -101,11 +101,11 @@ export function StarButton({ modId }: { modId: string }) {
 
   const onClick = () => {
     if (community.available && community.state === 'signedOut') {
-      setFailed(false);
+      setFailure(null);
       setPrompt(true);
       return;
     }
-    setFailed(false);
+    setFailure(null);
     toggle();
   };
 
@@ -134,7 +134,7 @@ export function StarButton({ modId }: { modId: string }) {
         <StarCount stars={current?.stars ?? 0} id={countId} icon={false} />
       </div>
       <p role="status" className="hint star-feedback">
-        {failed ? t.stars.failed : ''}
+        {failure === null ? '' : t.stars[failure]}
       </p>
       {prompt && (
         <div role="group" aria-labelledby={promptId} className="star-prompt">

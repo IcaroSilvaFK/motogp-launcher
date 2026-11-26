@@ -5,6 +5,7 @@ pub use stars::ModId;
 pub mod comments;
 pub mod downloads;
 pub use downloads::{InstallId, ModSlug};
+pub mod moderation;
 pub mod mods;
 
 use std::fmt;
@@ -105,9 +106,35 @@ impl Session {
     }
 }
 
+/// Who started an OAuth flow: the launcher (`App`) or the admin web (`Admin`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlowPurpose {
+    App,
+    Admin,
+}
+
+impl FlowPurpose {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::App => "app",
+            Self::Admin => "admin",
+        }
+    }
+
+    pub fn parse(value: &str) -> Option<Self> {
+        match value {
+            "app" => Some(Self::App),
+            "admin" => Some(Self::Admin),
+            _ => None,
+        }
+    }
+}
+
 /// An in-progress Discord OAuth sign-in (consumed by the callback).
+/// Admin flows store empty `redirect`, `app_state` and `app_challenge`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OAuthFlow {
+    pub purpose: FlowPurpose,
     /// The `state` sent to Discord (lookup key).
     pub state: String,
     pub discord_verifier: String,
@@ -195,6 +222,14 @@ pub fn is_url_safe_token(value: &str, max_len: usize) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn flow_purposes_round_trip() {
+        for purpose in [FlowPurpose::App, FlowPurpose::Admin] {
+            assert_eq!(FlowPurpose::parse(purpose.as_str()), Some(purpose));
+        }
+        assert_eq!(FlowPurpose::parse("other"), None);
+    }
 
     #[test]
     fn loopback_redirect_accepts_only_the_exact_form() {

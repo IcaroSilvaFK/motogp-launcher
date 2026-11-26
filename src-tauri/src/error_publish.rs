@@ -1,5 +1,6 @@
 //! Tauri-boundary mapping for the publish errors (#130): stable codes plus a
 //! user-facing English message. The token and server internals never leak.
+use crate::error_comments::{BANNED_CODE, BANNED_MESSAGE};
 use crate::CommandError;
 use motogp_application::PublishError;
 
@@ -18,6 +19,7 @@ impl From<&PublishError> for CommandError {
                 "offline",
                 "The community server cannot be reached. Try again later.".to_string(),
             ),
+            PublishError::Banned => (BANNED_CODE, BANNED_MESSAGE.to_string()),
             PublishError::Forbidden => (
                 "forbidden",
                 "You are not allowed to publish this mod.".to_string(),
@@ -101,6 +103,7 @@ mod tests {
             (PublishError::SessionExpired, "session_expired"),
             (PublishError::Offline, "offline"),
             (PublishError::Forbidden, "forbidden"),
+            (PublishError::Banned, "community_banned"),
             (PublishError::FileTooLarge, "file_too_large"),
             (PublishError::QuotaExceeded, "quota_exceeded"),
             (

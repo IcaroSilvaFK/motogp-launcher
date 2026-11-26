@@ -200,6 +200,7 @@ export const PUBLISH_ERROR_CODES = [
   'invalid_request',
   'server_error',
   'forbidden',
+  'banned',
 ] as const;
 
 export type PublishErrorCode = (typeof PUBLISH_ERROR_CODES)[number];
@@ -220,6 +221,10 @@ export function toPublishError(error: unknown): PublishError {
   if (error instanceof PublishError) return error;
   if (typeof error !== 'object' || error === null) return new PublishError('server_error');
   const { code, message } = error as { code?: unknown; message?: unknown };
+  // The backend's IPC code for a suspended account is `community_banned`; the typed code is `banned`.
+  if (code === 'community_banned') {
+    return new PublishError('banned', typeof message === 'string' ? message : undefined);
+  }
   const known = (PUBLISH_ERROR_CODES as readonly unknown[]).includes(code);
   return new PublishError(
     known ? (code as PublishErrorCode) : 'server_error',

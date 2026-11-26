@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use chrono::{DateTime, Duration, Utc};
+use community_domain::moderation::ModerationAction;
 use community_domain::mods::{
     ImageKind, ModMetadata, ModRuleError, ModSlug, ModUpload, ModVersion, PublishedMod,
     RawMetadata, Screenshot, StorageKey, VersionStatus, CHUNK_SIZE, MAX_REASON_CHARS,
@@ -11,6 +12,7 @@ use community_domain::mods::{
 use community_domain::{DiscordId, User};
 
 use crate::mod_ports::{ModRepository, ModStorage, NewVersion};
+use crate::moderation::{is_admin, record_audit, AuditLog};
 use crate::ports::{Clock, PortResult, TokenGenerator};
 use crate::AppError;
 
@@ -66,6 +68,8 @@ pub struct ModHostingService {
     pub tokens: Arc<dyn TokenGenerator>,
     pub repo: Arc<dyn ModRepository>,
     pub storage: Arc<dyn ModStorage>,
+    /// Approvals and rejections are recorded here.
+    pub audit: Arc<dyn AuditLog>,
     /// Discord ids allowed to review.
     pub admin_discord_ids: Vec<DiscordId>,
     pub limits: ModLimits,
@@ -80,7 +84,7 @@ fn rule(error: ModRuleError) -> AppError {
 
 impl ModHostingService {
     pub fn is_admin(&self, user: &User) -> bool {
-        self.admin_discord_ids.contains(&user.discord_id)
+        is_admin(&self.admin_discord_ids, user)
     }
 
     fn require_admin(&self, user: &User) -> PortResult<()> {
@@ -356,6 +360,54 @@ impl ModHostingService {
         self.repo.pending_versions().await
     }
 
+    /// A version in any status plus the on-disk path of its file (admin review).
+    pub async fn review_file(
+        &self,
+        admin: &User,
+        mod_id: &str,
+        version: &str,
+    ) -> PortResult<(ModVersion, std::path::PathBuf)> {
+        self.require_admin(admin)?;
+        let found = self.any_version(mod_id, version).await?;
+        let path = self
+            .storage
+            .locate(&found.storage_key)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        Ok((found, path))
+    }
+
+    /// One screenshot of a version plus its on-disk path (admin review).
+    pub async fn review_screenshot(
+        &self,
+        admin: &User,
+        mod_id: &str,
+        version: &str,
+        index: usize,
+    ) -> PortResult<(Screenshot, std::path::PathBuf)> {
+        self.require_admin(admin)?;
+        let found = self.any_version(mod_id, version).await?;
+        let shot = found
+            .screenshots
+            .into_iter()
+            .find(|s| s.index == index)
+            .ok_or(AppError::NotFound)?;
+        let path = self
+            .storage
+            .locate(&shot.storage_key)
+            .await?
+            .ok_or(AppError::NotFound)?;
+        Ok((shot, path))
+    }
+
+    async fn any_version(&self, mod_id: &str, version: &str) -> PortResult<ModVersion> {
+        let slug = ModSlug::parse(mod_id).ok_or(AppError::NotFound)?;
+        self.repo
+            .find_version(&slug, version)
+            .await?
+            .ok_or(AppError::NotFound)
+    }
+
     async fn pending_version(&self, mod_id: &str, version: &str) -> PortResult<ModVersion> {
         let slug = ModSlug::parse(mod_id).ok_or(AppError::NotFound)?;
         let found = self
@@ -387,7 +439,29 @@ impl ModHostingService {
                 &admin.id,
                 self.clock.now(),
             )
+            .await?;
+        self.audit_review(admin, ModerationAction::ApproveVersion, &found, None)
             .await
+    }
+
+    /// Records a review in the moderation audit log (target `mod@version`).
+    async fn audit_review(
+        &self,
+        admin: &User,
+        action: ModerationAction,
+        version: &ModVersion,
+        reason: Option<&str>,
+    ) -> PortResult<()> {
+        record_audit(
+            self.audit.as_ref(),
+            self.clock.as_ref(),
+            self.tokens.as_ref(),
+            &admin.id,
+            action,
+            format!("{}@{}", version.mod_id.as_str(), version.version),
+            reason.map(str::to_owned),
+        )
+        .await
     }
 
     /// Rejects a pending version: its files are deleted, the row stays with the reason.
@@ -418,6 +492,8 @@ impl ModHostingService {
                 &admin.id,
                 self.clock.now(),
             )
+            .await?;
+        self.audit_review(admin, ModerationAction::RejectVersion, &found, Some(reason))
             .await
     }
 

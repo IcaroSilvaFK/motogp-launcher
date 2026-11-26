@@ -30,8 +30,8 @@ pub use catalog_page::{
     check_https_url, check_https_url_on_hosts, check_page_url, PageUrlError, ALLOWED_PAGE_HOSTS,
 };
 pub use comments::{
-    is_valid_catalog_slug, CommentDraft, CommentDraftError, CommentsPage, ModComment,
-    MAX_COMMENT_CHARS,
+    is_valid_catalog_slug, parse_report_details, CommentDraft, CommentDraftError, CommentsPage,
+    InvalidReportDetails, ModComment, ReportReason, MAX_COMMENT_CHARS, MAX_REPORT_DETAILS_CHARS,
 };
 pub use community::{CommunityProfile, CommunityStatus, SessionToken};
 pub use config::Config;

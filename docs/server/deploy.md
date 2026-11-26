@@ -176,10 +176,29 @@ sudo rsync -a --delete /var/lib/motogp-community/mods/ /var/backups/motogp-commu
 `incoming/` holds partial uploads and may be skipped (`--exclude incoming/`). Restore the database and the folder from
 the same moment when you can.
 
-## 7b. Approving mods (until the admin page exists)
+## 7b. Moderation and approving mods (the admin page)
 
-Creators publish from the launcher; every version waits for an admin. Until the admin page of issue #121 lands, use
-`curl` with the session token of an admin (a user whose Discord id is in `ADMIN_DISCORD_IDS`; the launcher stores
+Creators publish from the launcher; every version waits for an admin. Admins also handle reported comments and bans.
+All of it lives in the admin page:
+
+1. Put your Discord user id in `ADMIN_DISCORD_IDS` (comma-separated) in `/etc/motogp-community/env`
+   (Discord: Settings > Advanced > Developer Mode, then right-click your name > Copy User ID).
+2. Restart the service: `sudo systemctl restart motogp-community`.
+3. Open `https://community.example.com/admin` and press "Sign in with Discord". The Discord application is the same
+   as the launcher's and the redirect URI stays `https://community.example.com/auth/discord/callback`: nothing to
+   change in the Discord developer portal.
+4. The page lists open reports, versions waiting for review (metadata, screenshots, a download link, Approve or
+   Reject with a reason), hidden comments, banned users and the last 50 actions. The session lasts 12 hours.
+
+The admin cookie is `Secure`, so the page needs HTTPS (Caddy provides it); browsers also accept it on
+`http://localhost` for a local run. Caddy needs no change: only `/files/*` is handled by `file_server`, and
+`/admin`, `/auth/*` and everything else already go through `reverse_proxy`, which passes cookies and the redirect
+unchanged. To remove an admin, delete the id from `ADMIN_DISCORD_IDS` and restart: their session stops working at
+once.
+
+### Fallback: curl
+
+If the page is not available, the JSON routes still work with the session token of an admin (the launcher stores
 its token, or sign in once and read it from `POST /auth/token`):
 
 ```sh

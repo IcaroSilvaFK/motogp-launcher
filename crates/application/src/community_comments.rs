@@ -1,7 +1,7 @@
 //! Ports and errors of the mod comments (issue #118). None of the errors ever
 //! carries the session token.
 use crate::CredentialError;
-use motogp_domain::SessionToken;
+use motogp_domain::{ReportReason, SessionToken};
 use std::fmt;
 
 /// A comment as the community server returns it (the avatar is still a URL).
@@ -36,6 +36,8 @@ pub enum CommentsApiError {
     RateLimited { retry_after_secs: u64 },
     /// HTTP 400: the server refused the input.
     Invalid,
+    /// HTTP 403 `banned`: the account may not write.
+    Banned,
     /// HTTP 404: the comment does not exist or is not the caller's.
     NotFound,
     /// The server answered, but not with the documented contract.
@@ -54,6 +56,7 @@ impl fmt::Display for CommentsApiError {
             }
             CommentsApiError::Invalid => write!(f, "the server refused the input"),
             CommentsApiError::NotFound => write!(f, "the comment was not found"),
+            CommentsApiError::Banned => write!(f, "the account is banned from community writes"),
             CommentsApiError::Protocol(detail) => {
                 write!(f, "unexpected community server answer: {detail}")
             }
@@ -92,6 +95,15 @@ pub trait CommunityCommentsApi: Send + Sync {
         comment_id: &str,
         token: &SessionToken,
     ) -> Result<(), CommentsApiError>;
+    /// Reports another member's comment. Idempotent per (member, comment).
+    fn report(
+        &self,
+        mod_id: &str,
+        comment_id: &str,
+        reason: ReportReason,
+        details: Option<&str>,
+        token: &SessionToken,
+    ) -> Result<(), CommentsApiError>;
 }
 
 /// Errors of the comment use cases.
@@ -107,6 +119,8 @@ pub enum CommentsError {
     Invalid,
     /// The comment is gone or is not the member's.
     NotFound,
+    /// The community account is banned from writes.
+    Banned,
     /// The credential store failed.
     Credential(CredentialError),
 }
@@ -121,6 +135,7 @@ impl fmt::Display for CommentsError {
             }
             CommentsError::Invalid => write!(f, "the comment is not valid"),
             CommentsError::NotFound => write!(f, "the comment was not found"),
+            CommentsError::Banned => write!(f, "the community account is banned"),
             CommentsError::Credential(error) => write!(f, "{error}"),
         }
     }
@@ -148,6 +163,7 @@ mod tests {
             },
             CommentsApiError::Invalid,
             CommentsApiError::NotFound,
+            CommentsApiError::Banned,
             CommentsApiError::Protocol("junk".into()),
         ];
         assert!(api.iter().all(|e| !e.to_string().is_empty()));
@@ -161,11 +177,12 @@ mod tests {
             },
             CommentsError::Invalid,
             CommentsError::NotFound,
+            CommentsError::Banned,
             CommentsError::from(CredentialError("locked".into())),
         ];
         assert!(app.iter().all(|e| !e.to_string().is_empty()));
         assert!(app[2].to_string().contains('9'));
-        assert!(app[5].to_string().contains("locked"));
+        assert!(app[6].to_string().contains("locked"));
         let _: &dyn std::error::Error = &app[0];
         let _: &dyn std::error::Error = &api[0];
     }

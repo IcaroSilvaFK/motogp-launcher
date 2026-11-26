@@ -32,6 +32,9 @@ pub trait ModStorage: Send + Sync {
     async fn delete(&self, key: &StorageKey) -> PortResult<()>;
     /// Removes the incoming file (missing is fine).
     async fn delete_incoming(&self, upload_id: &str) -> PortResult<()>;
+    /// The on-disk path of a stored file in the pending or public area (admin
+    /// review only), or `None` when it is not stored.
+    async fn locate(&self, key: &StorageKey) -> PortResult<Option<std::path::PathBuf>>;
 }
 
 /// The version row created when an upload completes.

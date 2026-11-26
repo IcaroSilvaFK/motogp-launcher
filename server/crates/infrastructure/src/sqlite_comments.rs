@@ -12,46 +12,52 @@ use sqlx::Row;
 
 use crate::SqliteStore;
 
-fn internal(error: sqlx::Error) -> AppError {
+pub(crate) fn internal(error: sqlx::Error) -> AppError {
     AppError::Internal(format!("database error: {error}"))
 }
 
-fn corrupt(what: &str) -> AppError {
+pub(crate) fn corrupt(what: &str) -> AppError {
     AppError::Internal(format!("stored {what} is invalid"))
 }
 
-fn from_ms(ms: i64) -> DateTime<Utc> {
+pub(crate) fn from_ms(ms: i64) -> DateTime<Utc> {
     DateTime::from_timestamp_millis(ms).unwrap_or_default()
 }
 
-const SELECT: &str = "SELECT c.id, c.mod_id, c.body, c.created_at, c.edited_at,
+pub(crate) const COLUMNS: &str = "c.id, c.mod_id, c.body, c.created_at, c.edited_at,
         u.id AS u_id, u.discord_id AS u_discord_id, u.username AS u_username,
         u.global_name AS u_global_name, u.avatar_hash AS u_avatar_hash,
-        u.created_at AS u_created_at
-    FROM comments c JOIN users u ON u.id = c.user_id";
+        u.created_at AS u_created_at";
 
-fn from_row(row: &SqliteRow) -> PortResult<CommentWithAuthor> {
-    let user_id = UserId(row.get("u_id"));
+const FROM: &str = "FROM comments c JOIN users u ON u.id = c.user_id";
+
+/// The author joined as `u_*` columns.
+pub(crate) fn author_from_row(row: &SqliteRow) -> PortResult<User> {
     let discord_id: String = row.get("u_discord_id");
+    Ok(User {
+        id: UserId(row.get("u_id")),
+        discord_id: DiscordId::parse(&discord_id).ok_or_else(|| corrupt("discord id"))?,
+        username: row.get("u_username"),
+        global_name: row.get("u_global_name"),
+        avatar_hash: row.get("u_avatar_hash"),
+        created_at: DateTime::from_timestamp(row.get("u_created_at"), 0).unwrap_or_default(),
+    })
+}
+
+pub(crate) fn from_row(row: &SqliteRow) -> PortResult<CommentWithAuthor> {
+    let author = author_from_row(row)?;
     let mod_id: String = row.get("mod_id");
     let body: String = row.get("body");
     Ok(CommentWithAuthor {
         comment: Comment {
             id: CommentId(row.get("id")),
             mod_id: ModId::parse(&mod_id).ok_or_else(|| corrupt("mod id"))?,
-            user_id: user_id.clone(),
+            user_id: author.id.clone(),
             body: CommentBody::parse(&body).map_err(|_| corrupt("comment body"))?,
             created_at: from_ms(row.get("created_at")),
             edited_at: row.get::<Option<i64>, _>("edited_at").map(from_ms),
         },
-        author: User {
-            id: user_id,
-            discord_id: DiscordId::parse(&discord_id).ok_or_else(|| corrupt("discord id"))?,
-            username: row.get("u_username"),
-            global_name: row.get("u_global_name"),
-            avatar_hash: row.get("u_avatar_hash"),
-            created_at: DateTime::from_timestamp(row.get("u_created_at"), 0).unwrap_or_default(),
-        },
+        author,
     })
 }
 
@@ -80,9 +86,13 @@ impl CommentRepository for SqliteStore {
         after: Option<&PageCursor>,
         limit: u32,
     ) -> PortResult<Vec<CommentWithAuthor>> {
+        // Hidden comments and comments of banned users are left out here, in
+        // the WHERE clause, so the keyset cursor keeps working across them.
         let rows = sqlx::query(&format!(
-            "{SELECT}
+            "SELECT {COLUMNS} {FROM}
              WHERE c.mod_id = ?1
+               AND c.hidden_at IS NULL
+               AND NOT EXISTS (SELECT 1 FROM user_bans b WHERE b.user_id = c.user_id)
                AND (?2 IS NULL OR c.created_at > ?2 OR (c.created_at = ?2 AND c.id > ?3))
              ORDER BY c.created_at, c.id
              LIMIT ?4"
@@ -98,12 +108,16 @@ impl CommentRepository for SqliteStore {
     }
 
     async fn find(&self, mod_id: &ModId, id: &CommentId) -> PortResult<Option<CommentWithAuthor>> {
-        let row = sqlx::query(&format!("{SELECT} WHERE c.mod_id = ?1 AND c.id = ?2"))
-            .bind(mod_id.as_str())
-            .bind(id.as_str())
-            .fetch_optional(self.pool())
-            .await
-            .map_err(internal)?;
+        // A hidden comment does not exist for the callers of this port.
+        let row = sqlx::query(&format!(
+            "SELECT {COLUMNS} {FROM}
+             WHERE c.mod_id = ?1 AND c.id = ?2 AND c.hidden_at IS NULL"
+        ))
+        .bind(mod_id.as_str())
+        .bind(id.as_str())
+        .fetch_optional(self.pool())
+        .await
+        .map_err(internal)?;
         row.as_ref().map(from_row).transpose()
     }
 
@@ -117,7 +131,7 @@ impl CommentRepository for SqliteStore {
     ) -> PortResult<bool> {
         let result = sqlx::query(
             "UPDATE comments SET body = ?4, edited_at = ?5
-             WHERE id = ?1 AND mod_id = ?2 AND user_id = ?3",
+             WHERE id = ?1 AND mod_id = ?2 AND user_id = ?3 AND hidden_at IS NULL",
         )
         .bind(id.as_str())
         .bind(mod_id.as_str())
@@ -131,14 +145,16 @@ impl CommentRepository for SqliteStore {
     }
 
     async fn delete(&self, mod_id: &ModId, id: &CommentId, author: &UserId) -> PortResult<bool> {
-        let result =
-            sqlx::query("DELETE FROM comments WHERE id = ?1 AND mod_id = ?2 AND user_id = ?3")
-                .bind(id.as_str())
-                .bind(mod_id.as_str())
-                .bind(author.as_str())
-                .execute(self.pool())
-                .await
-                .map_err(internal)?;
+        let result = sqlx::query(
+            "DELETE FROM comments
+             WHERE id = ?1 AND mod_id = ?2 AND user_id = ?3 AND hidden_at IS NULL",
+        )
+        .bind(id.as_str())
+        .bind(mod_id.as_str())
+        .bind(author.as_str())
+        .execute(self.pool())
+        .await
+        .map_err(internal)?;
         Ok(result.rows_affected() > 0)
     }
 }

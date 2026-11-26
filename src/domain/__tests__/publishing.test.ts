@@ -175,6 +175,7 @@ describe('Given backend answers', () => {
       code: 'file_too_large',
       message: 'big',
     });
+    expect(toPublishError({ code: 'community_banned', message: 'x' }).code).toBe('banned');
     expect(toPublishError({ code: 'weird', message: 'x' }).code).toBe('server_error');
     expect(toPublishError('boom').code).toBe('server_error');
     const own = new PublishError('offline', 'x');

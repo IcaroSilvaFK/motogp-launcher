@@ -17,6 +17,7 @@ Every error, on every endpoint (including unknown routes), uses the same shape a
 | `invalid_code` | 400 | One-time code unknown, used, expired or wrong verifier |
 | `unauthorized` | 401 | Missing, unknown, expired or revoked session |
 | `forbidden` | 403 | Not an admin, or not the owner of the upload |
+| `banned` | 403 | The account is banned from community writes (comments, reports, stars, uploads); reads still work |
 | `not_found` | 404 | Unknown route or resource |
 | `mod_id_taken` | 409 | The mod id belongs to another creator |
 | `version_exists` | 409 | A non-rejected version with this number already exists |
@@ -106,6 +107,9 @@ Query (sent by Discord): `code` and `state`, or `error` and `state`.
 - Discord unreachable or answering with an error: `502 discord_unavailable`.
 
 The flow is consumed on the first attempt, so a callback URL cannot be replayed.
+
+The same callback finishes the admin web sign-in (`GET /admin/login`, see [Admin web](#admin-web)): for such a flow it
+needs the `admin_login` cookie and answers an HTML page with the `admin_session` cookie instead of a loopback redirect.
 
 #### `POST /auth/token`
 
@@ -245,6 +249,94 @@ cursor is `400 bad_request`. Comments created in the same millisecond are ordere
 **Ownership.** A comment that does not exist, belongs to another mod, or belongs to another user answers the same
 `404 not_found` for `PATCH` and `DELETE`, so callers cannot probe which ids exist. Writes check the per-user write
 limit before the body is validated, so rejected writes also count.
+### Moderation
+
+Moderators are the Discord ids in `ADMIN_DISCORD_IDS`. They work in the [admin web](#admin-web) (a server-rendered
+page, no JavaScript); the JSON API only has the report endpoint for users plus the mod review routes below.
+
+#### `POST /mods/{mod_id}/comments/{comment_id}/reports`
+
+Bearer required. Body `{"reason": "spam"|"abuse"|"off_topic"|"other", "details"?: string}` (JSON, at most 16 KiB;
+`details` is trimmed and at most 500 characters). It shares the comment write bucket (5 per minute per user).
+
+- `204` on success. It is idempotent per (user, comment): a second report answers `204` and is not duplicated.
+- `400 bad_request` for a bad reason or details, or when you report your own comment.
+- `404 not_found` when the comment is unknown, belongs to another mod or is hidden.
+- `401`, `403 banned`, `429` as usual.
+
+#### Hidden comments
+
+An admin can hide a comment with a reason. A hidden comment disappears from `GET /mods/{mod_id}/comments` and
+answers `404 not_found` to `PATCH`, `DELETE` and reports. Hiding resolves the comment's open reports; restoring puts
+it back. Comments are never deleted by moderation.
+
+#### Bans and `banned`
+
+An admin can ban a user (with a reason). A banned user gets **`403 banned`** on every write: comment `POST`, `PATCH`
+and `DELETE`, reports, star `PUT` and `DELETE`, and every upload write (create, chunk, screenshots,
+complete, abort; `GET /mods/uploads/{id}` stays readable). The check runs after the session check and before the route's own limiter, so a banned user always
+sees `banned`, never `429`. Reads, sign-in and `GET /me` keep working. While the ban lasts, the user's comments are
+hidden from `GET`; unbanning shows them again (except those an admin hid one by one). Admins cannot ban themselves
+or another admin (`400`). The launcher maps `banned` to a "your account is suspended" message.
+
+#### Audit
+
+Every hide, restore, ban, unban, report dismissal, mod approval and mod rejection writes one row in
+`moderation_actions` (admin, action, target, reason, time; migration `0006_moderation.sql`). The target is a comment
+id, a user id, or `mod@version`. The admin page shows the last 50 entries. Rows keep their text when the admin's user
+row is later deleted (the admin shows as "(deleted user)").
+
+#### Admin web
+
+Server-rendered HTML under `/admin`, with a minimal inline stylesheet (`api/src/admin_css.rs`) and no JavaScript.
+
+**Sign-in.** `GET /admin/login` starts a Discord sign-in (the same Discord application and the same redirect URI,
+`/auth/discord/callback`) and answers `302` to Discord. It sets `admin_login=<state>` (HttpOnly, Secure,
+SameSite=Lax, Path=/, Max-Age 600). The callback requires that cookie to equal the OAuth `state` (login CSRF), else
+`400`. A user whose Discord id is not in `ADMIN_DISCORD_IDS` gets a `403` page and no session. An admin gets a
+12-hour session (`sessions` table), `Set-Cookie: admin_session=<token>; HttpOnly; Secure; SameSite=Strict;
+Path=/admin; Max-Age=43200`, and a `200` page that forwards to `/admin` with
+`<meta http-equiv="refresh" content="0;url=/admin">`. It is not a `302` on purpose: a `SameSite=Strict` cookie is
+not sent on a redirect chain that started on another site (Discord), so a redirect would land on the login page.
+The page makes the browser start a new, same-site navigation that carries the cookie. App sign-ins
+(`/auth/discord/start`) are unchanged.
+
+`Secure` cookies need HTTPS, except that browsers also accept them on `http://localhost`. Behind Caddy this is the
+normal setup.
+
+**Admin is re-checked on every request.** The cookie only proves the session; the Discord id must still be in
+`ADMIN_DISCORD_IDS` each time, so removing an id and restarting locks that admin out at once (`403`). Admin HTML
+routes take only the cookie, never a bearer token. They share the global IP limiter, and each request also counts
+against the per-user limit.
+
+**CSRF.** Every `POST` form carries a hidden `csrf` field, `hash("csrf:" + session token)`, compared in constant
+time. A missing or wrong token answers `403` and changes nothing. A successful `POST` answers `303` to `/admin`;
+errors render a small HTML page with the right status (`400` bad input or "cannot ban an admin", `404`, `403`, ...).
+
+**Headers on every `/admin` response:** `Cache-Control: no-store`, `X-Frame-Options: DENY`,
+`Referrer-Policy: no-referrer`, `X-Content-Type-Options: nosniff` and
+`Content-Security-Policy: default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`.
+All user content (comments, names, reasons, mod metadata) is HTML-escaped.
+
+| Route | What it does |
+|-------|--------------|
+| `GET /admin` | Dashboard: open reports, versions waiting for review, hidden comments, banned users (plus a ban-by-Discord-id form) and the last 50 audit entries. Without a valid cookie it shows the sign-in page (`200`); a non-admin session gets `403`. |
+| `GET /admin/login` | Starts the sign-in (see above). |
+| `POST /admin/comments/{id}/hide` (`reason`) | Hides a comment and resolves its open reports. |
+| `POST /admin/comments/{id}/restore` | Restores a hidden comment. |
+| `POST /admin/reports/{id}/dismiss` | Resolves one report as dismissed. |
+| `POST /admin/users/{user_id}/ban` (`reason`) | Bans a user by internal id. |
+| `POST /admin/users/ban` (`discord_id`, `reason`) | Bans by Discord id (the user must have signed in once). |
+| `POST /admin/users/{user_id}/unban` | Lifts a ban. |
+| `POST /admin/review/{mod}/{version}/approve` and `.../reject` (`reason`) | Approve or reject a pending version, same use cases as the JSON routes. |
+| `POST /admin/logout` | Revokes the session and clears the cookie. |
+| `GET /admin/mods/{mod}/versions/{version}/file` | The pending or approved file as `Content-Disposition: attachment` (with `Range`). |
+| `GET /admin/mods/{mod}/versions/{version}/screenshots/{n}` | A screenshot with its sniffed image type and `nosniff`. |
+
+Reasons are trimmed, 1 to 500 characters, and required for hide, ban and reject. The form routes for review live
+under `/admin/review/...` so they never collide with the bearer-JSON `/admin/mods/...` routes, which keep working
+unchanged (for curl).
+
 ### Download counts
 
 Anonymous routes (no session). A mod id is a catalog slug: 1 to 64 characters of `a-z 0-9 -`. Days are UTC calendar days.

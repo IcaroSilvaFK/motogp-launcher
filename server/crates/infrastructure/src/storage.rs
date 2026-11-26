@@ -208,6 +208,19 @@ impl ModStorage for LocalModStorage {
         let path = self.incoming_path(upload_id)?;
         not_found_ok(fs::remove_file(&path).await)
     }
+
+    async fn locate(&self, key: &StorageKey) -> PortResult<Option<PathBuf>> {
+        for area in ["pending", "public"] {
+            let path = self.area_path(area, key)?;
+            match fs::metadata(&path).await {
+                Ok(meta) if meta.is_file() => return Ok(Some(path)),
+                Ok(_) => {}
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => return Err(io_error(error)),
+            }
+        }
+        Ok(None)
+    }
 }
 
 #[cfg(test)]
@@ -225,6 +238,19 @@ mod tests {
 
     fn key(file: &str) -> StorageKey {
         StorageKey::file(&ModSlug::parse("brazil-livery").unwrap(), "1.0", file)
+    }
+
+    #[tokio::test]
+    async fn locate_finds_pending_then_public_files_only() {
+        let (_dir, s) = storage().await;
+        let k = key("a.zip");
+        assert_eq!(s.locate(&k).await.unwrap(), None);
+        s.put_pending(&k, b"x").await.unwrap();
+        let pending = s.locate(&k).await.unwrap().unwrap();
+        assert!(pending.starts_with(s.root.join("pending")));
+        s.publish(&k).await.unwrap();
+        let public = s.locate(&k).await.unwrap().unwrap();
+        assert!(public.starts_with(s.public_dir()));
     }
 
     #[tokio::test]

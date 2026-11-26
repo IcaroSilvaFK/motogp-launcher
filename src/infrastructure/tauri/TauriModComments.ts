@@ -12,7 +12,7 @@ async function call(command: string, args: Record<string, unknown>): Promise<unk
 
 /**
  * Mod comments over IPC (`community_comments_list`, `community_comment_post`, `community_comment_edit`,
- * `community_comment_delete`). Rejections are typed `ModCommentsError`s; a malformed answer is `failed`.
+ * `community_comment_delete`, `community_report_comment`). Rejections are typed `ModCommentsError`s; a malformed answer is `failed`.
  */
 export function createTauriModComments(): ModComments {
   return {
@@ -35,6 +35,12 @@ export function createTauriModComments(): ModComments {
     },
     async remove(modId, commentId) {
       await call('community_comment_delete', { modId, commentId });
+    },
+    async report(modId, commentId, reason, details) {
+      const args: Record<string, unknown> = { modId, commentId, reason };
+      const trimmed = details?.trim();
+      if (trimmed) args.details = trimmed;
+      await call('community_report_comment', args);
     },
   };
 }

@@ -19,7 +19,7 @@ use serde::Deserialize;
 use serde_json::{json, Value};
 
 use crate::auth::{bearer_token, user_json};
-use crate::{ApiError, AppState, AuthenticatedUser, RateLimitConfig, RateLimiter};
+use crate::{ApiError, AppState, RateLimitConfig, RateLimiter, WritingUser};
 
 /// Comment writes (POST, PATCH, DELETE) allowed per user per minute.
 pub const WRITES_PER_MINUTE: u32 = 5;
@@ -47,7 +47,7 @@ impl CommentsState {
         }
     }
 
-    fn check_write(&self, user: &User) -> Result<(), AppError> {
+    pub(crate) fn check_write(&self, user: &User) -> Result<(), AppError> {
         self.write_limiter
             .check(user.id.as_str())
             .map_err(|retry_after_secs| AppError::RateLimited { retry_after_secs })
@@ -134,7 +134,7 @@ async fn list(
 /// `POST /mods/{mod_id}/comments`.
 async fn create(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     Path(mod_id): Path<String>,
     body: Result<Json<BodyRequest>, JsonRejection>,
 ) -> Result<(StatusCode, Json<Value>), ApiError> {
@@ -154,7 +154,7 @@ async fn create(
 /// `PATCH /mods/{mod_id}/comments/{comment_id}`: author only (anyone else gets 404).
 async fn edit(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     Path((mod_id, comment_id)): Path<(String, String)>,
     body: Result<Json<BodyRequest>, JsonRejection>,
 ) -> Result<Json<Value>, ApiError> {
@@ -171,7 +171,7 @@ async fn edit(
 /// `DELETE /mods/{mod_id}/comments/{comment_id}`: author only (anyone else gets 404).
 async fn remove(
     State(app): State<AppState>,
-    auth: AuthenticatedUser,
+    WritingUser(auth): WritingUser,
     Path((mod_id, comment_id)): Path<(String, String)>,
 ) -> Result<StatusCode, ApiError> {
     app.comments.check_write(&auth.user)?;

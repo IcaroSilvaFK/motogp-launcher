@@ -354,4 +354,26 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       expect(screen.getByRole('button', { name: 'Publish a mod' })).toHaveFocus();
     });
   });
+
+  Scenario('A suspended creator sees why publishing is refused', ({ Given, When, Then }) => {
+    let world: World;
+    Given('the creator is signed in but their community account is suspended', async () => {
+      world = setUp(signedIn());
+      world.publisher.banned = true;
+      await openPublish(world);
+    });
+    When('they publish the mod', async () => {
+      await fillForm(world);
+      await world.user.click(publishButton());
+    });
+    Then('they see that the account is suspended, with no retry', async () => {
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent("Your community account is suspended, so you can't publish mods.");
+      // Trying again cannot help while the suspension lasts; only Dismiss is offered.
+      expect(within(alert).queryByRole('button', { name: 'Try again' })).not.toBeInTheDocument();
+      await world.user.click(within(alert).getByRole('button', { name: 'Dismiss' }));
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(world.publisher.stored.size).toBe(0);
+    });
+  });
 });

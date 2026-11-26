@@ -1,9 +1,12 @@
 //! Community server HTTP interface: router, error format, rate limiting.
 
+pub mod admin_css;
+pub mod admin_web;
 pub mod auth;
 pub mod comments;
 pub mod downloads;
 pub mod error;
+pub mod moderation;
 pub mod mods;
 pub mod rate_limit;
 pub mod routes;
@@ -21,12 +24,14 @@ use axum::Router;
 use community_application::ports::{Clock, HealthProbe};
 use community_application::AppError;
 use community_application::AuthService;
+use community_application::ModerationService;
 use community_application::StarService;
 use community_domain::UserId;
 use tower_http::trace::TraceLayer;
 
 pub use auth::AuthenticatedUser;
 pub use error::ApiError;
+pub use moderation::WritingUser;
 pub use rate_limit::{RateLimitConfig, RateLimiter};
 
 /// Shared state of every handler. Later issues add their ports here.
@@ -47,6 +52,8 @@ pub struct AppState {
     pub downloads: downloads::DownloadsState,
     /// Mod hosting: use cases, public URLs and the served directory.
     pub mods: mods::ModHosting,
+    /// Reports, bans and the audit log (also the write guard of every write route).
+    pub moderation: Arc<ModerationService>,
 }
 
 /// One limiter per route group.

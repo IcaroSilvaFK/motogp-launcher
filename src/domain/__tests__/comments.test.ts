@@ -82,6 +82,7 @@ describe('toModCommentsError', () => {
     expect(code('comment_rate_limited')).toBe('rate_limited');
     expect(code('comment_invalid')).toBe('invalid');
     expect(code('comment_not_found')).toBe('not_found');
+    expect(code('community_banned')).toBe('banned');
   });
 
   it('reads the wait from the rate-limit message', () => {

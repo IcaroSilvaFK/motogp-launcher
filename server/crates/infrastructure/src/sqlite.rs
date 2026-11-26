@@ -9,7 +9,7 @@ use community_application::ports::{
     UserRepository, UserUpsert,
 };
 use community_application::AppError;
-use community_domain::{DiscordId, OAuthFlow, OneTimeCode, Session, User, UserId};
+use community_domain::{DiscordId, FlowPurpose, OAuthFlow, OneTimeCode, Session, User, UserId};
 use sqlx::sqlite::{SqliteConnectOptions, SqliteJournalMode, SqlitePoolOptions, SqliteRow};
 use sqlx::{Row, SqlitePool};
 
@@ -185,8 +185,8 @@ impl OAuthFlowRepository for SqliteStore {
     async fn save(&self, flow: &OAuthFlow) -> PortResult<()> {
         sqlx::query(
             "INSERT INTO oauth_flows
-                 (state, discord_verifier, redirect, app_state, app_challenge, expires_at)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                 (state, discord_verifier, redirect, app_state, app_challenge, expires_at, purpose)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
         )
         .bind(&flow.state)
         .bind(&flow.discord_verifier)
@@ -194,6 +194,7 @@ impl OAuthFlowRepository for SqliteStore {
         .bind(&flow.app_state)
         .bind(&flow.app_challenge)
         .bind(to_ts(flow.expires_at))
+        .bind(flow.purpose.as_str())
         .execute(&self.pool)
         .await
         .map(|_| ())
@@ -203,14 +204,20 @@ impl OAuthFlowRepository for SqliteStore {
     async fn take(&self, state: &str, now: DateTime<Utc>) -> PortResult<Option<OAuthFlow>> {
         let row = sqlx::query(
             "DELETE FROM oauth_flows WHERE state = ?1
-             RETURNING state, discord_verifier, redirect, app_state, app_challenge, expires_at",
+             RETURNING state, discord_verifier, redirect, app_state, app_challenge, expires_at,
+                       purpose",
         )
         .bind(state)
         .fetch_optional(&self.pool)
         .await
         .map_err(internal)?;
-        Ok(row
+        let Some(row) = row else { return Ok(None) };
+        let purpose: String = row.get("purpose");
+        let purpose = FlowPurpose::parse(&purpose)
+            .ok_or_else(|| AppError::Internal("stored flow purpose is invalid".into()))?;
+        Ok(Some(row)
             .map(|row| OAuthFlow {
+                purpose,
                 state: row.get("state"),
                 discord_verifier: row.get("discord_verifier"),
                 redirect: row.get("redirect"),
@@ -383,6 +390,7 @@ mod tests {
     async fn oauth_flows_are_single_use_and_expire() {
         let store = store().await;
         let flow = OAuthFlow {
+            purpose: FlowPurpose::Admin,
             state: "st".into(),
             discord_verifier: "v".into(),
             redirect: "http://127.0.0.1:5000/callback".into(),

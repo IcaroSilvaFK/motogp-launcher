@@ -12,8 +12,10 @@ use crate::{ApiError, AppState};
 pub fn extra_routes() -> Router<AppState> {
     Router::new()
         .merge(crate::auth::routes())
+        .merge(crate::admin_web::routes())
         .merge(crate::stars::routes())
         .merge(crate::comments::routes())
+        .merge(crate::moderation::routes())
         .merge(crate::downloads::routes())
         .merge(crate::mods::routes())
         .merge(crate::uploads::routes())

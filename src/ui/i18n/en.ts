@@ -299,6 +299,7 @@ export const en: Messages = {
     signInPrompt: 'Sign in with Discord to star mods.',
     notNow: 'Not now',
     failed: 'Could not update the star. Try again.',
+    banned: "Your community account is suspended, so you can't star mods.",
   },
   comments: {
     title: 'Comments',
@@ -327,6 +328,22 @@ export const en: Messages = {
     delete: 'Delete',
     confirmDelete: 'Delete this comment? This cannot be undone.',
     dismiss: 'Dismiss',
+    report: 'Report',
+    reportTitle: 'Report this comment',
+    reportReasonsLegend: 'What is wrong with it?',
+    reportReasons: {
+      spam: 'Spam',
+      abuse: 'Abuse or harassment',
+      off_topic: 'Off-topic',
+      other: 'Other',
+    },
+    reportDetails: 'Details (optional)',
+    reportDetailsPlaceholder: 'Anything that helps the moderators understand.',
+    reportSend: 'Send report',
+    reported: 'Reported',
+    reportedStatus: 'Thanks. The moderators will review this comment.',
+    reportInvalid: 'This comment cannot be reported.',
+    suspendedTitle: 'Account suspended',
     errors: {
       offline: 'Could not reach the community. Try again in a moment.',
       signed_out: 'Your session ended. Sign in with Discord again to comment.',
@@ -334,6 +351,8 @@ export const en: Messages = {
         `Slow down: you can comment again in ${seconds} ${plural(seconds, 'second', 'seconds')}.`,
       invalid: 'A comment cannot be empty or longer than 2,000 characters.',
       not_found: 'That comment no longer exists.',
+      banned:
+        "Your community account is suspended, so you can't post, edit or report comments. You can still read them.",
       failed: 'Something went wrong. Try again.',
     },
   },
@@ -366,6 +385,7 @@ export const en: Messages = {
       invalid_request: 'Some of the mod details were refused. Review the form and try again.',
       server_error: 'The community server had a problem. Try again later.',
       forbidden: 'You are not allowed to do this.',
+      banned: "Your community account is suspended, so you can't publish mods.",
     },
     validation: {
       modIdRequired: 'Enter a mod id.',
