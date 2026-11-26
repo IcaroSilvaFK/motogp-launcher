@@ -3,6 +3,7 @@
 //! No I/O, no serde, no Tauri and no other project crates.
 //! Entities arrive in the next issues, always driven by tests.
 
+mod ad;
 mod catalog;
 mod catalog_page;
 mod config;
@@ -16,6 +17,7 @@ mod session;
 mod storage;
 mod support_page;
 
+pub use ad::{AdCreative, AdCreativeDraft, AdCreativeError, AdSlot};
 pub use catalog::{
     CatalogDownload, CatalogDownloadDraft, CatalogEntry, CatalogEntryDraft, CatalogEntryError,
     SUPPORTED_CATALOG_SCHEMA,
