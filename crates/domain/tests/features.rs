@@ -7,6 +7,8 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+#[path = "bdd/ad_creative.rs"]
+mod ad_creative;
 #[path = "bdd/catalog.rs"]
 mod catalog;
 #[path = "bdd/catalog_page_url.rs"]
@@ -37,6 +39,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("catalog", || Box::pin(catalog::run())),
     ("catalog-page-url", || Box::pin(catalog_page_url::run())),
     ("support-page", || Box::pin(support_page::run())),
+    ("ad-creative", || Box::pin(ad_creative::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

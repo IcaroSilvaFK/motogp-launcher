@@ -218,20 +218,26 @@ fn is_date(value: &str) -> bool {
 /// `https://` scheme (case-insensitive), a non-empty host, no whitespace and
 /// no `user@` credentials.
 fn https_url(field: &'static str, value: &str) -> Result<String, CatalogEntryError> {
+    well_formed_https_url(value).ok_or(CatalogEntryError::InsecureUrl { field })
+}
+
+/// The shared well-formed `https://` rule: the trimmed URL, or `None` when the
+/// scheme is not https, the host is missing, or it has whitespace or
+/// credentials. Also used by the ad creative rules.
+pub(crate) fn well_formed_https_url(value: &str) -> Option<String> {
     let url = value.trim();
-    let insecure = CatalogEntryError::InsecureUrl { field };
     let scheme_ok = url
         .get(..8)
         .is_some_and(|s| s.eq_ignore_ascii_case("https://"));
     if !scheme_ok || url.chars().any(char::is_whitespace) {
-        return Err(insecure);
+        return None;
     }
     let rest = &url[8..];
     let authority = rest.split(['/', '?', '#']).next().unwrap_or("");
     if authority.is_empty() || authority.contains('@') {
-        return Err(insecure);
+        return None;
     }
-    Ok(url.to_string())
+    Some(url.to_string())
 }
 
 #[cfg(test)]

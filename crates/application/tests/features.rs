@@ -7,6 +7,8 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
+#[path = "bdd/ads.rs"]
+mod ads;
 #[path = "bdd/catalog.rs"]
 mod catalog;
 #[path = "bdd/catalog_install.rs"]
@@ -39,6 +41,8 @@ mod storage;
 #[path = "bdd/support_page.rs"]
 mod support_page;
 
+#[path = "support/ad_fakes.rs"]
+pub mod ad_fakes;
 #[path = "support/catalog_fakes.rs"]
 pub mod catalog_fakes;
 #[path = "support/config_fakes.rs"]
@@ -74,6 +78,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("catalog-open-page", || Box::pin(catalog_open_page::run())),
     ("catalog-install", || Box::pin(catalog_install::run())),
     ("support-page", || Box::pin(support_page::run())),
+    ("ads", || Box::pin(ads::run())),
 ];
 
 /// Absolute path of a `.feature` file in `tests/features/`.

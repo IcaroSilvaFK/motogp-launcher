@@ -590,3 +590,25 @@ Sponsored placements (frontend only; the `get_ad`, `ad_clicked` and `ad_shown` c
 | No ad means no slot | `ads.feature.test.tsx` (null, a rejection and "command get_ad not found": no slot, no alert, no error text); `tauriAdProvider.test.ts` (missing command, rejection, synchronous throw and malformed payload map to `null`); `ads.test.ts` (`toAdViewModel` refuses SVG, remote URLs and incomplete payloads) |
 | Ads disabled renders nothing | `ads.feature.test.tsx` (stored preference "off" in a fake `AdPreferenceStore`: no region in the sidebar, Discover or Settings > About, no `get`, no `reportShown`); `AdSlot.test.tsx` ("renders nothing and requests nothing without a preference store", the "off" case); `useAd.test.tsx` ("requests nothing without a provider or when disabled") |
 | Turning sponsored content off in Settings removes the slots | `ads.feature.test.tsx` (sidebar and About cards shown with "on"; selecting "Off" in Settings > Preferences stores "off", removes every region and Discover then requests nothing) |
+
+### Issue #101: scenario traceability
+
+Sponsored creatives: domain validation, ports and `AdService` (no adapters or IPC yet). Gherkin: `crates/domain/tests/features/ad-creative.feature` (steps in `tests/bdd/ad_creative.rs`) and `crates/application/tests/features/ads.feature` (steps in `tests/bdd/ads.rs`, fakes in `tests/support/ad_fakes.rs`).
+
+| Scenario | Tests |
+|----------|-------|
+| A complete creative is accepted | `complete_draft_is_valid_and_trimmed`, `optional_fields_may_be_absent`, `slots_parse_exact_lowercase_names` (domain `ad.rs`) + cucumber |
+| A non-HTTPS click URL is rejected | `urls_must_be_https` (domain) + cucumber; application `validate_ads_drops_invalid_expired_unparseable_and_duplicates` + cucumber "A creative with a non-HTTPS click URL is rejected" |
+| A creative without a sponsor label is rejected | `blank_title_and_sponsor_label_are_missing`, `text_lengths_are_limited_in_characters`, `id_must_be_a_short_slug` + cucumber |
+| A creative for an unknown slot is rejected | `unknown_slot_is_named` + cucumber |
+| An SVG image is refused | `only_raster_base64_data_uris_are_images` + cucumber |
+| A valid creative is returned for a slot (no click URL in the view) | `the_view_carries_no_urls_and_fetches_then_caches` (application `ad_service.rs`) + cucumber |
+| Ads are off: nothing is touched | `disabled_ads_touch_no_port` + cucumber |
+| An expired creative is not shown | `expired_creatives_are_never_shown_even_after_loading`, `validate_ads_drops_...` + cucumber |
+| Feed unreachable and nothing cached | `an_unreachable_feed_with_no_cache_is_not_an_error`, `a_failed_attempt_is_not_repeated_on_every_call` + cucumber |
+| Cache TTL, stale fallback and cache errors | `a_fresh_cache_is_used_without_fetching`, `a_stale_cache_is_refetched`, `a_custom_ttl_decides_freshness`, `a_failed_fetch_falls_back_to_an_old_cache`, `cache_load_and_save_errors_are_ignored` |
+| Two creatives share a slot (rotation) | `creatives_of_a_slot_rotate_in_feed_order`, `only_creatives_of_the_requested_slot_are_offered` + cucumber |
+| An impression is counted once per session | `the_impression_beacon_is_sent_once_per_creative`, `a_failing_beacon_is_swallowed_and_not_retried` + cucumber |
+| A house ad sends no beacon | `a_creative_without_impression_url_sends_no_beacon` + cucumber |
+| Clicking opens the creative's URL by id | `clicking_opens_the_click_url_of_the_creative`, `an_opener_failure_is_reported_as_open` + cucumber |
+| An unknown creative id cannot be opened | `clicking_an_unknown_creative_opens_nothing`, `reporting_an_unknown_creative_or_wrong_slot_is_an_error` + cucumber |

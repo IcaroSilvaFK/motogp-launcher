@@ -3,6 +3,9 @@
 //! Depends only on `motogp-domain`. Ports and use cases arrive in the issues
 //! that need them.
 
+mod ad_error;
+mod ad_ports;
+mod ad_service;
 mod artwork_ports;
 mod artwork_service;
 mod catalog_error;
@@ -38,6 +41,9 @@ mod storage_ports;
 mod storage_service;
 mod support_service;
 
+pub use ad_error::{AdBeaconError, AdCacheError, AdError, AdSourceError};
+pub use ad_ports::{AdBeaconSink, AdCache, AdPayload, AdSource, CachedAds, RawAd};
+pub use ad_service::{validate_ads, AdService, AdView, DEFAULT_AD_TTL};
 pub use artwork_ports::{Artwork, GameArtworkSource, ImageMime};
 pub use artwork_service::ArtworkService;
 pub use catalog_error::{CatalogCacheError, CatalogError, CatalogSourceError};
