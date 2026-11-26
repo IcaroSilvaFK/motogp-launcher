@@ -4,6 +4,8 @@ import { pageHost } from '../application';
 import type { CatalogEntry, CommandError } from '../domain';
 import { AdSlot } from './AdSlot';
 import { CategoryCover, InlineError } from './CatalogParts';
+import { DownloadChart } from './DownloadChart';
+import { DownloadStat } from './DownloadCounts';
 import { Icon } from './Icon';
 import { formatDay, formatSize, useI18n } from './i18n';
 import { CatalogInstallButton } from './InstallButton';
@@ -176,6 +178,7 @@ export function ModPage({
             <dd>{stat.value}</dd>
           </div>
         ))}
+        <DownloadStat id={entry.id} />
       </dl>
 
       <div className="mod-layout">
@@ -197,6 +200,7 @@ export function ModPage({
               ))}
             </dl>
           </section>
+          <DownloadChart id={entry.id} />
           <ModComments modId={entry.id} />
         </div>
 

@@ -33,6 +33,7 @@ In-memory token buckets (burst = the per-minute limit, refilled continuously), k
 | `/auth/*` | client IP | 10 / minute |
 | Authenticated routes | user id | 120 / minute |
 | Comment writes (`POST`, `PATCH`, `DELETE` under `/mods/{mod_id}/comments`) | user id | 5 / minute (own bucket, on top of the 120 / minute user limit) |
+| `POST /mods/{id}/downloads` | client IP | 20 / minute (on top of the global limit) |
 
 When a bucket is empty the server answers `429 rate_limited` with `Retry-After: <seconds>`. Idle buckets are evicted.
 The client IP is the connection address; with `TRUST_PROXY_HEADERS=true` it is the right-most `X-Forwarded-For`
@@ -235,6 +236,34 @@ cursor is `400 bad_request`. Comments created in the same millisecond are ordere
 **Ownership.** A comment that does not exist, belongs to another mod, or belongs to another user answers the same
 `404 not_found` for `PATCH` and `DELETE`, so callers cannot probe which ids exist. Writes check the per-user write
 limit before the body is validated, so rejected writes also count.
+### Download counts
+
+Anonymous routes (no session). A mod id is a catalog slug: 1 to 64 characters of `a-z 0-9 -`. Days are UTC calendar days.
+Every failure uses the standard error format (`bad_request`, `rate_limited`).
+
+#### `POST /mods/{id}/downloads`
+
+Body: `{"install_id": "<22-128 chars of A-Z a-z 0-9 - _>"}`. Answers `204` with no body, whether the download was
+counted now or already counted today. `400 bad_request` for a malformed mod id, install id or JSON body.
+`429 rate_limited` with `Retry-After` after 20 reports per minute from one IP.
+
+**Dedup rule:** one count per (mod, install id, UTC day). Reporting the same mod twice on one day counts once; the
+next day counts again.
+
+**Privacy:** only `SHA-256(install_id)` (lowercase hex) is stored in `mod_downloads`, never the raw install id and
+never the IP address. The install id is not logged. The table is `(mod_id, install_hash, day)` where `day` is the
+number of days since 1970-01-01 UTC (migration `0004_downloads.sql`).
+
+#### `GET /mods/downloads`
+
+`200 {"mods":[{"id":"x","total":101,"last_30_days":7}]}`: only mods with at least one download, sorted by id.
+`last_30_days` covers the same 30 buckets as the daily route (today and the 29 days before).
+
+#### `GET /mods/{id}/downloads/daily`
+
+`200 {"id":"x","days":[{"date":"2026-10-28","count":0}, ...]}`: exactly 30 buckets, oldest first, the last one is
+today (UTC), zero for days without downloads. An unknown mod answers 30 zero buckets. `400 bad_request` for a
+malformed mod id.
 
 ## Adding routes in later issues
 

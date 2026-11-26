@@ -228,6 +228,11 @@ export interface Messages {
     autoEnableHint: string;
     adShow: string;
     adOff: string;
+    /** Anonymous usage sharing (#120): a switch, on unless the user turns it off. */
+    shareUsage: string;
+    shareUsageHint: string;
+    shareUsageOn: string;
+    shareUsageOff: string;
     languageHint: string;
     language: string;
     languageNames: Record<Locale, string>;
@@ -409,6 +414,23 @@ export interface Messages {
     cancel: string;
     /** Accessible name of the download progress bar. */
     progressLabel: string;
+  };
+  /**
+   * Download counts and the 30-day chart (#120). `count` drives the plural; `formatted` is the same
+   * number already formatted for the UI locale. Dates arrive formatted too.
+   */
+  downloads: {
+    /** Discover card meta line: "1,234 downloads". */
+    count: (count: number, formatted: string) => string;
+    /** Label of the mod page stats cell. */
+    label: string;
+    /** Secondary line of the stats cell. */
+    last30Days: (formatted: string) => string;
+    chartTitle: string;
+    /** Text summary of the chart (its accessible name): total in the window and the busiest day. */
+    chartSummary: (total: number, formatted: string, peak: { count: string; date: string } | null) => string;
+    /** Tooltip of one bar. */
+    bar: (date: string, count: number, formatted: string) => string;
   };
   errors: Record<ErrorCode, string>;
 }

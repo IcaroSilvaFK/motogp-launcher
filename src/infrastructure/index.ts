@@ -14,3 +14,5 @@ export { createTauriAdProvider } from './tauri/TauriAdProvider';
 export { createTauriCommunityAccount } from './tauri/TauriCommunityAccount';
 export { createTauriModStats } from './tauri/TauriModStats';
 export { createTauriModComments } from './tauri/TauriModComments';
+export { createLocalStorageUsagePreferenceStore } from './localStorageUsagePreferenceStore';
+export { createTauriDownloadStats } from './tauri/TauriDownloadStats';

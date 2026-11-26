@@ -41,6 +41,7 @@ async fn state_with(health: Arc<dyn HealthProbe>, clock: Arc<FakeClock>, trust: 
         health,
         auth,
         stars: star_service(store.clone()),
+        downloads: community_api::testing::downloads_state(store.clone(), clock.clone()),
         limits: RateLimits::new(clock.clone()),
         comments: comments_state(store, clock),
         trust_proxy_headers: trust,

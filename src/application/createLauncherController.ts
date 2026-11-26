@@ -500,6 +500,11 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
         },
       });
       try {
+        deps.onCatalogInstalled?.(id);
+      } catch {
+        // A side channel: it can never fail an install that already succeeded.
+      }
+      try {
         await load(result.enabled ? ['mods', 'profiles'] : ['mods']);
       } catch (caught) {
         set({ error: toCommandError(caught) });

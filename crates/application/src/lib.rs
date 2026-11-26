@@ -24,6 +24,8 @@ mod deploy_ports;
 mod deploy_service;
 mod deploy_session;
 mod download_ports;
+mod download_stats_ports;
+mod download_stats_service;
 mod error;
 mod game_error;
 mod game_ports;
@@ -83,6 +85,10 @@ pub use deploy_session::DeploySession;
 pub use download_ports::{
     CancelFlag, DownloadError, DownloadProgress, DownloadRequest, DownloadStaging, ModDownloader,
 };
+pub use download_stats_ports::{
+    DailyDownloads, DownloadStatsApi, DownloadStatsError, InstallIdStore, ModDownloads,
+};
+pub use download_stats_service::DownloadStatsService;
 pub use error::AppError;
 pub use game_error::GameError;
 pub use game_ports::{GameFiles, SteamLocator};

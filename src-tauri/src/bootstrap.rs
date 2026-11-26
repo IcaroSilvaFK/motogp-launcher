@@ -6,18 +6,19 @@ use crate::adapters::{TauriEvents, TauriFolderOpener, TauriOpener, TauriWebOpene
 use crate::ads_fallback::{NullAdBeacon, NullAdSource};
 use crate::{
     compose, configure, run_recovery, MemoryCredentialStore, UnavailableCatalogSource,
-    UnavailableCommunityApi, UnavailableModStatsApi, COMMUNITY_SERVER_URL,
+    UnavailableCommunityApi, UnavailableDownloadStats, UnavailableModStatsApi,
+    COMMUNITY_SERVER_URL,
 };
 use motogp_application::{
     AdBeaconSink, AdSource, AvatarFetcher, CatalogSource, CommunityApi, CommunityAuthService,
     CommunityCommentsApi, CommunityCommentsService, CommunityStarsService, CredentialStore,
-    InstanceGuard, InstanceLock, ModStatsApi,
+    DownloadStatsApi, DownloadStatsService, InstanceGuard, InstanceLock, ModStatsApi,
 };
 use motogp_infrastructure::{
-    bundled_catalog, DataDir, FileInstanceLock, HttpAdBeaconSink, HttpAdConfig, HttpAdSource,
-    HttpAvatarFetcher, HttpCatalogConfig, HttpCatalogSource, HttpCommunityApi, HttpCommunityConfig,
-    HttpModStatsApi, OsPkce, SteamArtwork, SteamLibraries, SysinfoProcesses, SystemClock,
-    TcpLoopbackReceiver, ThreadRunner, WindowsCredentialStore,
+    bundled_catalog, DataDir, FileInstanceLock, FsInstallIdStore, HttpAdBeaconSink, HttpAdConfig,
+    HttpAdSource, HttpAvatarFetcher, HttpCatalogConfig, HttpCatalogSource, HttpCommunityApi,
+    HttpCommunityConfig, HttpDownloadStats, HttpModStatsApi, OsPkce, SteamArtwork, SteamLibraries,
+    SysinfoProcesses, SystemClock, TcpLoopbackReceiver, ThreadRunner, WindowsCredentialStore,
 };
 use std::sync::{Arc, Mutex};
 use tauri::Manager;
@@ -143,6 +144,23 @@ fn community_services(
     (auth, stars, comments)
 }
 
+/// Anonymous download counts (#120): HTTP client plus the install id file. If the
+/// client cannot be built the counts are simply unavailable.
+fn download_stats(data: &DataDir) -> Arc<DownloadStatsService> {
+    let config = HttpCommunityConfig::new(COMMUNITY_SERVER_URL, env!("CARGO_PKG_VERSION"));
+    let api: Arc<dyn DownloadStatsApi> = match HttpDownloadStats::new(config) {
+        Ok(api) => Arc::new(api),
+        Err(error) => {
+            eprintln!("download stats unavailable: {error}");
+            Arc::new(UnavailableDownloadStats)
+        }
+    };
+    Arc::new(DownloadStatsService::new(
+        api,
+        Arc::new(FsInstallIdStore::new(data.install_id_file())),
+    ))
+}
+
 /// Avatar fetcher used when the HTTP client cannot be built: initials only.
 struct NoAvatars;
 
@@ -203,7 +221,8 @@ pub fn run() {
                 .ok(),
         )
         .with_stars(stars)
-        .with_comments(comments);
+        .with_comments(comments)
+        .with_downloads(download_stats(&data));
         // Recovery finishes before the state exists, so no command can run
         // `play` earlier. A failure is already on the error channel and blocks
         // new deploys; it must not stop the app from starting.

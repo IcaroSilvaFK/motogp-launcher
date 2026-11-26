@@ -3,19 +3,20 @@
 //! background execution, events) is injected.
 use crate::catalog_install_support::production_downloader;
 use crate::comments_fallback::offline_comments;
-use crate::{MemoryCredentialStore, UnavailableModStatsApi};
+use crate::{MemoryCredentialStore, UnavailableDownloadStats, UnavailableModStatsApi};
 use motogp_application::{
     AdBeaconSink, AdCache, AdService, AdSource, ArtworkService, BackgroundRunner, CancelFlag,
     CatalogInstaller, CatalogService, CatalogSource, CommunityAuthService,
-    CommunityCommentsService, CommunityStarsService, DeployService, FolderOpener, GameService,
-    GameSettings, ModDownloader, PlayService, ProcessInspector, ProfileModPlanner, ProfileService,
-    RawCatalog, SessionPublisher, SessionService, StorageService, UrlOpener, WebPageOpener,
+    CommunityCommentsService, CommunityStarsService, DeployService, DownloadStatsService,
+    FolderOpener, GameService, GameSettings, ModDownloader, PlayService, ProcessInspector,
+    ProfileModPlanner, ProfileService, RawCatalog, SessionPublisher, SessionService,
+    StorageService, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{
     mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsDownloadStaging, FsGameFiles,
-    FsStorageScanner, JsonAdCache, JsonCatalogCache, JsonConfigStore, JsonDeployedRepository,
-    JsonModRepository, JsonProfileStore, ModLibrary, MonotonicClock, Sha256Hasher, SteamArtwork,
-    SteamLibraries, SystemClock,
+    FsInstallIdStore, FsStorageScanner, JsonAdCache, JsonCatalogCache, JsonConfigStore,
+    JsonDeployedRepository, JsonModRepository, JsonProfileStore, ModLibrary, MonotonicClock,
+    Sha256Hasher, SteamArtwork, SteamLibraries, SystemClock,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -64,6 +65,8 @@ pub struct AppState {
     pub installer: Arc<Installer>,
     /// Cancel flags of the installs in flight, by catalog entry id.
     pub install_cancels: Arc<Mutex<HashMap<String, CancelFlag>>>,
+    /// Anonymous download counts (#120). Blocking network I/O; every failure is "nothing".
+    pub downloads: Arc<DownloadStatsService>,
 }
 
 /// Serves the bundled snapshot when nothing is cached and the source fails.
@@ -189,6 +192,10 @@ where
             Sha256Hasher,
         )),
         install_cancels: Arc::default(),
+        downloads: Arc::new(DownloadStatsService::new(
+            Arc::new(UnavailableDownloadStats),
+            Arc::new(FsInstallIdStore::new(data.install_id_file())),
+        )),
         catalog: Arc::new(with_bundled(
             CatalogService::new(
                 catalog_source,
@@ -229,6 +236,11 @@ impl AppState {
     /// Replaces the comments service (production wiring and tests).
     pub fn with_comments(self, comments: Arc<CommunityCommentsService>) -> Self {
         Self { comments, ..self }
+    }
+
+    /// Replaces the download-stats service (production wiring and tests).
+    pub fn with_downloads(self, downloads: Arc<DownloadStatsService>) -> Self {
+        Self { downloads, ..self }
     }
 
     /// Replaces the ad service (tests).

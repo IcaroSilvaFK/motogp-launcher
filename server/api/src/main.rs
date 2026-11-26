@@ -2,9 +2,10 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use community_api::comments::CommentsState;
+use community_api::downloads::DownloadsState;
 use community_api::{build_router, AppState, RateLimits};
 use community_application::comments::CommentsService;
-use community_application::{AuthService, StarService};
+use community_application::{AuthService, DownloadService, StarService};
 use community_infrastructure::{
     Config, DiscordHttp, OsTokenGenerator, Sha256Hasher, SqliteStore, SystemClock,
 };
@@ -60,6 +61,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         health: store.clone(),
         auth: Arc::new(auth),
         stars: Arc::new(StarService::new(store.clone())),
+        downloads: DownloadsState::new(
+            Arc::new(DownloadService {
+                clock: clock.clone(),
+                hasher: Arc::new(Sha256Hasher),
+                downloads: store.clone(),
+            }),
+            clock.clone(),
+        ),
         limits: RateLimits::new(clock),
         comments,
         trust_proxy_headers: config.trust_proxy_headers,

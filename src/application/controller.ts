@@ -123,6 +123,11 @@ export interface LauncherDeps {
   picker: FilePicker;
   session: SessionEvents;
   drop: DropEvents;
+  /**
+   * Called after a successful catalog install (#120: the download report). Never awaited, never
+   * called after a failure or a cancel; a throw cannot break the install.
+   */
+  onCatalogInstalled?: (id: string) => void;
 }
 
 /** Implemented by the application layer (Task C): can the user start a session now? */

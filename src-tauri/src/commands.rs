@@ -419,6 +419,9 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         crate::commands_comments::community_comment_post,
         crate::commands_comments::community_comment_edit,
         crate::commands_comments::community_comment_delete,
+        crate::commands_downloads::report_mod_download,
+        crate::commands_downloads::get_mod_downloads,
+        crate::commands_downloads::get_mod_download_daily,
         crate::commands_install::install_catalog_entry,
         crate::commands_install::cancel_catalog_install
     ])

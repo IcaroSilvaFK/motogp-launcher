@@ -15,6 +15,7 @@ import { AdSlot } from './AdSlot';
 import { BannerIcon } from './BannerIcon';
 import { CategoryCover, InlineError } from './CatalogParts';
 import { useCommunity } from './CommunityContext';
+import { DownloadCount } from './DownloadCounts';
 import { Icon } from './Icon';
 import type { IconName } from './Icon';
 import { formatDay, formatInstantDate, useI18n } from './i18n';
@@ -372,6 +373,7 @@ export function DiscoverScreen({
                         <span>{t.discover.updated(formatDay(entry.updatedAt, locale))}</span>
                         {showStars && <span className="dot" aria-hidden="true" />}
                         {showStars && <StarCount stars={starsOf(entry.id)} />}
+                        <DownloadCount id={entry.id} />
                       </span>
                       {owned && (
                         <span className="badge badge-on catalog-card-badge" title={t.discover.inLibraryDetail}>

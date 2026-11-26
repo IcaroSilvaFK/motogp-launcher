@@ -207,6 +207,11 @@ export const ptBR: Messages = {
     autoEnableHint: 'Adiciona o novo mod ao perfil ativo, exceto se conflitar com um mod ativo.',
     adShow: 'Mostrar',
     adOff: 'Desativado',
+    shareUsage: 'Compartilhar uso anônimo',
+    shareUsageHint:
+      'Quando uma instalação do catálogo termina, envia só o id do mod e um id de instalação aleatório para contar downloads. Sem conta, e seu IP não é guardado.',
+    shareUsageOn: 'Ativado',
+    shareUsageOff: 'Desativado',
     languageHint: 'Vale na hora e fica salvo.',
     language: 'Idioma',
     languageNames: { 'pt-BR': 'Português (Brasil)', en: 'English' },
@@ -392,6 +397,18 @@ export const ptBR: Messages = {
     retry: 'Tentar novamente',
     cancel: 'Cancelar',
     progressLabel: 'Progresso do download',
+  },
+  downloads: {
+    count: (count, formatted) => `${formatted} ${plural(count, 'download', 'downloads')}`,
+    label: 'Downloads',
+    last30Days: (formatted) => `${formatted} nos últimos 30 dias`,
+    chartTitle: 'Downloads nos últimos 30 dias',
+    chartSummary: (total, formatted, peak) =>
+      total === 0
+        ? 'Nenhum download nos últimos 30 dias'
+        : `${formatted} ${plural(total, 'download', 'downloads')} nos últimos 30 dias` +
+          (peak === null ? '' : `, pico de ${peak.count} em ${peak.date}`),
+    bar: (date, count, formatted) => `${date}: ${formatted} ${plural(count, 'download', 'downloads')}`,
   },
   errors: {
     read_failed: 'Não foi possível ler os dados do launcher.',

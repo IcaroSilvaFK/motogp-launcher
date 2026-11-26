@@ -206,6 +206,11 @@ export const en: Messages = {
     autoEnableHint: 'Adds the new mod to the active profile, unless it conflicts with an enabled mod.',
     adShow: 'Show',
     adOff: 'Off',
+    shareUsage: 'Share anonymous usage',
+    shareUsageHint:
+      'When a catalog install finishes, sends only the mod id and a random install id to count downloads. No account, and your IP is not stored.',
+    shareUsageOn: 'On',
+    shareUsageOff: 'Off',
     languageHint: 'Applies immediately and is remembered.',
     language: 'Language',
     languageNames: { 'pt-BR': 'Português (Brasil)', en: 'English' },
@@ -389,6 +394,18 @@ export const en: Messages = {
     retry: 'Retry',
     cancel: 'Cancel',
     progressLabel: 'Download progress',
+  },
+  downloads: {
+    count: (count, formatted) => `${formatted} ${plural(count, 'download', 'downloads')}`,
+    label: 'Downloads',
+    last30Days: (formatted) => `${formatted} in the last 30 days`,
+    chartTitle: 'Downloads in the last 30 days',
+    chartSummary: (total, formatted, peak) =>
+      total === 0
+        ? 'No downloads in the last 30 days'
+        : `${formatted} ${plural(total, 'download', 'downloads')} in the last 30 days` +
+          (peak === null ? '' : `, peak of ${peak.count} on ${peak.date}`),
+    bar: (date, count, formatted) => `${date}: ${formatted} ${plural(count, 'download', 'downloads')}`,
   },
   errors: {
     read_failed: 'Could not read the launcher data.',

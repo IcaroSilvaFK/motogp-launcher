@@ -8,6 +8,7 @@ mod catalog_fallback;
 mod catalog_install_support;
 mod commands;
 mod commands_comments;
+mod commands_downloads;
 mod commands_install;
 mod commands_stars;
 mod comments_fallback;
@@ -15,6 +16,7 @@ mod community_config;
 mod community_fallback;
 mod community_stars_fallback;
 mod compose;
+mod download_stats_fallback;
 mod dto;
 mod dto_comments;
 mod dto_stars;
@@ -47,6 +49,7 @@ pub use compose::{
     compose, compose_with_downloader, Ads, AppState, Catalog, Installer, Profiles, Settings,
     Storage,
 };
+pub use download_stats_fallback::UnavailableDownloadStats;
 pub use dto::{
     AdDto, CatalogDownloadDto, CatalogDto, CatalogEntryDto, CommunityProfileDto,
     CommunityStatusDto, ConfigDto, CurrentSessionDto, DeploySessionDto, GameInfoDto, ModDto,
