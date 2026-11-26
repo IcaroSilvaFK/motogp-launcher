@@ -1,6 +1,6 @@
 //! Steps for `tests/features/tauri-interface.feature` (issue #8): the real
 //! commands over the Tauri mock runtime with controlled ports.
-use crate::ipc_support::{FakeCatalogSource, Harness};
+use crate::ipc_support::{ads_over, FakeAdSource, FakeCatalogSource, Harness};
 use cucumber::writer::Stats as _;
 use cucumber::{given, then, when, World};
 use serde_json::{json, Value};
@@ -23,6 +23,7 @@ struct InterfaceWorld {
     locked: Value,
     locked_profile: String,
     removed_mod: String,
+    ad: Value,
 }
 
 impl std::fmt::Debug for InterfaceWorld {
@@ -373,6 +374,86 @@ fn web_opener_received(w: &mut InterfaceWorld) {
         *w.h().pages_opened.lock().unwrap(),
         vec!["https://overtake.gg/downloads/rebalanced-ai.69345/"]
     );
+}
+
+#[given(expr = "an ad feed with the creative {string} in the {string} slot")]
+fn ad_feed_with_creative(w: &mut InterfaceWorld, id: String, slot: String) {
+    let creative = motogp_domain::AdCreativeDraft {
+        id,
+        slot,
+        title: "Acme tires".to_string(),
+        body: "Grip for every lap.".to_string(),
+        // A tiny valid base64 PNG data URI: the feed rules accept only rasters.
+        image_data_uri: Some("data:image/png;base64,iVBORw0KGgo=".to_string()),
+        click_url: "https://sponsor.example/landing?c=1".to_string(),
+        sponsor_label: "Acme".to_string(),
+        ..Default::default()
+    };
+    let ads = ads_over(Arc::new(FakeAdSource::serving(vec![creative])));
+    w.harness = Some(Harness::with_ads(ads));
+}
+
+#[given("the composed state with an empty ad feed")]
+fn composed_state_with_empty_ad_feed(w: &mut InterfaceWorld) {
+    w.harness = Some(Harness::new());
+}
+
+#[when(expr = "the frontend invokes get_ad with slot {string}")]
+fn invoke_get_ad(w: &mut InterfaceWorld, slot: String) {
+    w.ad = w
+        .h()
+        .invoke("get_ad", json!({ "slot": slot }))
+        .expect("get_ad");
+}
+
+#[then(expr = "it receives the creative {string} without any URL")]
+fn receives_creative_without_url(w: &mut InterfaceWorld, id: String) {
+    assert_eq!(w.ad["id"], json!(id));
+    assert_eq!(w.ad["sponsorLabel"], json!("Acme"));
+    let wire = w.ad.to_string();
+    assert!(
+        !wire.contains("https://"),
+        "no URL may reach the WebView: {wire}"
+    );
+    assert!(w.ad.get("clickUrl").is_none() && w.ad.get("impressionUrl").is_none());
+}
+
+#[then("it receives null")]
+fn receives_null(w: &mut InterfaceWorld) {
+    assert_eq!(w.ad, Value::Null);
+}
+
+#[when(expr = "the frontend invokes ad_clicked with slot {string} and creativeId {string}")]
+fn invoke_ad_clicked(w: &mut InterfaceWorld, slot: String, creative_id: String) {
+    w.locked = match w.h().invoke(
+        "ad_clicked",
+        json!({ "slot": slot, "creativeId": creative_id }),
+    ) {
+        Ok(_) => Value::Null,
+        Err(error) => error,
+    };
+}
+
+#[then("the controlled ad opener receives the creative's click URL")]
+fn ad_opener_received(w: &mut InterfaceWorld) {
+    assert_eq!(w.locked, Value::Null);
+    assert_eq!(
+        *w.h().ad_pages_opened.lock().unwrap(),
+        vec!["https://sponsor.example/landing?c=1"]
+    );
+}
+
+#[then("no game session was started")]
+fn no_game_session_started(w: &mut InterfaceWorld) {
+    assert!(w.h().opened.lock().unwrap().is_empty());
+}
+
+#[then("nothing is opened")]
+fn nothing_is_opened(w: &mut InterfaceWorld) {
+    let h = w.h();
+    assert!(h.ad_pages_opened.lock().unwrap().is_empty());
+    assert!(h.pages_opened.lock().unwrap().is_empty());
+    assert!(h.opened.lock().unwrap().is_empty());
 }
 
 /// Runs only `tauri-interface.feature`; returns `true` when every step passed.

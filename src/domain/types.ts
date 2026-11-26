@@ -136,6 +136,8 @@ export const BACKEND_ERROR_CODES = [
   'download_size_mismatch',
   'download_hash_mismatch',
   'download_cancelled',
+  // Sponsored slots (#103).
+  'ad_unknown_creative',
 ] as const;
 
 export const FRONTEND_ERROR_CODES = [

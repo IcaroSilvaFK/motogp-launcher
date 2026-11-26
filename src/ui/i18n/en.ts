@@ -340,6 +340,7 @@ export const en: Messages = {
     catalog_entry_not_found: 'That mod is no longer in the catalog. Refresh the catalog and try again.',
     catalog_page_not_allowed: 'The page of this mod cannot be opened because its address is not trusted.',
     open_page_failed: 'The page could not be opened in your browser.',
+    ad_unknown_creative: 'This sponsor is no longer available.',
     // Catalog downloads (#74).
     catalog_entry_not_downloadable: 'This mod cannot be downloaded by the launcher. Open its page to get it.',
     catalog_install_in_progress: 'This mod is already being installed.',

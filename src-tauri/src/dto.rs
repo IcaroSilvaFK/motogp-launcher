@@ -1,8 +1,8 @@
 //! IPC data transfer objects. Fields are snake_case on the wire; the
 //! JS-side command arguments are camelCase (handled by `#[tauri::command]`).
 use motogp_application::{
-    CatalogOrigin, CatalogSnapshot, DeploySession, RecoveryState, RecoveryStatus, SessionEvent,
-    SessionPhase, SessionSnapshot, SessionState,
+    AdView, CatalogOrigin, CatalogSnapshot, DeploySession, RecoveryState, RecoveryStatus,
+    SessionEvent, SessionPhase, SessionSnapshot, SessionState,
 };
 use motogp_domain::{
     CatalogDownload, CatalogEntry, Config, FileConflict, GameInfo, ModEntry, Profile,
@@ -368,10 +368,56 @@ impl From<CatalogSnapshot> for CatalogDto {
     }
 }
 
+/// A sponsored creative as the WebView sees it: no click or impression URL.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdDto {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub image_data_uri: Option<String>,
+    pub sponsor_label: String,
+}
+
+impl From<AdView> for AdDto {
+    fn from(view: AdView) -> Self {
+        AdDto {
+            id: view.creative_id,
+            title: view.title,
+            body: view.body,
+            image_data_uri: view.image_data_uri,
+            sponsor_label: view.sponsor_label,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
+
+    #[test]
+    fn the_ad_dto_is_camel_case_and_carries_no_url() {
+        let view = AdView {
+            slot: motogp_domain::AdSlot::Discover,
+            creative_id: "acme-1".into(),
+            title: "Acme tires".into(),
+            body: "Grip".into(),
+            image_data_uri: Some("data:image/png;base64,AAAA".into()),
+            sponsor_label: "Acme".into(),
+        };
+        let value = serde_json::to_value(AdDto::from(view)).unwrap();
+        assert_eq!(
+            value,
+            serde_json::json!({
+                "id": "acme-1",
+                "title": "Acme tires",
+                "body": "Grip",
+                "imageDataUri": "data:image/png;base64,AAAA",
+                "sponsorLabel": "Acme",
+            })
+        );
+    }
 
     #[test]
     fn artwork_data_url_embeds_the_mime_and_base64_bytes() {

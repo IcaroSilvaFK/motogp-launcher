@@ -23,7 +23,7 @@ pub use catalog::{
     SUPPORTED_CATALOG_SCHEMA,
 };
 pub use catalog_page::{
-    check_https_url_on_hosts, check_page_url, PageUrlError, ALLOWED_PAGE_HOSTS,
+    check_https_url, check_https_url_on_hosts, check_page_url, PageUrlError, ALLOWED_PAGE_HOSTS,
 };
 pub use config::Config;
 pub use conflict::{detect_conflicts, FileConflict};

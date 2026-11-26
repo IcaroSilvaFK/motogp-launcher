@@ -342,6 +342,7 @@ export const ptBR: Messages = {
     catalog_entry_not_found: 'Este mod não está mais no catálogo. Atualize o catálogo e tente novamente.',
     catalog_page_not_allowed: 'A página deste mod não pode ser aberta porque o endereço não é confiável.',
     open_page_failed: 'Não foi possível abrir a página no navegador.',
+    ad_unknown_creative: 'Este patrocinador não está mais disponível.',
     // Catalog downloads (#74).
     catalog_entry_not_downloadable: 'Este mod não pode ser baixado pelo launcher. Abra a página dele para obtê-lo.',
     catalog_install_in_progress: 'Este mod já está sendo instalado.',
