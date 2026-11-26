@@ -1,5 +1,7 @@
 //! BDD runner (cucumber, `harness = false`) for the scenarios in `tests/features/`.
 //! Scenario traceability: see `docs/validation-workflow.md` (Scaffold section).
+#[path = "ipc_support/community_install_steps.rs"]
+mod community_install_steps;
 #[path = "ipc_support/interface_steps.rs"]
 mod interface_steps;
 mod ipc_support;
@@ -306,8 +308,9 @@ fn main() {
     )
     .execution_has_failed();
     let interface_ok = futures::executor::block_on(interface_steps::run());
+    let community_install_ok = futures::executor::block_on(community_install_steps::run());
     let updater_ok = futures::executor::block_on(updater_support::steps::run());
-    if scaffold_failed || !interface_ok || !updater_ok {
+    if scaffold_failed || !interface_ok || !community_install_ok || !updater_ok {
         std::process::exit(1);
     }
 }

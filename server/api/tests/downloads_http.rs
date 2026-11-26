@@ -46,6 +46,7 @@ async fn setup(trust: bool) -> Setup {
         trust_proxy_headers: trust,
         stars: star_service(store.clone()),
         downloads: downloads_state(store.clone(), clock.clone()),
+        mods: community_api::testing::unused_mod_hosting(store.clone(), clock.clone()),
         comments: comments_state(store.clone(), clock.clone()),
     };
     Setup {

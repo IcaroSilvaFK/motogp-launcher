@@ -75,6 +75,7 @@ impl AuthWorld {
                 limits: RateLimits::new(clock.clone()),
                 comments: comments_state(store.clone(), clock.clone()),
                 trust_proxy_headers: false,
+                mods: community_api::testing::unused_mod_hosting(store.clone(), clock.clone()),
             };
             self.harness = Some(Harness {
                 app: build_router(state),

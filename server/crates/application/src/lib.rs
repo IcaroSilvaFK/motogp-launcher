@@ -5,10 +5,13 @@ pub mod auth;
 pub mod comments;
 pub mod downloads;
 pub mod error;
+pub mod mod_ports;
+pub mod mods;
 pub mod ports;
 pub mod stars;
 
 pub use auth::AuthService;
 pub use downloads::DownloadService;
 pub use error::AppError;
+pub use mods::ModHostingService;
 pub use stars::{ModStats, StarRepository, StarService};

@@ -9,3 +9,4 @@ export * from './comments';
 export * from './community';
 export * from './modStats';
 export * from './downloads';
+export * from './publishing';

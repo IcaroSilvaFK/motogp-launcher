@@ -20,6 +20,8 @@ import type {
   LauncherController,
   ModStatsSource,
   ModComments,
+  ModPublisher,
+  PublishFilePicker,
   NavPreferenceStore,
   UpdateController,
   WindowControls,
@@ -87,6 +89,8 @@ function Shell({
   modComments,
   downloadStats,
   usagePreference,
+  modPublisher,
+  publishPicker,
 }: {
   controller: LauncherController;
   adProvider?: AdProvider;
@@ -97,6 +101,9 @@ function Shell({
   downloadStats?: DownloadStats;
   /** Anonymous usage sharing (#120); absent means no Settings row. */
   usagePreference?: UsagePreferenceHandle;
+  /** Mod hosting (#130): publish and "My mods". Absent: no publish UI. */
+  modPublisher?: ModPublisher;
+  publishPicker?: PublishFilePicker;
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
@@ -131,8 +138,14 @@ function Shell({
   // One stars store per source, so Discover and the mod page share its 60 s cache (#119).
   const starsStore = useMemo(() => (modStats ? createModStatsStore(modStats) : undefined), [modStats]);
   const community = useMemo(
-    () => ({ account: communityAccount, stars: starsStore, comments: modComments }),
-    [communityAccount, starsStore, modComments],
+    () => ({
+      account: communityAccount,
+      stars: starsStore,
+      comments: modComments,
+      publisher: modPublisher,
+      publishPicker,
+    }),
+    [communityAccount, starsStore, modComments, modPublisher, publishPicker],
   );
 
   useEffect(() => {
@@ -227,6 +240,8 @@ export function App({
   modComments,
   downloadStats,
   usagePreference,
+  modPublisher,
+  publishPicker,
 }: {
   controller: LauncherController;
   locale?: Locale;
@@ -252,6 +267,9 @@ export function App({
   downloadStats?: DownloadStats;
   /** Anonymous usage sharing (#120); absent means no Settings row. */
   usagePreference?: UsagePreferenceHandle;
+  /** Mod hosting (#130): publish and "My mods". Absent: no publish UI. */
+  modPublisher?: ModPublisher;
+  publishPicker?: PublishFilePicker;
 }) {
   return (
     <I18nProvider locale={locale} onLocaleChange={onLocaleChange}>
@@ -271,6 +289,8 @@ export function App({
         modComments={modComments}
         downloadStats={downloadStats}
         usagePreference={usagePreference}
+        modPublisher={modPublisher}
+        publishPicker={publishPicker}
       />
     </I18nProvider>
   );

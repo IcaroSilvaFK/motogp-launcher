@@ -23,7 +23,17 @@ startup, so no extra files are needed.
 sudo useradd --system --home /var/lib/motogp-community --shell /usr/sbin/nologin motogp-community
 sudo install -d -o motogp-community -g motogp-community -m 0750 /var/lib/motogp-community
 sudo install -d -o motogp-community -g motogp-community -m 0750 /var/backups/motogp-community
+# Mod files (uploads in progress, pending review, public). The service creates the subfolders itself.
+sudo install -d -o motogp-community -g motogp-community -m 0755 /var/lib/motogp-community/mods
 ```
+
+**Disk space planning.** Mod files live under `MOD_STORAGE_DIR`. Budget for the worst case: a user may hold
+`MOD_USER_QUOTA_BYTES` (default 10 GiB) and an upload may be `MOD_MAX_UPLOAD_BYTES` (default 2 GiB), so the number of
+active creators times the quota is the ceiling, plus one cap of temporary space per upload in progress (`incoming/`
+bytes are purged after 24 hours when abandoned). Lower the two limits, or put the folder on a bigger volume, before
+opening publishing to many creators. If `MOD_STORAGE_DIR` is outside `/var/lib/motogp-community`, add its path to
+`ReadWritePaths` in the systemd unit below. The `public/` folder must be readable by Caddy (mode `0755`, which the
+command above uses; the files the service writes inherit the default umask `0644`).
 
 ## 3. Discord application
 
@@ -48,9 +58,21 @@ DISCORD_CLIENT_SECRET=<client secret>
 PUBLIC_BASE_URL=https://community.example.com
 DATABASE_URL=sqlite:///var/lib/motogp-community/community.db
 ADMIN_DISCORD_IDS=<your discord user id>,<another id>
+MOD_STORAGE_DIR=/var/lib/motogp-community/mods
 BIND_ADDR=127.0.0.1:8787
 TRUST_PROXY_HEADERS=true
+# Optional mod hosting limits (defaults shown):
+# MOD_MAX_UPLOAD_BYTES=2147483648
+# MOD_USER_QUOTA_BYTES=10737418240
+# MOD_UPLOADS_PER_DAY=10
 ```
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `MOD_STORAGE_DIR` | required | Root of the mod files: `incoming/`, `pending/` and `public/` |
+| `MOD_MAX_UPLOAD_BYTES` | 2147483648 (2 GiB) | Largest file; a bigger declared size is refused before storing |
+| `MOD_USER_QUOTA_BYTES` | 10737418240 (10 GiB) | Total a user may hold (non-rejected versions plus uploads in progress) |
+| `MOD_UPLOADS_PER_DAY` | 10 | Uploads a user may start per 24 hours |
 
 `TRUST_PROXY_HEADERS=true` makes the server read the client IP from the right-most `X-Forwarded-For` value, which
 Caddy appends. Set it **only** when the server is reachable exclusively through Caddy (it binds to loopback, so it
@@ -107,9 +129,18 @@ Install Caddy from its official package repository, then `/etc/caddy/Caddyfile`:
 
 ```caddyfile
 community.example.com {
+    # Approved mod files are served straight from disk (fast, with Range support).
+    # Keep this before reverse_proxy. Only the public/ folder is exposed.
+    handle_path /files/* {
+        root * /var/lib/motogp-community/mods/public
+        file_server
+    }
     reverse_proxy 127.0.0.1:8787
 }
 ```
+
+Large uploads come through `reverse_proxy` in 8 MiB chunks, so no special body limit is needed in Caddy. The Rust
+server also serves `/files/*` itself, so everything still works when Caddy is not serving the folder.
 
 ```sh
 sudo systemctl reload caddy
@@ -134,6 +165,38 @@ Schedule it daily with cron or a systemd timer and prune old files, for example:
 ```
 
 Restore by stopping the service and copying a backup over `community.db`.
+
+The mod files are not in the database: back up `MOD_STORAGE_DIR` next to the SQLite backup, otherwise a restored
+database points at files that no longer exist. `rsync` copies only what changed:
+
+```sh
+sudo rsync -a --delete /var/lib/motogp-community/mods/ /var/backups/motogp-community/mods/
+```
+
+`incoming/` holds partial uploads and may be skipped (`--exclude incoming/`). Restore the database and the folder from
+the same moment when you can.
+
+## 7b. Approving mods (until the admin page exists)
+
+Creators publish from the launcher; every version waits for an admin. Until the admin page of issue #121 lands, use
+`curl` with the session token of an admin (a user whose Discord id is in `ADMIN_DISCORD_IDS`; the launcher stores
+its token, or sign in once and read it from `POST /auth/token`):
+
+```sh
+TOKEN=<admin session token>
+BASE=https://community.example.com
+
+# What is waiting?
+curl -s -H "Authorization: Bearer $TOKEN" $BASE/admin/mods/pending
+
+# Approve (the file becomes public) or reject (the file is deleted, the creator sees the reason).
+curl -s -X POST -H "Authorization: Bearer $TOKEN" $BASE/admin/mods/brazil-livery/versions/1.0/approve
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  -d '{"reason":"Contains assets we cannot redistribute"}' \
+  $BASE/admin/mods/brazil-livery/versions/1.0/reject
+```
+
+Pending files sit in `pending/` and are never served; only `public/` is exposed.
 
 ## 8. Updating
 

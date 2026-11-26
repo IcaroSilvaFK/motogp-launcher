@@ -11,7 +11,8 @@ use axum::extract::ConnectInfo;
 use axum::http::{header, Method, Request};
 use axum::Router;
 use community_api::testing::{
-    auth_service, comments_state, downloads_state, star_service, FakeClock, FakeDiscord,
+    auth_service, comments_state, downloads_state, star_service, unused_mod_hosting, FakeClock,
+    FakeDiscord,
 };
 use community_api::{build_router, AppState, RateLimits};
 use community_application::ports::DiscordUser;
@@ -54,6 +55,7 @@ impl Harness {
             auth: auth_service(store.clone(), clock.clone(), discord.clone()),
             stars: star_service(store.clone()),
             downloads: downloads_state(store.clone(), clock.clone()),
+            mods: unused_mod_hosting(store.clone(), clock.clone()),
             // Generous per-IP limits: these tests are not about them.
             limits: RateLimits::with_limits(clock.clone(), 10_000, 10_000, user_per_minute),
             comments: comments_state(store, clock.clone()),

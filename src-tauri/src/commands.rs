@@ -423,6 +423,9 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         crate::commands_downloads::get_mod_downloads,
         crate::commands_downloads::get_mod_download_daily,
         crate::commands_install::install_catalog_entry,
-        crate::commands_install::cancel_catalog_install
+        crate::commands_install::cancel_catalog_install,
+        crate::commands_publish::community_publish_mod,
+        crate::commands_publish::community_cancel_publish,
+        crate::commands_publish::community_my_mods
     ])
 }

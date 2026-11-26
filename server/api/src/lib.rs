@@ -4,10 +4,12 @@ pub mod auth;
 pub mod comments;
 pub mod downloads;
 pub mod error;
+pub mod mods;
 pub mod rate_limit;
 pub mod routes;
 pub mod stars;
 pub mod testing;
+pub mod uploads;
 
 use std::sync::Arc;
 
@@ -43,6 +45,8 @@ pub struct AppState {
     pub trust_proxy_headers: bool,
     /// Download counts: service and its report limiter.
     pub downloads: downloads::DownloadsState,
+    /// Mod hosting: use cases, public URLs and the served directory.
+    pub mods: mods::ModHosting,
 }
 
 /// One limiter per route group.
@@ -101,6 +105,7 @@ pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(routes::health))
         .merge(routes::extra_routes())
+        .merge(mods::files_router(&state.mods.files_dir))
         .fallback(routes::not_found)
         .layer(middleware::from_fn_with_state(
             state.clone(),

@@ -75,6 +75,7 @@ impl DownloadsWorld {
                 trust_proxy_headers: false,
                 stars: star_service(store.clone()),
                 downloads: downloads_state(store.clone(), clock.clone()),
+                mods: community_api::testing::unused_mod_hosting(store.clone(), clock.clone()),
                 comments: comments_state(store.clone(), clock.clone()),
             };
             self.harness = Some(Harness {

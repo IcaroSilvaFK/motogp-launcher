@@ -7,6 +7,9 @@ use community_domain::DiscordId;
 
 pub const DEFAULT_BIND_ADDR: &str = "127.0.0.1:8787";
 pub const DEFAULT_DISCORD_API_BASE: &str = "https://discord.com/api/v10";
+pub const DEFAULT_MOD_MAX_UPLOAD_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+pub const DEFAULT_MOD_USER_QUOTA_BYTES: u64 = 10 * 1024 * 1024 * 1024;
+pub const DEFAULT_MOD_UPLOADS_PER_DAY: u32 = 10;
 
 #[derive(Clone)]
 pub struct Config {
@@ -19,6 +22,11 @@ pub struct Config {
     pub bind_addr: SocketAddr,
     pub trust_proxy_headers: bool,
     pub discord_api_base: String,
+    /// Root of the mod files (`incoming/`, `pending/`, `public/`).
+    pub mod_storage_dir: std::path::PathBuf,
+    pub mod_max_upload_bytes: u64,
+    pub mod_user_quota_bytes: u64,
+    pub mod_uploads_per_day: u32,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -89,7 +97,30 @@ impl Config {
             .trim_end_matches('/')
             .to_owned();
 
+        let mod_storage_dir = required("MOD_STORAGE_DIR")?.into();
+        let positive = |name: &'static str, default: u64| -> Result<u64, ConfigError> {
+            match optional(name) {
+                None => Ok(default),
+                Some(value) => value
+                    .parse::<u64>()
+                    .ok()
+                    .filter(|number| *number > 0)
+                    .ok_or(ConfigError::Invalid(name)),
+            }
+        };
+        let mod_max_upload_bytes = positive("MOD_MAX_UPLOAD_BYTES", DEFAULT_MOD_MAX_UPLOAD_BYTES)?;
+        let mod_user_quota_bytes = positive("MOD_USER_QUOTA_BYTES", DEFAULT_MOD_USER_QUOTA_BYTES)?;
+        let mod_uploads_per_day = u32::try_from(positive(
+            "MOD_UPLOADS_PER_DAY",
+            u64::from(DEFAULT_MOD_UPLOADS_PER_DAY),
+        )?)
+        .map_err(|_| ConfigError::Invalid("MOD_UPLOADS_PER_DAY"))?;
+
         Ok(Self {
+            mod_storage_dir,
+            mod_max_upload_bytes,
+            mod_user_quota_bytes,
+            mod_uploads_per_day,
             discord_client_id,
             discord_client_secret,
             public_base_url,
@@ -113,6 +144,10 @@ impl fmt::Debug for Config {
             .field("bind_addr", &self.bind_addr)
             .field("trust_proxy_headers", &self.trust_proxy_headers)
             .field("discord_api_base", &self.discord_api_base)
+            .field("mod_storage_dir", &self.mod_storage_dir)
+            .field("mod_max_upload_bytes", &self.mod_max_upload_bytes)
+            .field("mod_user_quota_bytes", &self.mod_user_quota_bytes)
+            .field("mod_uploads_per_day", &self.mod_uploads_per_day)
             .finish()
     }
 }
@@ -129,6 +164,7 @@ mod tests {
             ("PUBLIC_BASE_URL", "https://community.example.com/"),
             ("DATABASE_URL", "sqlite::memory:"),
             ("ADMIN_DISCORD_IDS", "111, 222"),
+            ("MOD_STORAGE_DIR", "/var/lib/motogp-community/mods"),
         ])
     }
 
@@ -152,6 +188,31 @@ mod tests {
     }
 
     #[test]
+    fn mod_hosting_defaults_and_overrides() {
+        let config = load(&base()).unwrap();
+        assert_eq!(config.mod_max_upload_bytes, 2_147_483_648);
+        assert_eq!(config.mod_user_quota_bytes, 10_737_418_240);
+        assert_eq!(config.mod_uploads_per_day, 10);
+        assert_eq!(
+            config.mod_storage_dir,
+            std::path::PathBuf::from("/var/lib/motogp-community/mods")
+        );
+        let mut vars = base();
+        vars.insert("MOD_MAX_UPLOAD_BYTES", "1000");
+        vars.insert("MOD_USER_QUOTA_BYTES", "5000");
+        vars.insert("MOD_UPLOADS_PER_DAY", "3");
+        let config = load(&vars).unwrap();
+        assert_eq!(
+            (
+                config.mod_max_upload_bytes,
+                config.mod_user_quota_bytes,
+                config.mod_uploads_per_day
+            ),
+            (1000, 5000, 3)
+        );
+    }
+
+    #[test]
     fn optional_values_override_defaults() {
         let mut vars = base();
         vars.insert("BIND_ADDR", "0.0.0.0:9000");
@@ -171,6 +232,7 @@ mod tests {
             "PUBLIC_BASE_URL",
             "DATABASE_URL",
             "ADMIN_DISCORD_IDS",
+            "MOD_STORAGE_DIR",
         ] {
             let mut vars = base();
             vars.remove(name);
@@ -187,6 +249,10 @@ mod tests {
             ("ADMIN_DISCORD_IDS", "abc"),
             ("BIND_ADDR", "nope"),
             ("TRUST_PROXY_HEADERS", "yes"),
+            ("MOD_MAX_UPLOAD_BYTES", "0"),
+            ("MOD_USER_QUOTA_BYTES", "ten"),
+            ("MOD_UPLOADS_PER_DAY", "-1"),
+            ("MOD_UPLOADS_PER_DAY", "99999999999"),
         ] {
             let mut vars = base();
             vars.insert(name, value);

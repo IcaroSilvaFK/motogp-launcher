@@ -12,6 +12,26 @@ pub enum AppError {
         retry_after_secs: u64,
     },
     DiscordUnavailable,
+    /// Mod hosting: the caller may not do this (not an admin, not the owner).
+    Forbidden,
+    /// Mod hosting: the mod id belongs to another user.
+    ModIdTaken,
+    /// Mod hosting: a non-rejected version with this number exists.
+    VersionExists,
+    /// Mod hosting: the chunk offset is not the number of bytes received.
+    OffsetMismatch {
+        received: u64,
+    },
+    /// Mod hosting: the file is over the size cap.
+    FileTooLarge,
+    /// Mod hosting: the per-user storage quota would be exceeded.
+    QuotaExceeded,
+    /// Mod hosting: file extension or image type not allowed.
+    UnsupportedFile(String),
+    /// Mod hosting: the server-side SHA-256 differs from the client's.
+    ChecksumMismatch,
+    /// Mod hosting: completing before all bytes were received.
+    UploadIncomplete,
     /// Internal detail: logged, never returned to the client.
     Internal(String),
 }
@@ -27,6 +47,15 @@ impl AppError {
             Self::NotFound => "not_found",
             Self::RateLimited { .. } => "rate_limited",
             Self::DiscordUnavailable => "discord_unavailable",
+            Self::Forbidden => "forbidden",
+            Self::ModIdTaken => "mod_id_taken",
+            Self::VersionExists => "version_exists",
+            Self::OffsetMismatch { .. } => "offset_mismatch",
+            Self::FileTooLarge => "file_too_large",
+            Self::QuotaExceeded => "quota_exceeded",
+            Self::UnsupportedFile(_) => "unsupported_file",
+            Self::ChecksumMismatch => "checksum_mismatch",
+            Self::UploadIncomplete => "upload_incomplete",
             Self::Internal(_) => "internal",
         }
     }
@@ -41,6 +70,17 @@ impl AppError {
             Self::NotFound => "The resource was not found.".into(),
             Self::RateLimited { .. } => "Too many requests. Try again later.".into(),
             Self::DiscordUnavailable => "Discord is unavailable. Try again later.".into(),
+            Self::Forbidden => "You are not allowed to do this.".into(),
+            Self::ModIdTaken => "This mod id belongs to another creator.".into(),
+            Self::VersionExists => "This version already exists for the mod.".into(),
+            Self::OffsetMismatch { .. } => {
+                "The chunk offset does not match the bytes already received.".into()
+            }
+            Self::FileTooLarge => "The file is larger than the allowed size.".into(),
+            Self::QuotaExceeded => "The storage quota would be exceeded.".into(),
+            Self::UnsupportedFile(message) => message.clone(),
+            Self::ChecksumMismatch => "The SHA-256 of the uploaded file does not match.".into(),
+            Self::UploadIncomplete => "Not all bytes of the file were received yet.".into(),
             Self::Internal(_) => "An internal error occurred.".into(),
         }
     }
@@ -72,6 +112,21 @@ mod tests {
             "rate_limited"
         );
         assert_eq!(AppError::DiscordUnavailable.code(), "discord_unavailable");
+        let hosting = [
+            (AppError::Forbidden, "forbidden"),
+            (AppError::ModIdTaken, "mod_id_taken"),
+            (AppError::VersionExists, "version_exists"),
+            (AppError::OffsetMismatch { received: 1 }, "offset_mismatch"),
+            (AppError::FileTooLarge, "file_too_large"),
+            (AppError::QuotaExceeded, "quota_exceeded"),
+            (AppError::UnsupportedFile("x".into()), "unsupported_file"),
+            (AppError::ChecksumMismatch, "checksum_mismatch"),
+            (AppError::UploadIncomplete, "upload_incomplete"),
+        ];
+        for (error, code) in hosting {
+            assert_eq!(error.code(), code);
+            assert!(!error.public_message().is_empty());
+        }
     }
 
     #[test]

@@ -168,3 +168,46 @@ pub fn downloads_state(
     });
     crate::downloads::DownloadsState::new(service, clock)
 }
+
+/// Wires the real mod hosting use cases over the SQLite store and a storage
+/// directory (tests pass a temp dir). Admins are the given Discord ids.
+pub fn mod_hosting(
+    store: Arc<SqliteStore>,
+    clock: Arc<dyn Clock>,
+    storage_root: &std::path::Path,
+    admin_discord_ids: Vec<community_domain::DiscordId>,
+    limits: community_application::mods::ModLimits,
+) -> crate::mods::ModHosting {
+    let storage = community_infrastructure::LocalModStorage::new(storage_root);
+    let files_dir = storage.public_dir();
+    crate::mods::ModHosting {
+        service: Arc::new(community_application::ModHostingService {
+            clock,
+            tokens: Arc::new(OsTokenGenerator),
+            repo: store,
+            storage: Arc::new(storage),
+            admin_discord_ids,
+            limits,
+        }),
+        public_base_url: "https://community.test".into(),
+        files_dir,
+    }
+}
+
+/// Mod hosting for tests that never touch it (the directory does not exist).
+pub fn unused_mod_hosting(
+    store: Arc<SqliteStore>,
+    clock: Arc<dyn Clock>,
+) -> crate::mods::ModHosting {
+    mod_hosting(
+        store,
+        clock,
+        std::path::Path::new("unused-mod-storage"),
+        Vec::new(),
+        community_application::mods::ModLimits {
+            max_upload_bytes: 1,
+            user_quota_bytes: 1,
+            uploads_per_day: 1,
+        },
+    )
+}

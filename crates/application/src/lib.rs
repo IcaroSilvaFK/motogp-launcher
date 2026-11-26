@@ -10,12 +10,15 @@ mod artwork_ports;
 mod artwork_service;
 mod catalog_error;
 mod catalog_install;
+mod catalog_merge;
 mod catalog_ports;
 mod catalog_service;
 mod community_comments;
 mod community_comments_service;
 mod community_error;
 mod community_ports;
+mod community_publish;
+mod community_publish_ports;
 mod community_service;
 mod community_stars;
 mod config_service;
@@ -59,6 +62,7 @@ pub use catalog_install::{
     CatalogInstallError, CatalogInstaller, InstallOutcome, InstallPhase, InstallProgress,
     StagedDownload,
 };
+pub use catalog_merge::MergedCatalogSource;
 pub use catalog_ports::{
     CachedCatalog, CatalogCache, CatalogSource, RawCatalog, RawEntry, SourceFetch, WebPageOpener,
 };
@@ -74,6 +78,14 @@ pub use community_error::{CommunityApiError, CommunityError, CredentialError, Lo
 pub use community_ports::{
     AvatarFetcher, CallbackParams, CommunityApi, CredentialStore, LoopbackReceiver,
     LoopbackSession, PkceSource, ServerUser,
+};
+pub use community_publish::{
+    sanitize_file_name, CommunityPublishService, PublishError, PublishPhase, PublishProgress,
+    MAX_CHUNK_RETRIES, MAX_MOD_FILE_BYTES, MAX_SCREENSHOTS, MAX_SCREENSHOT_BYTES,
+};
+pub use community_publish_ports::{
+    CreateUpload, ModPublishApi, ModVersion, MyMod, PublishApiError, PublishFiles, PublishRequest,
+    UploadSession, UploadStatus, VersionStatus,
 };
 pub use community_service::{CommunityAuthService, SIGN_IN_TIMEOUT};
 pub use community_stars::{CommunityStarsService, ModStats, ModStatsApi};

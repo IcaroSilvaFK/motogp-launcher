@@ -6,9 +6,9 @@ use motogp_application::{
     AdBeaconError, AdBeaconSink, AdCache, AdCacheError, AdPayload, AdService, AdSource,
     AdSourceError, AppError, AvatarFetcher, BackgroundRunner, CachedAds, CatalogSource,
     CatalogSourceError, CommunityApi, CommunityAuthService, CommunityCommentsService,
-    CommunityStarsService, CredentialStore, FolderOpener, LoopbackError, LoopbackReceiver,
-    LoopbackSession, ModDownloader, PkceSource, ProcessInspector, RawAd, RawCatalog, RawEntry,
-    SessionEvent, SessionPublisher, SourceFetch, UrlOpener, WebPageOpener,
+    CommunityPublishService, CommunityStarsService, CredentialStore, FolderOpener, LoopbackError,
+    LoopbackReceiver, LoopbackSession, ModDownloader, PkceSource, ProcessInspector, RawAd,
+    RawCatalog, RawEntry, SessionEvent, SessionPublisher, SourceFetch, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{DataDir, SteamArtwork, SteamLibraries, SystemClock};
 use motogp_launcher_lib::{
@@ -297,6 +297,7 @@ impl Harness {
             None,
             None,
             Some(comments),
+            None,
         )
     }
 
@@ -329,6 +330,7 @@ impl Harness {
             community,
             None,
             None,
+            None,
         )
     }
 
@@ -343,6 +345,22 @@ impl Harness {
             None,
             Some(stars),
             None,
+            None,
+        )
+    }
+
+    /// The default composed state with the publish service replaced (#130).
+    pub fn with_publish(publish: Arc<CommunityPublishService>) -> Harness {
+        Harness::build_with(
+            Arc::new(FakeCatalogSource::failing()),
+            production_downloader(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(publish),
         )
     }
 
@@ -357,6 +375,7 @@ impl Harness {
         community: Option<Arc<CommunityAuthService>>,
         stars: Option<Arc<CommunityStarsService>>,
         comments: Option<Arc<CommunityCommentsService>>,
+        publish: Option<Arc<CommunityPublishService>>,
     ) -> Harness {
         let tmp = TempDir::new().unwrap();
         let data = DataDir::new(tmp.path().join("data"));
@@ -403,6 +422,10 @@ impl Harness {
         };
         let state = match comments {
             Some(comments) => state.with_comments(comments),
+            None => state,
+        };
+        let state = match publish {
+            Some(publish) => state.with_publish(publish),
             None => state,
         };
         let state = match ads {

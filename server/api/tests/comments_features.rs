@@ -183,6 +183,7 @@ async fn community_server(world: &mut CommentsWorld, first: String, second: Stri
         downloads: downloads_state(store.clone(), clock.clone()),
         limits: RateLimits::new(clock.clone()),
         comments: comments_state(store.clone(), clock.clone()),
+        mods: community_api::testing::unused_mod_hosting(store.clone(), clock.clone()),
         trust_proxy_headers: false,
     };
     let mut users = HashMap::new();

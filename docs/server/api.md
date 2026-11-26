@@ -16,7 +16,16 @@ Every error, on every endpoint (including unknown routes), uses the same shape a
 | `invalid_redirect` | 400 | Sign-in redirect is not an allowed loopback URL |
 | `invalid_code` | 400 | One-time code unknown, used, expired or wrong verifier |
 | `unauthorized` | 401 | Missing, unknown, expired or revoked session |
+| `forbidden` | 403 | Not an admin, or not the owner of the upload |
 | `not_found` | 404 | Unknown route or resource |
+| `mod_id_taken` | 409 | The mod id belongs to another creator |
+| `version_exists` | 409 | A non-rejected version with this number already exists |
+| `offset_mismatch` | 409 | The chunk offset is not the bytes received; the error carries `received` |
+| `upload_incomplete` | 409 | Completing before every byte was received |
+| `file_too_large` | 413 | Declared size over the cap (refused before storing), or chunk/screenshot over its limit |
+| `quota_exceeded` | 413 | The per-user storage quota would be exceeded |
+| `unsupported_file` | 400 | Extension is not `.zip`/`.7z`/`.pak`, or the screenshot is not PNG/JPEG/WebP |
+| `checksum_mismatch` | 400 | The server SHA-256 differs from the `sha256` the client sent |
 | `rate_limited` | 429 | Too many requests; see the `Retry-After` header (seconds) |
 | `discord_unavailable` | 502 | Discord could not be reached or answered with an error |
 | `internal` | 500 | Unexpected failure; details are logged, never returned |
@@ -264,6 +273,102 @@ number of days since 1970-01-01 UTC (migration `0004_downloads.sql`).
 `200 {"id":"x","days":[{"date":"2026-10-28","count":0}, ...]}`: exactly 30 buckets, oldest first, the last one is
 today (UTC), zero for days without downloads. An unknown mod answers 30 zero buckets. `400 bad_request` for a
 malformed mod id.
+
+## Mod hosting
+
+Creators upload mod files to the server; an admin approves them; the launcher lists approved mods in its catalog
+and downloads the files from `/files`. Everything below uses camelCase JSON unless it says "raw bytes".
+
+### Upload flow
+
+```
+Creator app                                   Community server
+ | POST /mods/uploads {modId, title, ..., size, sha256?, ownershipConfirmed}
+ |<-- 201 {uploadId, chunkSize: 8388608, received: 0, expiresAt}   (refused here: too large, quota, daily limit)
+ | PUT /mods/uploads/{id}/chunks?offset=0       raw bytes (<= chunkSize)
+ |<-- 200 {received}
+ |   ... connection drops ...
+ | GET /mods/uploads/{id}
+ |<-- 200 {received, size, state: "uploading"}  -> continue from `received`
+ | PUT /mods/uploads/{id}/chunks?offset=<received> ...
+ | POST /mods/uploads/{id}/screenshots          raw PNG/JPEG/WebP, up to 8
+ | POST /mods/uploads/{id}/complete
+ |<-- 201 {modId, version, status: "pending", sha256, ...}
+```
+
+Rules: the declared `size` is checked against the cap (`MOD_MAX_UPLOAD_BYTES`) **before** anything is stored, and the
+bytes received are checked again chunk by chunk. File names are limited to letters, digits, space, `.`, `_`, `-`,
+`(` and `)`, with a `.zip`, `.7z` or `.pak` extension (case-insensitive). The `modId` follows the catalog id rule
+(`^[a-z0-9]+(-[a-z0-9]+)*$`, at most 64; `mine`, `uploads` and `stats` are reserved). `version` is 1 to 32 letters, digits,
+`.`, `_`, `+` or `-`. Titles are at most 120 characters, descriptions 1000, `longDescription` 20 000.
+`ownershipConfirmed` must be `true`. The server computes the SHA-256 itself; when the client sent `sha256` the two
+must match (`checksum_mismatch` otherwise, and the upload is discarded). Sessions expire after 24 hours and are
+purged, with their bytes, on every `POST /mods/uploads`. A creator may start `MOD_UPLOADS_PER_DAY` uploads per 24
+hours (`429 rate_limited` with `Retry-After`) and hold `MOD_USER_QUOTA_BYTES` in total (`quota_exceeded`).
+Files are never executed or extracted by the server.
+
+### Endpoints
+
+| Method and path | Auth | Purpose |
+|---|---|---|
+| `POST /mods/uploads` | user | Start an upload. `201 {uploadId, chunkSize, received, expiresAt}` |
+| `PUT /mods/uploads/{id}/chunks?offset=N` | owner | Raw bytes (body limit 8 MiB). `offset` must equal `received`, else `409 offset_mismatch` with `error.received`. Bytes past the declared size: `400`. `200 {received}` |
+| `GET /mods/uploads/{id}` | owner | Resume info `{received, size, state}` (`uploading` or `ready`) |
+| `POST /mods/uploads/{id}/screenshots` | owner | Raw PNG, JPEG or WebP (magic bytes), at most 5 MiB and 8 per upload. `201 {index}` |
+| `POST /mods/uploads/{id}/complete` | owner | Verifies the bytes and creates the version as `pending`. `201` version |
+| `DELETE /mods/uploads/{id}` | owner | Abort; deletes the bytes. `204` |
+| `GET /mods/mine` | user | `{mods: [{id, versions: [...]}]}`: every version with `status` and `rejectionReason` |
+| `GET /admin/mods/pending` | admin | `{versions: [...]}` waiting for review |
+| `POST /admin/mods/{mod}/versions/{version}/approve` | admin | `200 {status: "approved"}`; the file moves to the public area |
+| `POST /admin/mods/{mod}/versions/{version}/reject` | admin | Body `{reason}`; `200 {status: "rejected"}`; the file is deleted, the row stays |
+| `GET /catalog` | public | `{schemaVersion: 1, entries: [...]}` |
+| `GET /mods/{id}` | public | Minimal escaped HTML page of an approved mod (the entry's `pageUrl`) |
+| `GET /files/{mod}/{version}/{file}` | public | Approved files only, with `Range` (`206`, `416`, `Accept-Ranges`) |
+
+Admins are the users whose Discord id is in `ADMIN_DISCORD_IDS`; anyone else gets `403 forbidden`. Another user's
+upload answers `403 forbidden`. Chunk requests skip the per-IP rate limit (a big file is hundreds of chunks) but the
+per-user limit still applies.
+
+A version JSON looks like:
+
+```json
+{
+  "modId": "brazil-livery", "version": "1.0", "title": "Brazil Livery", "description": "...",
+  "longDescription": null, "category": "liveries", "game": "MotoGP 26", "fileName": "brazil-livery.zip",
+  "size": 1234, "sha256": "<64 hex>", "status": "pending", "rejectionReason": null, "screenshotCount": 2,
+  "uploadedAt": "2026-11-26T10:00:00Z", "reviewedAt": null
+}
+```
+
+Every version stays as history. Uploading a version number that was **rejected** replaces the rejected row; any other
+existing number answers `409 version_exists`. A mod id belongs to its first creator (`409 mod_id_taken` for others).
+
+### `GET /catalog`
+
+The latest **approved** version of every mod, in the same entry shape as `catalog/catalog.json`: `id`, `title`,
+`author` (the creator's display name), `game`, `category`, `description`, `version`, `updatedAt` (approval date),
+`pageUrl` (`{PUBLIC_BASE_URL}/mods/{id}`), `thumbnailUrl` and `screenshots` (first and all public screenshots),
+`longDescription` and `download {url, size, sha256}` where `url` is
+`{PUBLIC_BASE_URL}/files/{mod}/{version}/{fileName}` (percent-encoded). The response carries a strong `ETag`; a request
+with a matching `If-None-Match` answers `304`. Pending and rejected versions never appear.
+
+### How the launcher uses it
+
+The launcher merges `GET /catalog` into the GitHub catalog (`MergedCatalogSource`): on the same id the community entry
+wins, and when the community server cannot be reached or answers something unreadable (including a newer
+`schemaVersion`) the launcher shows the GitHub catalog alone. Publishing goes through the endpoints above (8 MiB
+chunks, resuming from `GET /mods/uploads/{id}` after a network error, up to 3 retries per chunk).
+
+**Debug builds and `http://127.0.0.1:8787`:** the launcher's catalog domain only accepts `https` URLs (page, thumbnail,
+screenshots and download). A debug launcher talking to a local plain-HTTP server therefore **skips every community
+catalog entry** (they are counted as skipped, not shown). Publishing and "My mods" work against the local server, but
+installing a published mod end to end needs an HTTPS deployment (`PUBLIC_BASE_URL` with `https`).
+
+### Downloads
+
+`GET /files/...` serves only the `public/` area of `MOD_STORAGE_DIR` (`tower-http` `ServeDir`), so pending and
+incoming files cannot be reached, and path traversal is refused. In production Caddy serves the same directory
+directly (see the deployment guide); the Rust route is the fallback and what the tests use.
 
 ## Adding routes in later issues
 

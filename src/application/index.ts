@@ -61,3 +61,8 @@ export { createUsagePreference, loadUsagePreference, saveUsagePreference } from 
 export type { ReportCatalogDownloadDeps } from './useCases/reportCatalogDownload';
 export { reportCatalogDownload } from './useCases/reportCatalogDownload';
 export { useDownloadDaily, useDownloadTotals } from './useDownloadStats';
+export type { ModPublisher, PublishFilePicker } from './ports/ModPublisher';
+export type { PublishModHandle, PublishState } from './usePublishMod';
+export { usePublishMod } from './usePublishMod';
+export type { MyModsHandle, MyModsStatus } from './useMyMods';
+export { useMyMods } from './useMyMods';

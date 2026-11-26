@@ -47,6 +47,7 @@ async fn harness() -> Harness {
         downloads: downloads_state(store.clone(), clock.clone()),
         limits: RateLimits::new(clock.clone()),
         comments: comments_state(store.clone(), clock.clone()),
+        mods: community_api::testing::unused_mod_hosting(store.clone(), clock.clone()),
         trust_proxy_headers: false,
     };
     let ada = sign_in_user(&store, clock.as_ref(), "1001", "Ada").await;

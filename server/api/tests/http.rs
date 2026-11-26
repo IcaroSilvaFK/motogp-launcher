@@ -43,8 +43,9 @@ async fn state_with(health: Arc<dyn HealthProbe>, clock: Arc<FakeClock>, trust: 
         stars: star_service(store.clone()),
         downloads: community_api::testing::downloads_state(store.clone(), clock.clone()),
         limits: RateLimits::new(clock.clone()),
-        comments: comments_state(store, clock),
+        comments: comments_state(store.clone(), clock.clone()),
         trust_proxy_headers: trust,
+        mods: community_api::testing::unused_mod_hosting(store, clock.clone()),
     }
 }
 

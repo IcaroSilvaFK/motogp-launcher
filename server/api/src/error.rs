@@ -18,9 +18,17 @@ impl From<AppError> for ApiError {
 
 pub fn status_of(error: &AppError) -> StatusCode {
     match error {
-        AppError::BadRequest(_) | AppError::InvalidRedirect | AppError::InvalidCode => {
-            StatusCode::BAD_REQUEST
-        }
+        AppError::BadRequest(_)
+        | AppError::InvalidRedirect
+        | AppError::InvalidCode
+        | AppError::UnsupportedFile(_)
+        | AppError::ChecksumMismatch => StatusCode::BAD_REQUEST,
+        AppError::Forbidden => StatusCode::FORBIDDEN,
+        AppError::ModIdTaken
+        | AppError::VersionExists
+        | AppError::OffsetMismatch { .. }
+        | AppError::UploadIncomplete => StatusCode::CONFLICT,
+        AppError::FileTooLarge | AppError::QuotaExceeded => StatusCode::PAYLOAD_TOO_LARGE,
         AppError::Unauthorized => StatusCode::UNAUTHORIZED,
         AppError::NotFound => StatusCode::NOT_FOUND,
         AppError::RateLimited { .. } => StatusCode::TOO_MANY_REQUESTS,
@@ -36,9 +44,13 @@ impl IntoResponse for ApiError {
             // Detail stays in the log; the client only sees a generic message.
             tracing::error!(detail = %detail, "internal error");
         }
-        let body = json!({
+        let mut body = json!({
             "error": { "code": error.code(), "message": error.public_message() }
         });
+        if let AppError::OffsetMismatch { received } = &error {
+            // Lets the client resume without another request.
+            body["error"]["received"] = json!(received);
+        }
         let mut response = (status_of(&error), Json(body)).into_response();
         if let AppError::RateLimited { retry_after_secs } = error {
             if let Ok(value) = HeaderValue::from_str(&retry_after_secs.to_string()) {
@@ -84,6 +96,23 @@ mod tests {
             ),
             (AppError::DiscordUnavailable, 502, "discord_unavailable"),
             (AppError::Internal("boom".into()), 500, "internal"),
+            (AppError::Forbidden, 403, "forbidden"),
+            (AppError::ModIdTaken, 409, "mod_id_taken"),
+            (AppError::VersionExists, 409, "version_exists"),
+            (
+                AppError::OffsetMismatch { received: 5 },
+                409,
+                "offset_mismatch",
+            ),
+            (AppError::UploadIncomplete, 409, "upload_incomplete"),
+            (AppError::FileTooLarge, 413, "file_too_large"),
+            (AppError::QuotaExceeded, 413, "quota_exceeded"),
+            (
+                AppError::UnsupportedFile("x".into()),
+                400,
+                "unsupported_file",
+            ),
+            (AppError::ChecksumMismatch, 400, "checksum_mismatch"),
         ];
         for (error, status, code) in cases {
             let (actual, _, json) = render(error).await;
@@ -91,6 +120,12 @@ mod tests {
             assert_eq!(json["error"]["code"], code);
             assert!(json["error"]["message"].is_string());
         }
+    }
+
+    #[tokio::test]
+    async fn offset_mismatch_reports_the_received_bytes() {
+        let (_, _, json) = render(AppError::OffsetMismatch { received: 42 }).await;
+        assert_eq!(json["error"]["received"], 42);
     }
 
     #[tokio::test]

@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react';
-import type { CommunityAccount, ModComments, ModStatsStore } from '../application';
+import type { CommunityAccount, ModComments, ModPublisher, ModStatsStore, PublishFilePicker } from '../application';
 
 /** The community ports wired in `main.tsx` (#122, #119, #118). */
 export interface CommunityContextValue {
@@ -9,6 +9,10 @@ export interface CommunityContextValue {
   stars?: ModStatsStore;
   /** Mod comments (#118). Absent in tests and builds without the community: the section is hidden. */
   comments?: ModComments;
+  /** Mod hosting (#130): publish a mod and list my mods. Absent: no publish UI. */
+  publisher?: ModPublisher;
+  /** Native dialogs of the publish form (#130). */
+  publishPicker?: PublishFilePicker;
 }
 
 export const CommunityContext = createContext<CommunityContextValue>({});

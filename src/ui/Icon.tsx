@@ -131,6 +131,26 @@ const GLYPHS = {
       <path d="M5.5 6l.8 9.5h7.4l.8-9.5" />
     </>
   ),
+  // Mod hosting (#130): the import arrow turned upward (publish), a file and a picture.
+  upload: (
+    <>
+      <path d="M10 12.5v-9M6.5 7L10 3.5 13.5 7" />
+      <path d="M4 13.5v2.5h12v-2.5" />
+    </>
+  ),
+  file: (
+    <>
+      <path d="M5.5 3h6l3 3v11h-9z" />
+      <path d="M11.5 3v3h3" />
+    </>
+  ),
+  image: (
+    <>
+      <rect x="3" y="4.5" width="14" height="11" rx="1.5" />
+      <path d="M3 13l4-3.5 3 2.5 2.5-2 4.5 3.5" />
+      <circle cx="13" cy="8" r="1" />
+    </>
+  ),
 } satisfies Record<string, ReactNode>;
 
 export type IconName = keyof typeof GLYPHS;
