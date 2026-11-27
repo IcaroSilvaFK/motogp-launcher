@@ -28,6 +28,7 @@ import {
   createLocalStorageUsagePreferenceStore,
   createTauriDownloadStats,
   createTauriAppInfo,
+  createTauriDiagnostics,
   createTauriDropEvents,
   createTauriGateway,
   createTauriPicker,
@@ -84,6 +85,7 @@ createRoot(container).render(
       }}
       updater={updater}
       appInfo={createTauriAppInfo()}
+      diagnostics={createTauriDiagnostics()}
       navStore={createLocalStorageNavStore()}
       // First-run welcome (#147): shown once, then reachable from Settings.
       welcomeStore={createLocalStorageWelcomeStore()}

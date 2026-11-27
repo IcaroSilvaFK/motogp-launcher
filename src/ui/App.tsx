@@ -17,6 +17,7 @@ import type {
   DownloadStats,
   UsagePreferenceHandle,
   AppInfo,
+  Diagnostics,
   CatalogController,
   DiscoverViewStore,
   LauncherController,
@@ -82,6 +83,7 @@ function Shell({
   controller,
   updater,
   appInfo,
+  diagnostics,
   navStore,
   welcomeStore,
   windowControls,
@@ -112,6 +114,7 @@ function Shell({
   publishPicker?: PublishFilePicker;
   updater?: UpdateController;
   appInfo?: AppInfo;
+  diagnostics?: Diagnostics;
   navStore?: NavPreferenceStore;
   /** First-run welcome (#147); absent means no welcome and no "Show welcome again". */
   welcomeStore?: WelcomeStore;
@@ -150,8 +153,8 @@ function Shell({
   const value = useMemo(() => ({ controller, state }), [controller, state]);
   const markUserChecked = useCallback(() => setUserChecked(true), []);
   const info = useMemo(
-    () => ({ version, updater, userChecked, markUserChecked }),
-    [version, updater, userChecked, markUserChecked],
+    () => ({ version, updater, diagnostics, userChecked, markUserChecked }),
+    [version, updater, diagnostics, userChecked, markUserChecked],
   );
   const loading = state.status === 'loading';
   // Waits for the launcher data, so step 1 knows whether a game is configured.
@@ -254,6 +257,7 @@ export function App({
   onLocaleChange,
   updater,
   appInfo,
+  diagnostics,
   navStore,
   welcomeStore,
   windowControls,
@@ -275,6 +279,7 @@ export function App({
   onLocaleChange?: (locale: Locale) => void;
   updater?: UpdateController;
   appInfo?: AppInfo;
+  diagnostics?: Diagnostics;
   navStore?: NavPreferenceStore;
   /** First-run welcome (#147); absent means no welcome and no "Show welcome again". */
   welcomeStore?: WelcomeStore;
@@ -306,6 +311,7 @@ export function App({
         controller={controller}
         updater={updater}
         appInfo={appInfo}
+        diagnostics={diagnostics}
         navStore={navStore}
         welcomeStore={welcomeStore}
         windowControls={windowControls}

@@ -3,11 +3,13 @@
 
 mod adapters;
 mod ads_fallback;
+mod app_log;
 mod bootstrap;
 mod catalog_fallback;
 mod catalog_install_support;
 mod commands;
 mod commands_comments;
+mod commands_diagnostics;
 mod commands_downloads;
 mod commands_install;
 mod commands_publish;
@@ -52,8 +54,8 @@ pub use community_fallback::{MemoryCredentialStore, UnavailableCommunityApi};
 pub use community_publish_fallback::UnavailablePublishApi;
 pub use community_stars_fallback::UnavailableModStatsApi;
 pub use compose::{
-    compose, compose_with_downloader, Ads, AppState, Catalog, Installer, Profiles, Settings,
-    Storage,
+    compose, compose_with_downloader, Ads, AppState, Catalog, Diagnostics, Installer, Profiles,
+    Settings, Storage,
 };
 pub use download_stats_fallback::UnavailableDownloadStats;
 pub use dto::{

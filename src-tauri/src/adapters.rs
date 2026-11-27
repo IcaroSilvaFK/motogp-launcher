@@ -31,7 +31,7 @@ impl<R: Runtime> SessionPublisher for TauriEvents<R> {
             .handle
             .emit(SESSION_EVENT, SessionEventDto::from(event))
         {
-            eprintln!("could not emit the session event: {error}");
+            crate::app_log::warn(&format!("could not emit the session event: {error}"));
         }
     }
 
@@ -40,7 +40,7 @@ impl<R: Runtime> SessionPublisher for TauriEvents<R> {
             message: message.to_string(),
         };
         if let Err(error) = self.handle.emit(SESSION_ERROR_EVENT, payload) {
-            eprintln!("could not emit the session error: {error}");
+            crate::app_log::warn(&format!("could not emit the session error: {error}"));
         }
     }
 }

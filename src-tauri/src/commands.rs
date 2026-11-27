@@ -229,9 +229,12 @@ where
     let state = state.inner().clone();
     tauri::async_runtime::spawn_blocking(move || job(&state))
         .await
-        .map_err(|error| CommandError {
-            code: "task_failed".to_string(),
-            message: format!("the operation did not finish: {error}"),
+        .map_err(|error| {
+            crate::app_log::error(&format!("a background command did not finish: {error}"));
+            CommandError {
+                code: "task_failed".to_string(),
+                message: format!("the operation did not finish: {error}"),
+            }
         })?
 }
 
@@ -401,6 +404,8 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         clean_stale_session,
         get_storage_usage,
         open_data_folder,
+        crate::commands_diagnostics::get_diagnostics,
+        crate::commands_diagnostics::open_logs_folder,
         get_game_artwork,
         get_catalog,
         refresh_catalog,

@@ -10,21 +10,23 @@ use motogp_application::{
     AdBeaconSink, AdCache, AdService, AdSource, ArtworkService, BackgroundRunner, CancelFlag,
     CatalogInstaller, CatalogService, CatalogSource, CommunityAuthService,
     CommunityCommentsService, CommunityPublishService, CommunityStarsService, DeployService,
-    DownloadStatsService, FolderOpener, GameService, GameSettings, ModDownloader, PlayService,
-    ProcessInspector, ProfileModPlanner, ProfileService, RawCatalog, SessionPublisher,
-    SessionService, StorageService, UrlOpener, WebPageOpener,
+    DiagnosticsService, DownloadStatsService, FolderOpener, GameService, GameSettings,
+    ModDownloader, PlayService, ProcessInspector, ProfileModPlanner, ProfileService, RawCatalog,
+    SessionPublisher, SessionService, StorageService, UrlOpener, WebPageOpener,
 };
 use motogp_infrastructure::{
-    mod_library, AtomicSessionLock, DataDir, FsDeployFiles, FsDownloadStaging, FsGameFiles,
-    FsInstallIdStore, FsPublishFiles, FsStorageScanner, JsonAdCache, JsonCatalogCache,
+    mod_library, AtomicSessionLock, DataDir, FileLog, FsDeployFiles, FsDownloadStaging,
+    FsGameFiles, FsInstallIdStore, FsPublishFiles, FsStorageScanner, JsonAdCache, JsonCatalogCache,
     JsonConfigStore, JsonDeployedRepository, JsonModRepository, JsonProfileStore, ModLibrary,
-    MonotonicClock, Sha256Hasher, SteamArtwork, SteamLibraries, SystemClock,
+    MonotonicClock, Sha256Hasher, SteamArtwork, SteamLibraries, SysinfoOs, SystemClock,
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 pub type Profiles = ProfileService<JsonProfileStore, SystemClock>;
 pub type Settings = GameSettings<JsonConfigStore, SteamLibraries, FsGameFiles>;
+pub type Diagnostics =
+    DiagnosticsService<Arc<FileLog>, SysinfoOs, Arc<dyn FolderOpener + Send + Sync>>;
 pub type Storage = StorageService<FsStorageScanner, Arc<dyn FolderOpener + Send + Sync>>;
 pub type Catalog = CatalogService<Arc<dyn CatalogSource>, JsonCatalogCache, SystemClock>;
 pub type Installer = CatalogInstaller<Arc<dyn ModDownloader>, FsDownloadStaging, Sha256Hasher>;
@@ -42,6 +44,8 @@ pub struct AppState {
     pub play: PlayService,
     /// Read-only: measuring never takes `write_lock`.
     pub storage: Arc<Storage>,
+    /// Log file, OS facts and the logs folder (#148). Read-only.
+    pub diagnostics: Arc<Diagnostics>,
     /// Read-only: reads Steam's local artwork cache.
     pub artwork: Arc<ArtworkService<SteamArtwork>>,
     /// Serializes every mutation of the shared JSON stores, so concurrent
@@ -187,6 +191,11 @@ where
         config: JsonConfigStore::new(data.config_file()),
         play,
         artwork: Arc::new(ArtworkService::new(artwork)),
+        diagnostics: Arc::new(DiagnosticsService::new(
+            Arc::new(FileLog::new(data.logs_dir())),
+            SysinfoOs,
+            folder_opener.clone(),
+        )),
         storage: Arc::new(StorageService::new(
             data.root().to_path_buf(),
             FsStorageScanner,

@@ -26,6 +26,7 @@ mod deploy_error;
 mod deploy_ports;
 mod deploy_service;
 mod deploy_session;
+mod diagnostics;
 mod download_ports;
 mod download_stats_ports;
 mod download_stats_service;
@@ -94,6 +95,10 @@ pub use deploy_error::DeployError;
 pub use deploy_ports::{DeployFiles, DeployedRepository, DirCheck};
 pub use deploy_service::{DeployMod, DeployService};
 pub use deploy_session::DeploySession;
+pub use diagnostics::{
+    redact_secrets, DiagnosticsService, DiagnosticsSnapshot, LogFiles, SystemInfo,
+    DIAGNOSTICS_LOG_LINES,
+};
 pub use download_ports::{
     CancelFlag, DownloadError, DownloadProgress, DownloadRequest, DownloadStaging, ModDownloader,
 };
