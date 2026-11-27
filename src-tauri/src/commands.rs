@@ -6,6 +6,7 @@
 //! deploys, profiles, settings) is `async`: the blocking use case runs on the
 //! blocking pool, never on the main thread, and mutations are serialized
 //! through `AppState::write_lock` so they cannot lose each other's updates.
+use crate::command_log;
 use crate::dto::{
     AdDto, CatalogDto, CommunityStatusDto, ConfigDto, ConflictDto, CurrentSessionDto,
     DeploySessionDto, GameInfoDto, ModDto, ProfileDto, RecoveryStatusDto, StorageUsageDto,
@@ -25,8 +26,9 @@ where
     T: Send + 'static,
     F: FnOnce(&AppState) -> CommandResult<T> + Send + 'static,
 {
+    let name = command_log::name_of(&job);
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let _serialized = state.write_lock.lock().unwrap_or_else(|e| e.into_inner());
         job(&state)
     })
@@ -34,12 +36,14 @@ where
     .map_err(|error| CommandError {
         code: "task_failed".to_string(),
         message: format!("the operation did not finish: {error}"),
-    })?
+    })
+    .and_then(|outcome| outcome);
+    command_log::record(&name, result)
 }
 
 #[tauri::command]
 pub fn get_config(state: State<'_, AppState>) -> CommandResult<ConfigDto> {
-    Ok(state.settings.config()?.into())
+    command_log::logged("get_config", state.settings.config().map(Into::into))
 }
 
 #[tauri::command]
@@ -65,12 +69,21 @@ pub async fn set_game_dir(state: State<'_, AppState>, path: String) -> CommandRe
 
 #[tauri::command]
 pub fn get_game(state: State<'_, AppState>) -> CommandResult<Option<GameInfoDto>> {
-    Ok(state.settings.get_game()?.map(Into::into))
+    command_log::logged(
+        "get_game",
+        state.settings.get_game().map(|game| game.map(Into::into)),
+    )
 }
 
 #[tauri::command]
 pub fn list_mods(state: State<'_, AppState>) -> CommandResult<Vec<ModDto>> {
-    Ok(state.library.list()?.into_iter().map(Into::into).collect())
+    command_log::logged(
+        "list_mods",
+        state
+            .library
+            .list()
+            .map(|mods| mods.into_iter().map(Into::into).collect()),
+    )
 }
 
 #[tauri::command]
@@ -98,7 +111,13 @@ pub async fn remove_mod(state: State<'_, AppState>, id: String) -> CommandResult
 
 #[tauri::command]
 pub fn list_profiles(state: State<'_, AppState>) -> CommandResult<Vec<ProfileDto>> {
-    Ok(state.profiles.list()?.into_iter().map(Into::into).collect())
+    command_log::logged(
+        "list_profiles",
+        state
+            .profiles
+            .list()
+            .map(|profiles| profiles.into_iter().map(Into::into).collect()),
+    )
 }
 
 #[tauri::command]
@@ -144,12 +163,13 @@ pub fn list_conflicts(
     state: State<'_, AppState>,
     mod_ids: Vec<String>,
 ) -> CommandResult<Vec<ConflictDto>> {
-    Ok(state
-        .library
-        .list_conflicts(&mod_ids)?
-        .into_iter()
-        .map(Into::into)
-        .collect())
+    command_log::logged(
+        "list_conflicts",
+        state
+            .library
+            .list_conflicts(&mod_ids)
+            .map(|found| found.into_iter().map(Into::into).collect()),
+    )
 }
 
 #[tauri::command]
@@ -178,13 +198,14 @@ pub fn current_session(state: State<'_, AppState>) -> CurrentSessionDto {
 #[tauri::command]
 pub async fn stop_session(state: State<'_, AppState>) -> CommandResult<()> {
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || state.play.stop_session())
+    let result = tauri::async_runtime::spawn_blocking(move || state.play.stop_session())
         .await
         .map_err(|error| CommandError {
             code: "task_failed".to_string(),
             message: format!("the operation did not finish: {error}"),
-        })?
-        .map_err(CommandError::from)
+        })
+        .and_then(|outcome| outcome.map_err(CommandError::from));
+    command_log::record("stop_session", result)
 }
 
 /// The startup recovery result. The frontend reads it after subscribing to
@@ -197,7 +218,10 @@ pub fn recovery_status(state: State<'_, AppState>) -> RecoveryStatusDto {
 /// How the deployment manifest relates to the current game install.
 #[tauri::command]
 pub fn deploy_session(state: State<'_, AppState>) -> CommandResult<DeploySessionDto> {
-    Ok(state.play.deploy_session()?.into())
+    command_log::logged(
+        "deploy_session",
+        state.play.deploy_session().map(Into::into),
+    )
 }
 
 /// Recovery: drops the manifest of a previous game install (no file is touched).
@@ -234,16 +258,16 @@ where
     T: Send + 'static,
     F: FnOnce(&AppState) -> CommandResult<T> + Send + 'static,
 {
+    let name = command_log::name_of(&job);
     let state = state.inner().clone();
-    tauri::async_runtime::spawn_blocking(move || job(&state))
+    let result = tauri::async_runtime::spawn_blocking(move || job(&state))
         .await
-        .map_err(|error| {
-            crate::app_log::error(&format!("a background command did not finish: {error}"));
-            CommandError {
-                code: "task_failed".to_string(),
-                message: format!("the operation did not finish: {error}"),
-            }
-        })?
+        .map_err(|error| CommandError {
+            code: "task_failed".to_string(),
+            message: format!("the operation did not finish: {error}"),
+        })
+        .and_then(|outcome| outcome);
+    command_log::record(&name, result)
 }
 
 /// Size of the launcher data folder, grouped by category.
