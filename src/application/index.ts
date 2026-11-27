@@ -14,6 +14,8 @@ export type {
   DropEvents,
   FilePicker,
   LauncherGateway,
+  LibrarySort,
+  LibrarySortStore,
   LocaleStore,
   NavPreferenceStore,
   WelcomeStore,
@@ -25,6 +27,8 @@ export { loadLocale, saveLocale } from './localePreference';
 export { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarPreference';
 export { loadWelcomeSeen, saveWelcomeSeen } from './welcomePreference';
 export { loadDiscoverView, saveDiscoverView } from './discoverViewPreference';
+export { loadLibrarySort, saveLibrarySort } from './librarySort';
+export { selectConflictingMods, sortMods } from './librarySelectors';
 export { loadAdPreference, saveAdPreference } from './adPreference';
 export { loadAutoEnablePreference, saveAutoEnablePreference } from './autoEnablePreference';
 export { createLauncherController } from './createLauncherController';

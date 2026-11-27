@@ -72,6 +72,10 @@ export const ptBR: Messages = {
       `${total} ${plural(total, 'mod', 'mods')}` + (profileName === null ? '' : ` · ${inProfile} em ${profileName}`),
     filterLabel: 'Filtro',
     filterAll: 'Todos',
+    sortLabel: 'Ordenar por',
+    sortName: 'Nome',
+    sortSize: 'Tamanho',
+    filterConflicts: 'Com conflitos',
     clearFilters: 'Limpar filtros',
     toggleNamed: (modName, profileName) =>
       profileName === null ? `Incluir ${modName} no perfil ativo` : `Incluir ${modName} em ${profileName}`,

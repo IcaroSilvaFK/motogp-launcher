@@ -20,6 +20,7 @@ import type {
   Diagnostics,
   CatalogController,
   DiscoverViewStore,
+  LibrarySortStore,
   LauncherController,
   ModStatsSource,
   ModComments,
@@ -89,6 +90,7 @@ function Shell({
   windowControls,
   catalog,
   discoverViewStore,
+  librarySortStore,
   adPreferenceStore,
   autoEnableStore,
   adProvider,
@@ -121,6 +123,7 @@ function Shell({
   windowControls?: WindowControls;
   catalog?: CatalogController;
   discoverViewStore?: DiscoverViewStore;
+  librarySortStore?: LibrarySortStore;
   adPreferenceStore?: AdPreferenceStore;
   /** "Enable mods after installing from Discover" (#129); without it the preference is on and not persisted. */
   autoEnableStore?: AutoEnablePreferenceStore;
@@ -223,7 +226,7 @@ function Shell({
                           ) : (
                             // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
                             <ScreenTransition key={screen}>
-                              {screen === 'library' && <LibraryScreen />}
+                              {screen === 'library' && <LibraryScreen sortStore={librarySortStore} />}
                               {screen === 'discover' && catalog && (
                                 <DiscoverScreen
                                   catalog={catalog}
@@ -263,6 +266,7 @@ export function App({
   windowControls,
   catalog,
   discoverViewStore,
+  librarySortStore,
   adPreferenceStore,
   autoEnableStore,
   adProvider,
@@ -287,6 +291,7 @@ export function App({
   /** The Discover tab (#73) is listed only when a catalog controller is wired. */
   catalog?: CatalogController;
   discoverViewStore?: DiscoverViewStore;
+  librarySortStore?: LibrarySortStore;
   /** The sponsored-content choice (#105); without it ads stay off. */
   adPreferenceStore?: AdPreferenceStore;
   /** "Enable mods after installing from Discover" (#129); without it the preference is on and not persisted. */
@@ -317,6 +322,7 @@ export function App({
         windowControls={windowControls}
         catalog={catalog}
         discoverViewStore={discoverViewStore}
+        librarySortStore={librarySortStore}
         adPreferenceStore={adPreferenceStore}
         autoEnableStore={autoEnableStore}
         adProvider={adProvider}

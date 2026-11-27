@@ -2,6 +2,7 @@ export { createLocalStorageLocaleStore } from './localStorageLocaleStore';
 export { createLocalStorageNavStore } from './localStorageNavStore';
 export { createLocalStorageWelcomeStore } from './localStorageWelcomeStore';
 export { createLocalStorageDiscoverViewStore } from './localStorageDiscoverViewStore';
+export { createLocalStorageLibrarySortStore } from './localStorageLibrarySortStore';
 export { createLocalStorageAdPreferenceStore } from './localStorageAdPreferenceStore';
 export { createLocalStorageAutoEnableStore } from './localStorageAutoEnableStore';
 export { createTauriGateway } from './tauriGateway';

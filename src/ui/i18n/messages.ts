@@ -79,6 +79,10 @@ export interface Messages {
     summary: (total: number, inProfile: number, profileName: string | null) => string;
     filterLabel: string;
     filterAll: string;
+    sortLabel: string;
+    sortName: string;
+    sortSize: string;
+    filterConflicts: string;
     clearFilters: string;
     /** Accessible name of the row switch; `profileName` is null without an active profile. */
     toggleNamed: (modName: string, profileName: string | null) => string;

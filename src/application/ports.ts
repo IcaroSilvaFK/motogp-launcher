@@ -129,3 +129,12 @@ export interface UsagePreferenceStore {
   load(): 'on' | 'off' | null;
   save(value: 'on' | 'off'): void;
 }
+
+/** How the Library list is ordered. */
+export type LibrarySort = 'name' | 'size';
+
+/** The Library sort choice. Synchronous so the first render already uses the stored order. */
+export interface LibrarySortStore {
+  load(): LibrarySort | null;
+  save(sort: LibrarySort): void;
+}
