@@ -83,15 +83,24 @@ async function openPublish(world: World) {
   return screen.getByRole('region', { name: 'Publish a mod' });
 }
 
-/** Fills every field of a valid form for "Brazil Livery" with a zip file. */
+/**
+ * Fills every field of a valid form for "Brazil Livery" with a zip file. Text goes in with one paste
+ * per field instead of one keystroke per character: typing ~60 characters re-renders the whole App
+ * on each key, which made the steps that call this the slowest in the file and pushed them past the
+ * step timeout on a loaded machine (#162). The timeout is unchanged; the steps just do less work.
+ */
 async function fillForm(world: World, versionText = '1.0') {
   const { user } = world;
-  await user.type(screen.getByLabelText('Title'), 'Brazil Livery');
-  await user.type(screen.getByLabelText('Short description'), 'Green and yellow.');
-  await user.type(screen.getByLabelText('Category'), 'liveries');
+  const fill = async (label: string, text: string) => {
+    await user.click(screen.getByLabelText(label));
+    await user.paste(text);
+  };
+  await fill('Title', 'Brazil Livery');
+  await fill('Short description', 'Green and yellow.');
+  await fill('Category', 'liveries');
   await user.clear(screen.getByLabelText('Game'));
-  await user.type(screen.getByLabelText('Game'), 'MotoGP 26');
-  await user.type(screen.getByLabelText('Version'), versionText);
+  await fill('Game', 'MotoGP 26');
+  await fill('Version', versionText);
   await user.click(screen.getByRole('button', { name: 'Choose mod file' }));
   await within(screen.getByRole('tabpanel', { name: 'Publish' })).findByText('brazil-livery.zip');
   await user.click(screen.getByRole('checkbox', { name: /I made this mod/ }));
