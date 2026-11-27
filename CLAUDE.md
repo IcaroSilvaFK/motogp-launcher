@@ -66,6 +66,7 @@ Parallelism applies to **agents**, never to heavy local processes. The limits be
   - The full suite runs **only in CI**, which stays the merge gate. A CI failure in an untouched area goes back as a normal fix task.
 - **Coverage (`cargo llvm-cov`, `pnpm test --coverage`) is not run locally**, not even by QA: CI measures it. Run it locally only to investigate a CI coverage failure, and only for the affected crate.
 - **Stop stale work:** when an issue's code is about to change (for example after a QA failure), stop its running QA. Remove a merged issue's worktree right away.
+- **Worktree node_modules:** install them inside the worktree (`corepack pnpm install --frozen-lockfile`); never junction or symlink them to the main checkout. Before deleting any worktree folder, remove any junction in it with `cmd //c rmdir <path>`: an `rm -rf` follows the junction and wipes the main checkout's `node_modules`, breaking the user's running app (happened on 2026-11-26).
 - **Prefer CI over local:** PR validation, rebases with no code changes and installer builds rely on GitHub Actions, not local builds.
 
 **One branch per unit of work, always.** Every task, fix, translation or doc change gets its own branch from `dev` and its own PR; never mix unrelated changes in the same branch. Parallel work uses separate `git worktree`s inside the repo, under `.worktrees/<issue>` (git-ignored), so branches don't step on each other.
@@ -77,6 +78,7 @@ Parallelism applies to **agents**, never to heavy local processes. The limits be
 - **After every merge into `dev`**, the PO tells the Coordinators of the in-flight issues that touch the same crates or frontend layers. They rebase at the next checkpoint (between dev tasks, never mid-task, setting uncommitted work aside in a local WIP commit that the PO rewrites later) and rerun the integration gate, so a break surfaces while the issue is still in development and not only in the PR's CI. GitHub already enforces "branch up to date + green CI" on `dev`, `qas` and `main` (strict status checks); this step only moves the detection earlier.
 - QA, translation/docs and CI waits run concurrently with development; the orchestrator never idles waiting on a single agent.
 - Only serialize what truly conflicts: the same files, or a dependency whose contract (ports/types) doesn't exist yet.
+- **Shared registration points count as the same files.** Features that each add a migration, a route in the server's router, an `AppState` field, a Tauri command list entry or an IPC error mapping collide on every rebase (the parallel #118/#119/#120/#130 server issues cost two 20-file conflict rounds on 2026-11-26). Run such features one after another, or split the shared wiring into a first small PR that the others stack on.
 
 ### Standard branches
 
