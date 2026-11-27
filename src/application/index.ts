@@ -16,12 +16,14 @@ export type {
   LauncherGateway,
   LocaleStore,
   NavPreferenceStore,
+  WelcomeStore,
   SessionEvents,
   Unsubscribe,
   UsagePreferenceStore,
 } from './ports';
 export { loadLocale, saveLocale } from './localePreference';
 export { loadSidebarCollapsed, saveSidebarCollapsed } from './sidebarPreference';
+export { loadWelcomeSeen, saveWelcomeSeen } from './welcomePreference';
 export { loadDiscoverView, saveDiscoverView } from './discoverViewPreference';
 export { loadAdPreference, saveAdPreference } from './adPreference';
 export { loadAutoEnablePreference, saveAutoEnablePreference } from './autoEnablePreference';

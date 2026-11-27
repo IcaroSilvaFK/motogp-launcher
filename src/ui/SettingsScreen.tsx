@@ -13,6 +13,7 @@ import { useLauncher } from './LauncherContext';
 import { stagger } from './motion';
 import { StorageSection } from './StorageSection';
 import { UsageSharingRow } from './UsageSharingRow';
+import { useWelcome } from './WelcomeContext';
 
 type SectionId = 'game' | 'preferences' | 'community' | 'storage' | 'about';
 
@@ -31,6 +32,8 @@ export function SettingsScreen() {
   const { enabled: autoEnable, setEnabled: setAutoEnable } = useAutoEnablePreference();
   // Without a community port (tests, builds without the community) the section and its link are absent.
   const hasCommunity = useCommunity().account !== undefined;
+  // Without a welcome store there is no welcome to reopen, so no row.
+  const welcome = useWelcome();
   const sections = SECTIONS.filter(({ id }) => id !== 'community' || hasCommunity);
   const { game, detected } = state;
   const [current, setCurrent] = useState<SectionId>('game');
@@ -219,6 +222,20 @@ export function SettingsScreen() {
                 </div>
               </div>
               <UsageSharingRow />
+              {welcome !== null && (
+                <div className="setting-row">
+                  <div className="setting-text">
+                    <p className="setting-label">{t.settings.welcome}</p>
+                    <p className="hint">{t.settings.welcomeHint}</p>
+                  </div>
+                  <div className="setting-control">
+                    <button type="button" className="btn btn-sm" onClick={welcome.show}>
+                      <Icon name="info" />
+                      {t.settings.welcomeAgain}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </section>
 

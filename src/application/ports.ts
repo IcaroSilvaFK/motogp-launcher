@@ -97,6 +97,12 @@ export interface NavPreferenceStore {
   save(collapsed: boolean): void;
 }
 
+/** Whether the first-run welcome (#147) was finished or skipped; `null` when nothing is stored. */
+export interface WelcomeStore {
+  load(): boolean | null;
+  save(seen: boolean): void;
+}
+
 /** How the Discover results are laid out. */
 export type DiscoverView = 'grid' | 'list';
 
