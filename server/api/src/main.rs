@@ -5,12 +5,15 @@ use community_api::comments::CommentsState;
 use community_api::downloads::DownloadsState;
 use community_api::{build_router, AppState, RateLimits};
 use community_application::comments::CommentsService;
+use community_application::dev_seed::{DevSeeder, SeedOutcome};
 use community_application::mods::ModLimits;
+use community_application::ports::DiscordOAuth;
 use community_application::{
     AuthService, DownloadService, ModHostingService, ModerationService, StarService,
 };
 use community_infrastructure::{
-    Config, DiscordHttp, LocalModStorage, OsTokenGenerator, Sha256Hasher, SqliteStore, SystemClock,
+    Config, DevFakeDiscord, DiscordHttp, LocalModStorage, OsTokenGenerator, Sha256Hasher,
+    SqliteStore, SystemClock,
 };
 use tracing_subscriber::EnvFilter;
 
@@ -29,17 +32,35 @@ async fn main() {
 }
 
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
-    let config = Config::from_env()?;
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let config = Config::from_env_and_args(&args)?;
     let store = SqliteStore::connect(&config.database_url).await?;
     store.migrate().await?;
 
     let clock = Arc::new(SystemClock);
-    let discord = DiscordHttp::new(
-        &config.discord_api_base,
-        &config.discord_client_id,
-        &config.discord_client_secret,
-        &config.public_base_url,
-    )?;
+    // The Discord adapter is chosen once, here. `Config` has already refused
+    // dev mode on anything but a loopback base URL.
+    let discord: Arc<dyn DiscordOAuth> = match &config.dev_fake_auth {
+        Some(fake) => {
+            tracing::warn!(
+                user = %fake.username,
+                discord_id = %fake.discord_id,
+                "DEV MODE: sign-in is FAKED and Discord is never contacted. \
+                 Never use DEV_FAKE_AUTH outside local development."
+            );
+            Arc::new(DevFakeDiscord::new(
+                &config.public_base_url,
+                &fake.username,
+                &fake.discord_id,
+            ))
+        }
+        None => Arc::new(DiscordHttp::new(
+            &config.discord_api_base,
+            &config.discord_client_id,
+            &config.discord_client_secret,
+            &config.public_base_url,
+        )?),
+    };
     let store = Arc::new(store);
     let auth = AuthService {
         clock: clock.clone(),
@@ -49,20 +70,18 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         sessions: store.clone(),
         flows: store.clone(),
         codes: store.clone(),
-        discord: Arc::new(discord),
+        discord,
     };
-    let comments = CommentsState::new(
-        Arc::new(CommentsService {
-            clock: clock.clone(),
-            tokens: Arc::new(OsTokenGenerator),
-            comments: store.clone(),
-        }),
-        clock.clone(),
-    );
+    let comments_service = Arc::new(CommentsService {
+        clock: clock.clone(),
+        tokens: Arc::new(OsTokenGenerator),
+        comments: store.clone(),
+    });
+    let comments = CommentsState::new(comments_service.clone(), clock.clone());
     let mod_storage = LocalModStorage::new(&config.mod_storage_dir);
     mod_storage.ensure_dirs().await?;
     let files_dir = mod_storage.public_dir();
-    let mods = ModHostingService {
+    let mods = Arc::new(ModHostingService {
         clock: clock.clone(),
         tokens: Arc::new(OsTokenGenerator),
         repo: store.clone(),
@@ -74,7 +93,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             user_quota_bytes: config.mod_user_quota_bytes,
             uploads_per_day: config.mod_uploads_per_day,
         },
-    };
+    });
     let moderation = ModerationService {
         clock: clock.clone(),
         tokens: Arc::new(OsTokenGenerator),
@@ -84,25 +103,42 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         users: store.clone(),
         admin_discord_ids: config.admin_discord_ids.clone(),
     };
+    let stars = Arc::new(StarService::new(store.clone()));
+    let download_service = Arc::new(DownloadService {
+        clock: clock.clone(),
+        hasher: Arc::new(Sha256Hasher),
+        downloads: store.clone(),
+    });
+
+    if config.dev_seed {
+        let seeder = DevSeeder {
+            clock: clock.clone(),
+            tokens: Arc::new(OsTokenGenerator),
+            users: store.clone(),
+            mods: mods.clone(),
+            comments: comments_service,
+            stars: stars.clone(),
+            downloads: download_service.clone(),
+            admin_discord_ids: config.admin_discord_ids.clone(),
+        };
+        match seeder.seed().await? {
+            SeedOutcome::Seeded => tracing::info!("dev seed: demo data inserted"),
+            SeedOutcome::AlreadySeeded => tracing::info!("dev seed: demo data already present"),
+        }
+    }
+
     let state = AppState {
         clock: clock.clone(),
         health: store.clone(),
         auth: Arc::new(auth),
-        stars: Arc::new(StarService::new(store.clone())),
-        downloads: DownloadsState::new(
-            Arc::new(DownloadService {
-                clock: clock.clone(),
-                hasher: Arc::new(Sha256Hasher),
-                downloads: store.clone(),
-            }),
-            clock.clone(),
-        ),
+        stars,
+        downloads: DownloadsState::new(download_service, clock.clone()),
         limits: RateLimits::new(clock),
         comments,
         moderation: Arc::new(moderation),
         trust_proxy_headers: config.trust_proxy_headers,
         mods: community_api::mods::ModHosting {
-            service: Arc::new(mods),
+            service: mods,
             public_base_url: config.public_base_url.clone(),
             files_dir,
         },

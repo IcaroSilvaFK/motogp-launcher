@@ -60,3 +60,7 @@ harness = false
 # HTTP tests of the admin web.
 [[test]]
 name = "admin_http"
+
+[[test]]
+name = "dev_mode_features"
+harness = false
