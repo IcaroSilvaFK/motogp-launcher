@@ -45,7 +45,14 @@ export function SettingsScreen() {
   const jump = (event: MouseEvent<HTMLAnchorElement>, id: SectionId) => {
     event.preventDefault();
     setCurrent(id);
-    document.getElementById(`settings-${id}`)?.scrollIntoView?.({ block: 'start' });
+    const target = document.getElementById(`settings-${id}`);
+    // Scroll only the shell's content scroller: scrollIntoView would also scroll every other
+    // scrollable ancestor, the document included (#141).
+    const scroller = target?.closest('main');
+    if (!target || !scroller) return;
+    const margin = Number.parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
+    const top = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+    scroller.scrollTop = top - margin;
   };
 
   return (
