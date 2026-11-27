@@ -238,6 +238,30 @@ async fn removing_an_admin_id_locks_the_session_out_at_once() {
 
 // ---- Dashboard content ----
 
+/// Every text input and textarea must have a unique id and a matching `<label for>`.
+fn assert_every_text_field_is_labelled(html: &str) {
+    let mut fields = 0;
+    let mut ids = std::collections::HashSet::new();
+    let starts = html
+        .match_indices("<input type=\"text\"")
+        .chain(html.match_indices("<textarea"));
+    for (index, _) in starts {
+        let tag = &html[index..index + html[index..].find('>').unwrap()];
+        let id = tag
+            .split(" id=\"")
+            .nth(1)
+            .and_then(|rest| rest.split('"').next())
+            .unwrap_or_else(|| panic!("text field without id: {tag}"));
+        assert!(ids.insert(id.to_string()), "duplicate id {id}");
+        assert!(
+            html.contains(&format!("<label class=\"visually-hidden\" for=\"{id}\"")),
+            "no label for {id}"
+        );
+        fields += 1;
+    }
+    assert!(fields >= 4, "expected several text fields, found {fields}");
+}
+
 #[tokio::test]
 async fn the_dashboard_lists_every_section_and_escapes_user_content() {
     let env = env().await;
@@ -301,6 +325,7 @@ async fn the_dashboard_lists_every_section_and_escapes_user_content() {
     ] {
         assert!(html.contains(needle), "missing {needle}");
     }
+    assert_every_text_field_is_labelled(&html);
     // Hostile content is escaped everywhere, never emitted raw.
     assert!(!html.contains("<script>"));
     assert!(!html.contains("<img src=x"));
