@@ -10,7 +10,11 @@ import { usePresence } from './usePresence';
 function noticeText(t: Messages, notice: Notice): string {
   switch (notice.kind) {
     case 'imported':
+      if (notice.rejected !== undefined)
+        return `${t.notices.imported(notice.count)}. ${t.notices.filesRejected(notice.rejected)}`;
       return t.notices.imported(notice.count);
+    case 'files-rejected':
+      return t.notices.filesRejected(notice.names);
     case 'mod-removed':
       return t.notices.modRemoved;
     case 'game-configured':
@@ -29,6 +33,13 @@ function noticeText(t: Messages, notice: Notice): string {
       if (notice.conflictWith !== undefined) return t.notices.modInstalledConflict(notice.name, notice.conflictWith);
       return notice.enabled ? t.notices.modInstalledEnabled(notice.name) : t.notices.modInstalled(notice.name);
   }
+}
+
+/** A notice that names rejected files is a warning: something the user asked for did not happen. */
+function noticeVariant(notice: Notice): 'success' | 'warning' {
+  if (notice.kind === 'files-rejected' || (notice.kind === 'imported' && notice.rejected !== undefined))
+    return 'warning';
+  return 'success';
 }
 
 /** Translated text for an error code; an unexpected code (newer backend) falls back to the generic text. */
@@ -72,12 +83,12 @@ export function NoticeBar({ onOpenLibrary }: { onOpenLibrary?: () => void } = {}
       {notice !== null && (
         <div
           role="status"
-          className="notice notice-success"
+          className={`notice notice-${noticeVariant(notice)}`}
           data-state={shownNotice.state}
           inert={shownNotice.state === 'exiting'}
           aria-hidden={shownNotice.state === 'exiting' || undefined}
         >
-          <BannerIcon variant="success" />
+          <BannerIcon variant={noticeVariant(notice)} />
           <p>{noticeText(t, notice)}</p>
           {notice.kind === 'mod-installed' && notice.enabled && (
             <button

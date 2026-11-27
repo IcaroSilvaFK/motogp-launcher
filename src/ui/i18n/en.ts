@@ -62,6 +62,8 @@ export const en: Messages = {
     files: (count) => `${count} ${plural(count, 'file', 'files')}`,
     empty: 'No mods yet. Import some to get started.',
     dropHint: 'Drop .pak, .utoc, .ucas or .zip files here to import them',
+    dropOverlayTitle: 'Drop to install',
+    dropOverlayDetail: 'Release .pak, .utoc, .ucas or .zip files anywhere to add them to the library',
     name: 'Name',
     search: 'Search mods',
     searchPlaceholder: 'Search by name',
@@ -503,6 +505,10 @@ export const en: Messages = {
     undo: 'Undo',
     openLibrary: 'Open in Library',
     imported: (count) => `${count} ${plural(count, 'mod', 'mods')} imported`,
+    filesRejected: (names) =>
+      names.length === 1
+        ? `"${names[0]}" is not a mod archive and was not installed. Use .pak, .utoc, .ucas or .zip files.`
+        : `${names.map((name) => `"${name}"`).join(', ')} are not mod archives and were not installed. Use .pak, .utoc, .ucas or .zip files.`,
     modRemoved: 'Mod removed',
     gameConfigured: (name) => `Game configured: ${name}`,
     profileSaved: 'Profile saved',

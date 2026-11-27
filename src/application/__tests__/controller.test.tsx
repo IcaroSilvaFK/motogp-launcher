@@ -89,7 +89,7 @@ describe('Given the launcher controller', () => {
     expect(gateway.callsOf('importMods')[0]?.args).toEqual([['C:/x/a.pak', 'C:/x/b.zip']]);
     const state = controller.getState();
     expect(state.mods.map((m) => m.id)).toEqual(['a', 'b']);
-    expect(state.notice).toEqual({ kind: 'imported', count: 2 });
+    expect(state.notice).toEqual({ kind: 'imported', count: 2, rejected: ['readme.txt'] });
     expect(state.busy).toBe(false);
   });
 
@@ -135,8 +135,47 @@ describe('Given the launcher controller', () => {
       await new Promise((r) => setTimeout(r, 5));
     });
     expect(gateway.callsOf('importMods')[0]?.args).toEqual([['C:/x/a.pak']]);
+    expect(controller.getState().notice).toEqual({ kind: 'imported', count: 1, rejected: ['notes.txt'] });
     release();
     expect(drop.activeListeners()).toBe(0);
+  });
+
+  it('When only unsupported files are dropped Then a rejected notice names them', async () => {
+    const { controller, drop, gateway } = await ready();
+    await controller.subscribeDrop();
+    drop.emitDrop(['C:\\x\\readme.txt', 'D:/y/photo.png']);
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 5));
+    });
+    expect(gateway.callsOf('importMods')).toHaveLength(0);
+    expect(controller.getState().notice).toEqual({ kind: 'files-rejected', names: ['readme.txt', 'photo.png'] });
+  });
+
+  it('When files are dragged Then dragging follows the drag state until drop or cancel', async () => {
+    const { controller, drop } = await ready();
+    const release = await controller.subscribeDrop();
+    expect(controller.getState().dragging).toBe(false);
+    drop.emitDragState(true);
+    expect(controller.getState().dragging).toBe(true);
+    drop.emitDragState(false);
+    expect(controller.getState().dragging).toBe(false);
+    drop.emitDragState(true);
+    controller.cancelDrag();
+    expect(controller.getState().dragging).toBe(false);
+    // The SDK keeps sending "over" while the same drag continues: Esc wins until it ends.
+    drop.emitDragState(true);
+    expect(controller.getState().dragging).toBe(false);
+    drop.emitDragState(false);
+    drop.emitDragState(true);
+    expect(controller.getState().dragging).toBe(true);
+    drop.emitDrop(['C:/x/a.pak']);
+    expect(controller.getState().dragging).toBe(false);
+    drop.emitDragState(true);
+    expect(drop.activeDragListeners()).toBe(1);
+    release();
+    expect(controller.getState().dragging).toBe(false);
+    expect(drop.activeListeners()).toBe(0);
+    expect(drop.activeDragListeners()).toBe(0);
   });
 
   it('When a mod is removed Then remove_mod_refreshes_profiles', async () => {

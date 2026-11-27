@@ -510,20 +510,36 @@ export class FakeSessionEvents implements SessionEvents {
 
 export class FakeDropEvents implements DropEvents {
   private readonly drops: Listeners<string[]>;
+  private readonly dragStates: Listeners<boolean>;
 
   constructor(options: { log?: string[] } = {}) {
     this.drops = new Listeners('drop', options.log);
+    this.dragStates = new Listeners('drag-state', options.log);
   }
 
   onDrop(callback: (paths: string[]) => void): Promise<Unsubscribe> {
     return this.drops.add(callback);
   }
 
+  onDragState(callback: (dragging: boolean) => void): Promise<Unsubscribe> {
+    return this.dragStates.add(callback);
+  }
+
   emitDrop(paths: string[]): void {
     this.drops.emit(paths);
   }
 
+  emitDragState(dragging: boolean): void {
+    this.dragStates.emit(dragging);
+  }
+
+  /** Number of drop callbacks still registered. */
   activeListeners(): number {
     return this.drops.count;
+  }
+
+  /** Number of drag-state callbacks still registered (#152). */
+  activeDragListeners(): number {
+    return this.dragStates.count;
   }
 }

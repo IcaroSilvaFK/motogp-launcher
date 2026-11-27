@@ -31,6 +31,7 @@ export const initialState: LauncherState = {
   conflicts: [],
   error: null,
   notice: null,
+  dragging: false,
   catalogInstalls: {},
 };
 
@@ -80,6 +81,7 @@ export function createFakeController(patch: Partial<LauncherState> = {}): FakeCo
       counters.subscribeDrop += 1;
       return Promise.resolve(release);
     }),
+    cancelDrag: vi.fn(),
     removeMod: action(),
     createProfile: action(),
     renameProfile: action(),

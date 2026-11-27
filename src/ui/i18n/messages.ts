@@ -70,6 +70,9 @@ export interface Messages {
     files: (count: number) => string;
     empty: string;
     dropHint: string;
+    /** Full-window drop overlay while files are dragged over the Library (#152). */
+    dropOverlayTitle: string;
+    dropOverlayDetail: string;
     name: string;
     search: string;
     searchPlaceholder: string;
@@ -497,6 +500,8 @@ export interface Messages {
     undo: string;
     openLibrary: string;
     imported: (count: number) => string;
+    /** Dropped or picked files that are not mod archives (#152); `names` are file names. */
+    filesRejected: (names: string[]) => string;
     modRemoved: string;
     gameConfigured: (name: string) => string;
     profileSaved: string;

@@ -23,7 +23,10 @@ export type SessionPhase =
   | { kind: 'unavailable' };
 
 export type Notice =
-  | { kind: 'imported'; count: number }
+  /** `rejected`: file names of the given paths that are not mod archives (#152); absent when none. */
+  | { kind: 'imported'; count: number; rejected?: string[] }
+  /** Every given path was rejected: nothing was imported (#152). */
+  | { kind: 'files-rejected'; names: string[] }
   | { kind: 'mod-removed' }
   | { kind: 'game-configured'; name: string }
   | { kind: 'profile-saved' }
@@ -52,6 +55,8 @@ export interface LauncherState {
   staleSession: { modsDir: string; tracked: number } | null;
   error: CommandError | null;
   notice: Notice | null;
+  /** Files are being dragged over the window while the drop listener is active (#152). */
+  dragging: boolean;
   /** Install state per catalog entry id; an absent id means idle. */
   catalogInstalls: Record<string, CatalogInstallState>;
 }
@@ -71,7 +76,10 @@ export interface LauncherController {
   /** Opens the import dialog; cancelling does not import. */
   importFromDialog(): Promise<void>;
   importPaths(paths: string[]): Promise<void>;
+  /** Listens to drops and to the drag state; releasing also clears `dragging`. */
   subscribeDrop(): Promise<Unsubscribe>;
+  /** Hides the drop overlay (Esc) until the next drag enters the window. */
+  cancelDrag(): void;
   removeMod(id: string): Promise<void>;
   createProfile(name: string): Promise<void>;
   renameProfile(id: string, name: string): Promise<void>;

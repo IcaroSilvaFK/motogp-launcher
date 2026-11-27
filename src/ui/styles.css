@@ -198,6 +198,13 @@
   --layer-dialog: 20;
   --welcome-tile-size: 32px;
   --welcome-progress-height: 4px;
+  /* Drop to install (#152): the full-window drop overlay. Its scrim is the background tone, so the
+     page stays faintly visible; it sits above popovers and the lightbox, below the title bar. */
+  --scrim-drop: rgba(15, 17, 21, 0.88);
+  --layer-drop: 30;
+  --drop-target-max-width: 480px;
+  --drop-icon-size: 40px;
+  --motion-drop-scale: 0.96;
 
   font-family: var(--font-body);
   font-size: var(--type-body-large);
@@ -1504,6 +1511,74 @@ button {
   padding: var(--space-3);
   border: 1px dashed var(--border-strong);
   border-radius: var(--radius-md);
+}
+
+/* Drop to install overlay (#152): a scrim over everything below the title bar with one dashed
+   accent target in the middle. It never takes the pointer: the OS hands the drop to the webview. */
+.drop-overlay {
+  position: fixed;
+  inset: var(--titlebar-height) 0 0 0;
+  z-index: var(--layer-drop);
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  background: var(--scrim-drop);
+  pointer-events: none;
+  animation: fade-in var(--motion-enter) backwards;
+}
+
+.drop-overlay[data-state='exiting'] {
+  animation: fade-out var(--motion-exit) forwards;
+}
+
+.drop-overlay-target {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: var(--drop-target-max-width);
+  padding: var(--space-6) var(--space-5);
+  border: 2px dashed var(--accent-text);
+  border-radius: var(--radius-lg);
+  background: var(--accent-tint);
+  text-align: center;
+  animation: drop-target-in var(--motion-enter) backwards;
+}
+
+.drop-overlay-icon {
+  width: var(--drop-icon-size);
+  height: var(--drop-icon-size);
+  margin-bottom: var(--space-2);
+  fill: none;
+  stroke: var(--accent-text);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.drop-overlay-title {
+  margin: 0;
+  font-size: var(--type-title-large);
+  font-weight: var(--type-label-large-weight);
+  color: var(--text);
+}
+
+.drop-overlay-detail {
+  margin: 0;
+  font-size: var(--type-body-medium);
+  color: var(--text-muted);
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes drop-target-in {
+  from {
+    transform: scale(var(--motion-drop-scale));
+  }
 }
 
 .mod-list {
