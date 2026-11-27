@@ -331,6 +331,12 @@ export interface Messages {
     copyDiagnostics: string;
     copied: string;
     copyFailed: string;
+    /** Keyboard shortcuts list (#157). */
+    shortcutsLabel: string;
+    shortcutsHint: string;
+    shortcutEsc: string;
+    shortcutSearch: string;
+    shortcutSections: string;
   };
   /** Settings > Community: the Discord account row (#122). */
   community: {

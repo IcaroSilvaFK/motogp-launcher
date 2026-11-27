@@ -300,6 +300,11 @@ export const ptBR: Messages = {
     copyDiagnostics: 'Copiar diagnóstico',
     copied: 'Copiado',
     copyFailed: 'Não foi possível copiar para a área de transferência.',
+    shortcutsLabel: 'Atalhos de teclado',
+    shortcutsHint: 'Os atalhos são ignorados enquanto você digita em um campo ou há um diálogo aberto.',
+    shortcutEsc: 'Voltar da página de um mod',
+    shortcutSearch: 'Focar o campo de busca',
+    shortcutSections: 'Trocar de seção (na ordem da barra lateral)',
   },
   community: {
     title: 'Comunidade',

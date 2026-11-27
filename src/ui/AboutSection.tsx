@@ -43,10 +43,39 @@ export function AboutSection() {
         </div>
         {updater && <UpdateCheckRow updater={updater} />}
         {diagnostics && <DiagnosticsRow diagnostics={diagnostics} />}
+        <ShortcutsRow />
         <SupportLink placement="settings" />
         <AdSlot slot="about" />
       </div>
     </section>
+  );
+}
+
+/** The keyboard shortcuts (#157), read-only. */
+function ShortcutsRow() {
+  const { t } = useI18n();
+  const rows: [string, string][] = [
+    ['Esc', t.about.shortcutEsc],
+    ['/ · Ctrl+F', t.about.shortcutSearch],
+    ['Ctrl+1…4', t.about.shortcutSections],
+  ];
+  return (
+    <div className="setting-row">
+      <div className="setting-text">
+        <p className="setting-label">{t.about.shortcutsLabel}</p>
+        <p className="hint">{t.about.shortcutsHint}</p>
+      </div>
+      <dl className="setting-control shortcut-list">
+        {rows.map(([keys, label]) => (
+          <div key={keys} className="shortcut-item">
+            <dt>
+              <kbd className="num">{keys}</kbd>
+            </dt>
+            <dd>{label}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
   );
 }
 
