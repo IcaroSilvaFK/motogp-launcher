@@ -3,6 +3,7 @@ import type { FormEvent } from 'react';
 import { selectProfileLocked } from '../application';
 import type { FileConflict, Profile } from '../domain';
 import { isVanilla, moveItem, toggleMod } from '../domain';
+import { ConfirmAction } from './ConfirmAction';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
@@ -103,6 +104,7 @@ function ProfileEditor({ profile }: { profile: Profile }) {
   // Keyboard focus follows the moved mod: its button in the same direction, or the other one
   // when the move reached an end of the list (that button is then disabled).
   const moveButtons = useRef(new Map<string, HTMLButtonElement>());
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [moved, setMoved] = useState<{ id: string; direction: Direction } | null>(null);
   useLayoutEffect(() => {
     if (moved === null) return;
@@ -141,18 +143,33 @@ function ProfileEditor({ profile }: { profile: Profile }) {
         <h3>{profile.name}</h3>
         {!isVanilla(profile) && (
           <button
+            id="delete-profile"
             type="button"
             className="btn btn-danger btn-sm"
             aria-label={t.profiles.deleteNamed(profile.name)}
             {...lockProps}
             onClick={() => {
-              if (!locked) void controller.deleteProfile(profile.id);
+              if (!locked) setConfirmingDelete(true);
             }}
           >
             {t.profiles.delete}
           </button>
         )}
       </div>
+
+      {confirmingDelete && !locked && !isVanilla(profile) && (
+        <ConfirmAction
+          prompt={t.profiles.confirmDelete(profile.name)}
+          confirmLabel={t.profiles.delete}
+          cancelLabel={t.profiles.cancel}
+          returnFocusId="delete-profile"
+          onConfirm={() => {
+            setConfirmingDelete(false);
+            void controller.deleteProfile(profile.id);
+          }}
+          onCancel={() => setConfirmingDelete(false)}
+        />
+      )}
 
       {locked && !isVanilla(profile) && (
         <p id="profile-editor-lock-hint" className="hint">
