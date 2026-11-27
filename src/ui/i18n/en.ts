@@ -193,6 +193,9 @@ export const en: Messages = {
     conflictsHint: 'Files shipped by more than one mod in this order. The mod that loads last wins.',
     conflictsEmpty: 'No two mods in this load order ship the same file.',
     conflictWinner: 'Wins',
+    conflictDetailsTitle: (name) => `Conflicts of ${name}`,
+    conflictDetailsClose: 'Close',
+    conflictDetailsToggle: (name) => `Show conflict details of ${name}`,
   },
   settings: {
     title: 'Settings',

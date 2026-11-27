@@ -194,6 +194,9 @@ export const ptBR: Messages = {
     conflictsHint: 'Arquivos que mais de um mod desta ordem inclui. Vence o mod que carrega por último.',
     conflictsEmpty: 'Nenhum par de mods desta ordem inclui o mesmo arquivo.',
     conflictWinner: 'Vence',
+    conflictDetailsTitle: (name) => `Conflitos de ${name}`,
+    conflictDetailsClose: 'Fechar',
+    conflictDetailsToggle: (name) => `Mostrar detalhes dos conflitos de ${name}`,
   },
   settings: {
     title: 'Configurações',
