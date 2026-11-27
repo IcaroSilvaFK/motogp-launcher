@@ -62,6 +62,8 @@ export const ptBR: Messages = {
     files: (count) => `${count} ${plural(count, 'arquivo', 'arquivos')}`,
     empty: 'Nenhum mod ainda. Importe alguns para começar.',
     dropHint: 'Solte arquivos .pak, .utoc, .ucas ou .zip aqui para importá-los',
+    dropOverlayTitle: 'Solte para instalar',
+    dropOverlayDetail: 'Solte arquivos .pak, .utoc, .ucas ou .zip em qualquer lugar para adicioná-los à biblioteca',
     name: 'Nome',
     search: 'Buscar mods',
     searchPlaceholder: 'Buscar pelo nome',
@@ -506,6 +508,10 @@ export const ptBR: Messages = {
     undo: 'Desfazer',
     openLibrary: 'Abrir na Biblioteca',
     imported: (count) => `${count} ${plural(count, 'mod importado', 'mods importados')}`,
+    filesRejected: (names) =>
+      names.length === 1
+        ? `"${names[0]}" não é um arquivo de mod e não foi instalado. Use arquivos .pak, .utoc, .ucas ou .zip.`
+        : `${names.map((name) => `"${name}"`).join(', ')} não são arquivos de mod e não foram instalados. Use arquivos .pak, .utoc, .ucas ou .zip.`,
     modRemoved: 'Mod removido',
     gameConfigured: (name) => `Jogo configurado: ${name}`,
     profileSaved: 'Perfil salvo',

@@ -100,4 +100,21 @@ describe('Given the session and drop adapters', () => {
     drop.emit({ type: 'leave' });
     expect(onDrop).not.toHaveBeenCalled();
   });
+
+  it('When drag events arrive Then drag_state_follows_enter_over_leave_and_drop', async () => {
+    const drag = fakeRegistration();
+    const onDragState = vi.fn();
+    const off = await createTauriDropEvents(webviewOf(drag)).onDragState(onDragState);
+    drag.emit({ type: 'enter', paths: ['a.pak'] });
+    drag.emit({ type: 'over' });
+    drag.emit({ type: 'leave' });
+    drag.emit({ type: 'enter', paths: ['a.pak'] });
+    drag.emit({ type: 'drop', paths: ['a.pak'] });
+    expect(onDragState.mock.calls).toEqual([[true], [true], [false], [true], [false]]);
+    off();
+    await flush();
+    expect(drag.unlisten).toHaveBeenCalledTimes(1);
+    drag.emit({ type: 'enter', paths: ['b.pak'] });
+    expect(onDragState).toHaveBeenCalledTimes(5);
+  });
 });

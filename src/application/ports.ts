@@ -83,6 +83,8 @@ export interface SessionEvents {
 
 export interface DropEvents {
   onDrop(callback: (paths: string[]) => void): Promise<Unsubscribe>;
+  /** `true` while files are dragged over the window; `false` when the drag leaves or the files are dropped (#152). */
+  onDragState(callback: (dragging: boolean) => void): Promise<Unsubscribe>;
 }
 
 /** Synchronous on purpose: the locale must be known before the first render. */

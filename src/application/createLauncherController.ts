@@ -30,8 +30,14 @@ const initialState: LauncherState = {
   staleSession: null,
   error: null,
   notice: null,
+  dragging: false,
   catalogInstalls: {},
 };
+
+/** The last segment of a Windows or POSIX path: what the user recognises in a notice. */
+function fileNameOf(path: string): string {
+  return path.split(/[\\/]/).pop() || path;
+}
 
 /** The install state announced by a progress event. */
 function installStateOf(progress: CatalogInstallProgress): CatalogInstallState {
@@ -294,15 +300,28 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
 
   async function importPaths(paths: string[]): Promise<void> {
     const supported = paths.filter(isSupportedModFile);
-    if (supported.length === 0) return;
+    const rejected = paths.filter((path) => !isSupportedModFile(path)).map(fileNameOf);
+    if (supported.length === 0) {
+      if (rejected.length > 0) set({ error: null, notice: { kind: 'files-rejected', names: rejected } });
+      return;
+    }
     await mutate(
       ['mods'],
       async () => {
         const imported = await gateway.importMods(supported);
-        return { kind: 'imported', count: imported.length };
+        return { kind: 'imported', count: imported.length, ...(rejected.length > 0 ? { rejected } : {}) };
       },
       true,
     );
+  }
+
+  // Esc hides the overlay for the rest of the current drag: the SDK keeps reporting "over" until
+  // the drag leaves or drops, and only then may the next drag show the overlay again.
+  let dragCancelled = false;
+  function setDragging(dragging: boolean): void {
+    if (!dragging) dragCancelled = false;
+    else if (dragCancelled) return;
+    if (state.dragging !== dragging) set({ dragging });
   }
 
   async function configureGame(path: string): Promise<void> {
@@ -358,10 +377,27 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
     },
     importPaths,
     async subscribeDrop() {
-      const release = await drop.onDrop((paths) => {
+      const releaseDrop = await drop.onDrop((paths) => {
+        setDragging(false);
         void importPaths(paths);
       });
-      return release;
+      let releaseDrag: Unsubscribe;
+      try {
+        releaseDrag = await drop.onDragState(setDragging);
+      } catch (reason) {
+        releaseDrop();
+        throw reason;
+      }
+      return () => {
+        releaseDrop();
+        releaseDrag();
+        setDragging(false);
+      };
+    },
+    cancelDrag() {
+      if (!state.dragging) return;
+      dragCancelled = true;
+      set({ dragging: false });
     },
     removeMod: (id) =>
       mutateUnlessLocked(

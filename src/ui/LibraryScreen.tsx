@@ -4,6 +4,7 @@ import type { LibrarySort, LibrarySortStore } from '../application';
 import type { FileConflict, ModEntry } from '../domain';
 import { conflictsOfMod, isVanilla, modConflictStatus } from '../domain';
 import { ConfirmAction } from './ConfirmAction';
+import { DropOverlay } from './DropOverlay';
 import { Icon } from './Icon';
 import type { Messages } from './i18n';
 import { formatSize, useI18n } from './i18n';
@@ -143,6 +144,7 @@ export function LibraryScreen({ sortStore }: { sortStore?: LibrarySortStore }) {
     return (
       <section aria-labelledby="library-title" className="page">
         {head(false)}
+        <DropOverlay />
         <div className="empty-state">
           <span className="empty-icon" aria-hidden="true">
             <Icon name="library" />
@@ -161,6 +163,7 @@ export function LibraryScreen({ sortStore }: { sortStore?: LibrarySortStore }) {
   return (
     <section aria-labelledby="library-title" className="page">
       {head(true)}
+      <DropOverlay />
       <div className="library-layout">
         <aside className="filter-rail">
           <div className="search">
