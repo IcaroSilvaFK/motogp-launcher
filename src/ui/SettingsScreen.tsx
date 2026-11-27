@@ -52,7 +52,7 @@ export function SettingsScreen() {
     if (!target || !scroller) return;
     const margin = Number.parseFloat(getComputedStyle(target).scrollMarginTop) || 0;
     const top = target.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
-    scroller.scrollTo({ top: top - margin });
+    scroller.scrollTop = top - margin;
   };
 
   return (

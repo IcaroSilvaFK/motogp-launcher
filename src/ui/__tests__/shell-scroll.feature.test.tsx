@@ -31,6 +31,8 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
   AfterEachScenario(() => {
     cleanup();
     vi.restoreAllMocks();
+    // Drop the scrollTop stub so jsdom's own accessor on Element applies again.
+    delete (HTMLElement.prototype as { scrollTop?: number }).scrollTop;
   });
 
   Scenario('The content area is the containing block of out-of-flow content', ({ Given, Then, And }) => {
@@ -58,8 +60,14 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       user = userEvent.setup();
       scrollTo = vi.fn();
       intoView = vi.fn();
-      // jsdom implements neither; record the calls to tell the scroller apart from the document.
-      Object.defineProperty(HTMLElement.prototype, 'scrollTo', { configurable: true, value: scrollTo });
+      // jsdom does not scroll; record the writes and calls to tell the scroller apart from the document.
+      Object.defineProperty(HTMLElement.prototype, 'scrollTop', {
+        configurable: true,
+        get: () => 0,
+        set(this: HTMLElement, value: number) {
+          scrollTo.call(this, { top: value });
+        },
+      });
       Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: intoView });
       windowScroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
       render(<App controller={createFakeController()} locale="en" />);
