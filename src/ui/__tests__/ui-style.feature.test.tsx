@@ -331,6 +331,9 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     And('each row offers a remove button named after the mod', async () => {
       expect(screen.getByRole('button', { name: 'Remove Mod A' })).toBeInTheDocument();
       await user.click(screen.getByRole('button', { name: 'Remove Mod B' }));
+      await user.click(
+        within(screen.getByRole('group', { name: /This cannot be undone/ })).getByRole('button', { name: 'Remove' }),
+      );
       expect(controller.removeMod).toHaveBeenCalledWith('B');
     });
   });
