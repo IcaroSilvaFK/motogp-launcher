@@ -54,7 +54,7 @@ fn catalog_source() -> Arc<dyn CatalogSource> {
         match HttpCatalogSource::new(HttpCatalogConfig::github(version)) {
             Ok(source) => Arc::new(source),
             Err(error) => {
-                eprintln!("catalog source unavailable: {error}");
+                crate::app_log::warn(&format!("catalog source unavailable: {error}"));
                 Arc::new(UnavailableCatalogSource::new(error.to_string()))
             }
         };
@@ -65,7 +65,7 @@ fn catalog_source() -> Arc<dyn CatalogSource> {
     ) {
         Ok(source) => Arc::new(source),
         Err(error) => {
-            eprintln!("community catalog unavailable: {error}");
+            crate::app_log::warn(&format!("community catalog unavailable: {error}"));
             Arc::new(UnavailableCatalogSource::new(error.to_string()))
         }
     };
@@ -85,14 +85,14 @@ fn ad_adapters() -> (Arc<dyn AdSource>, Arc<dyn AdBeaconSink>) {
     let source: Arc<dyn AdSource> = match HttpAdSource::new(config.clone(), SystemClock) {
         Ok(source) => Arc::new(source),
         Err(error) => {
-            eprintln!("ad source unavailable: {error}");
+            crate::app_log::warn(&format!("ad source unavailable: {error}"));
             Arc::new(NullAdSource)
         }
     };
     let beacon: Arc<dyn AdBeaconSink> = match HttpAdBeaconSink::new(&config) {
         Ok(beacon) => Arc::new(beacon),
         Err(error) => {
-            eprintln!("ad beacon unavailable: {error}");
+            crate::app_log::warn(&format!("ad beacon unavailable: {error}"));
             Arc::new(NullAdBeacon)
         }
     };
@@ -118,7 +118,7 @@ fn community_services(
                 (api.clone(), api)
             }
             Err(error) => {
-                eprintln!("community server client unavailable: {error}");
+                crate::app_log::warn(&format!("community server client unavailable: {error}"));
                 let api = Arc::new(UnavailableCommunityApi::new(error.to_string()));
                 (api.clone(), api)
             }
@@ -126,14 +126,14 @@ fn community_services(
     let store: Arc<dyn CredentialStore> = match WindowsCredentialStore::new() {
         Ok(store) => Arc::new(store),
         Err(error) => {
-            eprintln!("credential store unavailable: {error}");
+            crate::app_log::warn(&format!("credential store unavailable: {error}"));
             Arc::new(MemoryCredentialStore::default())
         }
     };
     let avatars: Arc<dyn AvatarFetcher> = match HttpAvatarFetcher::new(version) {
         Ok(fetcher) => Arc::new(fetcher),
         Err(error) => {
-            eprintln!("avatar fetcher unavailable: {error}");
+            crate::app_log::warn(&format!("avatar fetcher unavailable: {error}"));
             Arc::new(NoAvatars)
         }
     };
@@ -141,7 +141,7 @@ fn community_services(
         match HttpModStatsApi::new(HttpCommunityConfig::new(COMMUNITY_SERVER_URL, version)) {
             Ok(api) => Arc::new(api),
             Err(error) => {
-                eprintln!("community stars client unavailable: {error}");
+                crate::app_log::warn(&format!("community stars client unavailable: {error}"));
                 Arc::new(UnavailableModStatsApi::new(error.to_string()))
             }
         };
@@ -157,7 +157,7 @@ fn community_services(
     let publish_api: Arc<dyn ModPublishApi> = match HttpModPublishApi::new(publish_config) {
         Ok(api) => Arc::new(api),
         Err(error) => {
-            eprintln!("community publish client unavailable: {error}");
+            crate::app_log::warn(&format!("community publish client unavailable: {error}"));
             Arc::new(UnavailablePublishApi::new(error.to_string()))
         }
     };
@@ -184,7 +184,7 @@ fn download_stats(data: &DataDir) -> Arc<DownloadStatsService> {
     let api: Arc<dyn DownloadStatsApi> = match HttpDownloadStats::new(config) {
         Ok(api) => Arc::new(api),
         Err(error) => {
-            eprintln!("download stats unavailable: {error}");
+            crate::app_log::warn(&format!("download stats unavailable: {error}"));
             Arc::new(UnavailableDownloadStats)
         }
     };
@@ -218,6 +218,13 @@ pub fn run() {
     .setup(|app| {
         let data = DataDir::new(app.path().app_data_dir()?);
         std::fs::create_dir_all(data.root())?;
+        crate::app_log::install(Arc::new(motogp_infrastructure::FileLog::new(
+            data.logs_dir(),
+        )));
+        crate::app_log::info(&format!(
+            "MotoGP Launcher {} starting",
+            app.package_info().version
+        ));
         // One launcher process at a time: a second one would share the
         // deployment manifest and the game directory. The lock is taken before
         // the recovery and held for the whole app lifetime.
@@ -226,7 +233,7 @@ pub fn run() {
                 app.manage(InstanceHold(Mutex::new(Some(guard))));
             }
             None => {
-                eprintln!("another MotoGP Launcher is already running; exiting");
+                crate::app_log::warn("another MotoGP Launcher is already running; exiting");
                 std::process::exit(0);
             }
         }
@@ -250,7 +257,9 @@ pub fn run() {
             ad_beacon,
             community.clone(),
             bundled_catalog()
-                .map_err(|error| eprintln!("bundled catalog unavailable: {error}"))
+                .map_err(|error| {
+                    crate::app_log::warn(&format!("bundled catalog unavailable: {error}"))
+                })
                 .ok(),
         )
         .with_stars(stars)
@@ -261,7 +270,7 @@ pub fn run() {
         // `play` earlier. A failure is already on the error channel and blocks
         // new deploys; it must not stop the app from starting.
         if let Err(error) = run_recovery(&state) {
-            eprintln!("startup recovery failed: {}", error.message);
+            crate::app_log::error(&format!("startup recovery failed: {}", error.message));
         }
         app.manage(state);
         Ok(())

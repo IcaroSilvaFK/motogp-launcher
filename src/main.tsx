@@ -27,6 +27,7 @@ import {
   createLocalStorageUsagePreferenceStore,
   createTauriDownloadStats,
   createTauriAppInfo,
+  createTauriDiagnostics,
   createTauriDropEvents,
   createTauriGateway,
   createTauriPicker,
@@ -83,6 +84,7 @@ createRoot(container).render(
       }}
       updater={updater}
       appInfo={createTauriAppInfo()}
+      diagnostics={createTauriDiagnostics()}
       navStore={createLocalStorageNavStore()}
       windowControls={createTauriWindowControls()}
       catalog={catalog}

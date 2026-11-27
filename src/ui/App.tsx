@@ -15,6 +15,7 @@ import type {
   DownloadStats,
   UsagePreferenceHandle,
   AppInfo,
+  Diagnostics,
   CatalogController,
   DiscoverViewStore,
   LauncherController,
@@ -77,6 +78,7 @@ function Shell({
   controller,
   updater,
   appInfo,
+  diagnostics,
   navStore,
   windowControls,
   catalog,
@@ -106,6 +108,7 @@ function Shell({
   publishPicker?: PublishFilePicker;
   updater?: UpdateController;
   appInfo?: AppInfo;
+  diagnostics?: Diagnostics;
   navStore?: NavPreferenceStore;
   windowControls?: WindowControls;
   catalog?: CatalogController;
@@ -130,8 +133,8 @@ function Shell({
   const value = useMemo(() => ({ controller, state }), [controller, state]);
   const markUserChecked = useCallback(() => setUserChecked(true), []);
   const info = useMemo(
-    () => ({ version, updater, userChecked, markUserChecked }),
-    [version, updater, userChecked, markUserChecked],
+    () => ({ version, updater, diagnostics, userChecked, markUserChecked }),
+    [version, updater, diagnostics, userChecked, markUserChecked],
   );
   const loading = state.status === 'loading';
   const ads = useMemo(() => ({ provider: adProvider }), [adProvider]);
@@ -228,6 +231,7 @@ export function App({
   onLocaleChange,
   updater,
   appInfo,
+  diagnostics,
   navStore,
   windowControls,
   catalog,
@@ -248,6 +252,7 @@ export function App({
   onLocaleChange?: (locale: Locale) => void;
   updater?: UpdateController;
   appInfo?: AppInfo;
+  diagnostics?: Diagnostics;
   navStore?: NavPreferenceStore;
   windowControls?: WindowControls;
   /** The Discover tab (#73) is listed only when a catalog controller is wired. */
@@ -277,6 +282,7 @@ export function App({
         controller={controller}
         updater={updater}
         appInfo={appInfo}
+        diagnostics={diagnostics}
         navStore={navStore}
         windowControls={windowControls}
         catalog={catalog}

@@ -1,7 +1,7 @@
 import { useState, useSyncExternalStore } from 'react';
-import { selectSessionClean } from '../application';
+import { copyDiagnostics, selectSessionClean } from '../application';
 import { AdSlot } from './AdSlot';
-import type { UpdateController, UpdateState } from '../application';
+import type { Diagnostics, UpdateController, UpdateState } from '../application';
 import { useAppInfo } from './AppInfoContext';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
@@ -15,7 +15,7 @@ import { SupportLink } from './SupportLink';
  */
 export function AboutSection() {
   const { t } = useI18n();
-  const { version, updater } = useAppInfo();
+  const { version, updater, diagnostics } = useAppInfo();
 
   return (
     <section
@@ -42,10 +42,63 @@ export function AboutSection() {
           </div>
         </div>
         {updater && <UpdateCheckRow updater={updater} />}
+        {diagnostics && <DiagnosticsRow diagnostics={diagnostics} />}
         <SupportLink placement="settings" />
         <AdSlot slot="about" />
       </div>
     </section>
+  );
+}
+
+/** "Copy diagnostics" (#148): puts a bug-report text on the clipboard and confirms or fails inline. */
+function DiagnosticsRow({ diagnostics }: { diagnostics: Diagnostics }) {
+  const { t } = useI18n();
+  const { state } = useLauncher();
+  const { version } = useAppInfo();
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<'copied' | 'failed' | null>(null);
+
+  const copy = async () => {
+    setBusy(true);
+    setResult(null);
+    try {
+      await copyDiagnostics(diagnostics, {
+        version,
+        gameDir: state.game?.root ?? null,
+        modCount: state.mods.length,
+        activeProfile: state.profiles.find((profile) => profile.id === state.config.active_profile)?.name ?? null,
+      });
+      setResult('copied');
+    } catch (error) {
+      console.warn('Could not copy the diagnostics', error);
+      setResult('failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="setting-row">
+      <div className="setting-text">
+        <p className="setting-label">{t.about.diagnosticsLabel}</p>
+        <p className="hint">{t.about.diagnosticsHint}</p>
+        <div role="status">
+          {result === 'copied' && (
+            <span className="update-result-ok">
+              <Icon name="check" />
+              {t.about.copied}
+            </span>
+          )}
+          {result === 'failed' && <span className="update-result-error">{t.about.copyFailed}</span>}
+        </div>
+      </div>
+      <div className="setting-control">
+        <button type="button" className="btn btn-sm" disabled={busy} onClick={() => void copy()}>
+          <Icon name="file" />
+          {t.about.copyDiagnostics}
+        </button>
+      </div>
+    </div>
   );
 }
 

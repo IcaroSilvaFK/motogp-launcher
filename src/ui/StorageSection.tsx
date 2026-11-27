@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CommandError, StorageUsage } from '../domain';
 import { storageBreakdown, toCommandError } from '../domain';
+import { useAppInfo } from './AppInfoContext';
 import { Icon } from './Icon';
 import { formatShare, formatSize, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
@@ -18,6 +19,8 @@ export function StorageSection() {
   const [measuring, setMeasuring] = useState(true);
   const [error, setError] = useState<CommandError | null>(null);
   const [openFailed, setOpenFailed] = useState(false);
+  const [logsFailed, setLogsFailed] = useState(false);
+  const { diagnostics } = useAppInfo();
   /** Id of the latest request: an older answer (or one after unmount) is ignored. */
   const latest = useRef(0);
 
@@ -54,6 +57,11 @@ export function StorageSection() {
   const openFolder = () => {
     setOpenFailed(false);
     controller.openDataFolder().catch(() => setOpenFailed(true));
+  };
+
+  const openLogs = () => {
+    setLogsFailed(false);
+    diagnostics?.openLogsFolder().catch(() => setLogsFailed(true));
   };
 
   const firstLoad = usage === null && measuring;
@@ -118,6 +126,26 @@ export function StorageSection() {
             </button>
           </div>
         </div>
+
+        {diagnostics && (
+          <div className="setting-row">
+            <div className="setting-text">
+              <p className="setting-label">{t.storage.logsLabel}</p>
+              <p className="hint">{t.storage.logsHint}</p>
+              {logsFailed && (
+                <p className="storage-inline-error" role="alert">
+                  {t.storage.openLogsFailed}
+                </p>
+              )}
+            </div>
+            <div className="setting-control">
+              <button type="button" className="btn btn-sm" onClick={openLogs}>
+                <Icon name="folder" />
+                {t.storage.openLogs}
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="setting-row">
           <dl className="storage-stats">

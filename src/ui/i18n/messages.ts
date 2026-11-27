@@ -255,6 +255,10 @@ export interface Messages {
     folderHint: string;
     openFolder: string;
     openFailed: string;
+    logsLabel: string;
+    logsHint: string;
+    openLogs: string;
+    openLogsFailed: string;
     totalUsed: string;
     freeSpace: string;
     unavailable: string;
@@ -304,6 +308,11 @@ export interface Messages {
     upToDate: string;
     available: (version: string) => string;
     install: string;
+    diagnosticsLabel: string;
+    diagnosticsHint: string;
+    copyDiagnostics: string;
+    copied: string;
+    copyFailed: string;
   };
   /** Settings > Community: the Discord account row (#122). */
   community: {

@@ -48,6 +48,10 @@ impl DataDir {
         self.root.join("downloads")
     }
 
+    pub fn logs_dir(&self) -> PathBuf {
+        self.root.join("logs")
+    }
+
     pub fn library_dir(&self) -> PathBuf {
         self.root.join("library")
     }

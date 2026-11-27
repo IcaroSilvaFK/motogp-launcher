@@ -225,6 +225,10 @@ export const ptBR: Messages = {
     folderHint: 'Os mods importados, os perfis e as configurações do launcher ficam aqui.',
     openFolder: 'Abrir pasta',
     openFailed: 'Não foi possível abrir a pasta de dados.',
+    logsLabel: 'Arquivos de log',
+    logsHint: 'O que o launcher registra para ajudar a diagnosticar problemas. Segredos nunca são gravados.',
+    openLogs: 'Abrir pasta de logs',
+    openLogsFailed: 'Não foi possível abrir a pasta de logs.',
     totalUsed: 'Total usado',
     freeSpace: 'Espaço livre no disco',
     unavailable: 'Indisponível',
@@ -274,6 +278,12 @@ export const ptBR: Messages = {
     upToDate: 'O launcher está atualizado.',
     available: (version) => `A versão ${version} está disponível`,
     install: 'Instalar atualização',
+    diagnosticsLabel: 'Diagnóstico',
+    diagnosticsHint:
+      'Copia a versão, o sistema, a pasta do jogo e as últimas linhas do log para anexar a um relatório de erro.',
+    copyDiagnostics: 'Copiar diagnóstico',
+    copied: 'Copiado',
+    copyFailed: 'Não foi possível copiar para a área de transferência.',
   },
   community: {
     title: 'Comunidade',

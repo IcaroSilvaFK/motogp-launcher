@@ -9,6 +9,7 @@ export { createTauriSessionEvents } from './tauriSessionEvents';
 export { createTauriDropEvents } from './tauriDropEvents';
 export { createTauriUpdateService } from './tauri/TauriUpdateService';
 export { createTauriAppInfo } from './tauri/TauriAppInfo';
+export { createTauriDiagnostics } from './tauri/TauriDiagnostics';
 export { createTauriWindowControls } from './tauri/TauriWindowControls';
 export { createTauriAdProvider } from './tauri/TauriAdProvider';
 export { createTauriCommunityAccount } from './tauri/TauriCommunityAccount';
