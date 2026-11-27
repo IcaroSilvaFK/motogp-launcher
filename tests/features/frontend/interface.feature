@@ -38,14 +38,33 @@ Feature: Use the launcher through the interface
 
   Scenario: Rename, delete and protect profiles
     Given a regular profile and Vanilla
-    When I rename the regular profile and then delete it
+    When I rename the regular profile and then delete it after confirming
     Then the list reflects both changes
     And Vanilla offers no delete action
 
+  Scenario: Deleting a profile asks first
+    Given a regular profile and Vanilla
+    When I click Delete on the regular profile
+    Then a confirmation appears and the profile is not deleted yet
+    When I cancel with Esc
+    Then the profile is still listed
+
   Scenario: Remove a mod from the library and from profiles
     Given a listed mod referenced in a profile
-    When I remove it from the Library
+    When I remove it from the Library after confirming
     Then it no longer appears in the library nor in the profile selection
+
+  Scenario: Removing a mod asks first
+    Given a listed mod referenced in a profile
+    When I click Remove on the mod
+    Then a confirmation appears and the mod is not removed yet
+    When I cancel with the Cancel button
+    Then the mod stays installed
+
+  Scenario: A failed removal is reported
+    Given a listed mod whose removal fails
+    When I remove it from the Library after confirming
+    Then I see the error in the accessible notice at the top
 
   Scenario: Warn of an error when playing without an App ID
     Given the profile "Teste" active and a game configured without an App ID
