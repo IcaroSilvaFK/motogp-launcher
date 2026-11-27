@@ -28,6 +28,7 @@ const initialState: LauncherState = {
   session: { kind: 'idle' },
   recovery: null,
   staleSession: null,
+  deployedFiles: 0,
   error: null,
   notice: null,
   dragging: false,
@@ -123,6 +124,7 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
           // The deploy session only matters against a configured game; skip the backend otherwise.
           if (game === null) {
             patch.staleSession = null;
+            patch.deployedFiles = 0;
             patch.artwork = null;
             return;
           }
@@ -134,6 +136,7 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
             deploy.state === 'stale' && deploy.mods_dir !== null
               ? { modsDir: deploy.mods_dir, tracked: deploy.tracked }
               : null;
+          patch.deployedFiles = deploy.state === 'current' ? deploy.tracked : 0;
         }),
       );
     }
@@ -479,6 +482,12 @@ export function createLauncherController(deps: LauncherDeps): LauncherController
       await mutate(['game'], async () => {
         const cleaned = await gateway.cleanStaleSession(stale.modsDir);
         return { kind: 'stale-cleaned', cleaned };
+      });
+    },
+    async restoreGameFiles() {
+      await mutate(['game'], async () => {
+        const cleaned = await gateway.restoreGameFiles();
+        return { kind: 'game-restored', cleaned };
       });
     },
     async play() {

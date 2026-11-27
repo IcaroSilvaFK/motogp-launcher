@@ -291,6 +291,17 @@ export class FakeGateway implements LauncherGateway {
     });
   }
 
+  restoreGameFiles(): Promise<number> {
+    return this.run('restoreGameFiles', [], () => {
+      if (this.manifestState() === 'stale') {
+        throw { code: 'deploy_unauthorized_directory', message: 'stale manifest' } satisfies CommandError;
+      }
+      const removed = this.manifest?.tracked ?? 0;
+      this.manifest = null;
+      return removed;
+    });
+  }
+
   getStorageUsage(): Promise<StorageUsage> {
     return this.run('getStorageUsage', [], () => ({
       ...this.storage,

@@ -29,6 +29,8 @@ function noticeText(t: Messages, notice: Notice): string {
       return t.notices.staleForgotten;
     case 'stale-cleaned':
       return t.notices.staleCleaned(notice.cleaned);
+    case 'game-restored':
+      return t.notices.gameRestored(notice.cleaned);
     case 'mod-installed':
       if (notice.conflictWith !== undefined) return t.notices.modInstalledConflict(notice.name, notice.conflictWith);
       return notice.enabled ? t.notices.modInstalledEnabled(notice.name) : t.notices.modInstalled(notice.name);

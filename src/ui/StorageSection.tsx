@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CommandError, StorageUsage } from '../domain';
 import { storageBreakdown, toCommandError } from '../domain';
 import { useAppInfo } from './AppInfoContext';
+import { GameFilesRow } from './GameFilesRow';
 import { Icon } from './Icon';
 import { formatShare, formatSize, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
@@ -165,6 +166,8 @@ export function StorageSection() {
             </button>
           </div>
         </div>
+
+        <GameFilesRow />
 
         {(usage !== null || firstLoad) && (
           <div className="setting-row setting-row-block">

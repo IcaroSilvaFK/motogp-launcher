@@ -459,6 +459,32 @@ describe('Given a stale deploy session', () => {
     expect(selectCanPlay(state)).toBe(false);
   });
 
+  it('When the user restores the game files Then the deployed count is reported and refreshed (restore_game_files)', async () => {
+    const { controller, gateway } = await ready({ manifest: { mods_dir: game.mods_dir, tracked: 2 } });
+    expect(controller.getState().deployedFiles).toBe(2);
+    await controller.restoreGameFiles();
+    const state = controller.getState();
+    expect(gateway.callsOf('restoreGameFiles')).toHaveLength(1);
+    expect(state.notice).toEqual({ kind: 'game-restored', cleaned: 2 });
+    expect(state.deployedFiles).toBe(0);
+    expect(state.busy).toBe(false);
+  });
+
+  it('When restoring is refused Then the error is shown and no notice is raised (restore_refused)', async () => {
+    const { controller, gateway } = await ready({ manifest: { mods_dir: game.mods_dir, tracked: 2 } });
+    gateway.failNext('restoreGameFiles', { code: 'game_still_running', message: 'no' });
+    await controller.restoreGameFiles();
+    const state = controller.getState();
+    expect(state.error?.code).toBe('game_still_running');
+    expect(state.notice).toBeNull();
+    expect(state.deployedFiles).toBe(2);
+  });
+
+  it('When the manifest is stale or absent Then deployedFiles is 0 (deployed_files_current_only)', async () => {
+    expect((await ready({ manifest: stale })).controller.getState().deployedFiles).toBe(0);
+    expect((await ready({})).controller.getState().deployedFiles).toBe(0);
+  });
+
   it('When a different folder is confirmed Then the backend refuses and nothing is removed (confirmed_dir_mismatch)', async () => {
     const { gateway } = await ready({ manifest: stale });
     await expect(gateway.cleanStaleSession('D:/other/~mods')).rejects.toMatchObject({
