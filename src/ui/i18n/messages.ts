@@ -283,6 +283,14 @@ export interface Messages {
     refresh: string;
     measuring: string;
     breakdownLabel: string;
+    gameFiles: {
+      label: string;
+      hint: string;
+      status: (count: number) => string;
+      restore: string;
+      restoring: string;
+      blocked: { session: string; 'no-game': string; stale: string };
+    };
     categories: Record<StorageCategory, string>;
     categoryHints: Record<StorageCategory, string>;
     measureFailed: string;
@@ -515,6 +523,7 @@ export interface Messages {
     gameRunning: string;
     staleForgotten: string;
     staleCleaned: (cleaned: number) => string;
+    gameRestored: (cleaned: number) => string;
   };
   update: {
     available: (version: string) => string;

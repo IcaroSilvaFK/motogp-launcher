@@ -248,6 +248,14 @@ impl PlayService {
         self.recover_stale(|deployer, mods_dir| deployer.clean_stale_session(mods_dir, confirmed))
     }
 
+    /// Recovery on demand: removes every file the launcher deployed into the
+    /// current install's mods folder and returns how many. Like the stale
+    /// recovery it is refused while a game or session is active, and it
+    /// unblocks Play after a failed cleanup.
+    pub fn restore_game_files(&self) -> Result<usize, PlayError> {
+        self.recover_stale(|deployer, mods_dir| deployer.clean(mods_dir))
+    }
+
     fn recover_stale(
         &self,
         action: impl FnOnce(&dyn Deployer, &Path) -> Result<usize, DeployError>,

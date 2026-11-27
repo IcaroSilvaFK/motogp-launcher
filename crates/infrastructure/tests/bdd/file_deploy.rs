@@ -28,6 +28,29 @@ struct FileWorld {
     clean_result: Option<Result<usize, DeployError>>,
     log_order: Vec<String>,
     lock: Option<fs::File>,
+    /// Set by the game-install scenarios: `~mods` then lives in a realistic
+    /// `Content/Paks/~mods` tree and `before` holds the snapshot to compare.
+    game_tree: bool,
+    before: Vec<(PathBuf, Vec<u8>)>,
+}
+
+/// Every file under `root` (relative path, bytes), sorted.
+fn snapshot(root: &Path) -> Vec<(PathBuf, Vec<u8>)> {
+    fn walk(dir: &Path, root: &Path, out: &mut Vec<(PathBuf, Vec<u8>)>) {
+        for entry in fs::read_dir(dir).unwrap() {
+            let path = entry.unwrap().path();
+            if path.is_dir() {
+                walk(&path, root, out);
+            } else {
+                let relative = path.strip_prefix(root).unwrap().to_path_buf();
+                out.push((relative, fs::read(&path).unwrap()));
+            }
+        }
+    }
+    let mut out = vec![];
+    walk(root, root, &mut out);
+    out.sort();
+    out
 }
 
 impl FileWorld {
@@ -39,7 +62,12 @@ impl FileWorld {
     }
 
     fn mods_dir(&mut self) -> PathBuf {
-        self.root().join("game").join("~mods")
+        let game = self.root().join("game");
+        if self.game_tree {
+            game.join("Content").join("Paks").join("~mods")
+        } else {
+            game.join("~mods")
+        }
     }
 
     fn manifest_path(&mut self) -> PathBuf {
@@ -385,6 +413,58 @@ fn operation_error(w: &mut FileWorld) {
 fn external_kept(w: &mut FileWorld) {
     let external = w.mods_dir().parent().unwrap().join("evil.pak");
     assert_eq!(fs::read(external).unwrap(), b"external");
+}
+
+// ---------- Original game files stay untouched ----------
+
+#[given(expr = "a game install with original file {string} and user file {string}")]
+fn game_install(w: &mut FileWorld, original: String, user: String) {
+    w.game_tree = true;
+    let game = w.root().join("game");
+    for (relative, bytes) in [
+        (original, &b"original game data"[..]),
+        (user, b"my own mod"),
+    ] {
+        let path = game.join(relative);
+        fs::create_dir_all(path.parent().unwrap()).unwrap();
+        fs::write(path, bytes).unwrap();
+    }
+    w.before = snapshot(&game);
+}
+
+#[given("a profile with two mods is deployed")]
+#[when("a profile with two mods is deployed")]
+fn two_mods_deployed(w: &mut FileWorld) {
+    let mods = w.two_mods();
+    w.deploy(&mods);
+    assert_eq!(w.deployed.len(), 2);
+}
+
+#[when("the original game files are restored")]
+fn restore_original(w: &mut FileWorld) {
+    w.clean_result = Some(w.clean());
+}
+
+#[then("every original file and the user file are byte-for-byte unchanged")]
+fn originals_unchanged(w: &mut FileWorld) {
+    let after = snapshot(&w.root().join("game"));
+    for (path, bytes) in &w.before {
+        assert!(
+            after.contains(&(path.clone(), bytes.clone())),
+            "{path:?} changed"
+        );
+    }
+}
+
+#[then("no deployed file remains")]
+fn no_deployed_file(w: &mut FileWorld) {
+    assert_eq!(w.clean_result, Some(Ok(2)));
+    assert!(w.manifest().files.is_empty());
+}
+
+#[then("every file of the game install is byte-for-byte as before the deploy")]
+fn tree_identical(w: &mut FileWorld) {
+    assert_eq!(snapshot(&w.root().join("game")), w.before);
 }
 
 /// Runs only `file-deploy.feature`; returns `true` when every step passed.

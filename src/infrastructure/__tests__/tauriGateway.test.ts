@@ -24,6 +24,7 @@ const CASES: [keyof LauncherGateway, unknown[], string, Record<string, unknown> 
   ['deploySession', [], 'deploy_session', undefined],
   ['forgetStaleSession', [], 'forget_stale_session', undefined],
   ['cleanStaleSession', ['D:/old/~mods'], 'clean_stale_session', { confirmedDir: 'D:/old/~mods' }],
+  ['restoreGameFiles', [], 'restore_game_files', undefined],
   ['openDataFolder', [], 'open_data_folder', undefined],
   ['openSupportPage', [], 'open_support_page', undefined],
 ];

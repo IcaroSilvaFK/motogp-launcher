@@ -250,6 +250,19 @@ export const en: Messages = {
     refresh: 'Refresh',
     measuring: 'Measuring…',
     breakdownLabel: 'Usage by category',
+    gameFiles: {
+      label: 'Game files',
+      hint: 'The launcher never changes your original game files: mods are added to the ~mods folder and removed when the game closes.',
+      status: (count) =>
+        count === 0 ? 'No mod files deployed' : `${count} mod ${plural(count, 'file', 'files')} deployed`,
+      restore: 'Restore original game files',
+      restoring: 'Restoring…',
+      blocked: {
+        session: 'Wait for the game session to end before restoring.',
+        'no-game': 'Choose a game folder first.',
+        stale: 'Resolve the old session notice first.',
+      },
+    },
     categories: { mods: 'Mods', launcher_data: 'Launcher data', other: 'Other' },
     categoryHints: {
       mods: 'Imported mod files',
@@ -521,6 +534,7 @@ export const en: Messages = {
     gameRunning: 'The game is already running',
     staleForgotten: 'Old session forgotten',
     staleCleaned: (cleaned) => `Old folder cleaned; ${cleaned} ${plural(cleaned, 'file', 'files')} removed`,
+    gameRestored: (cleaned) => `Original game files restored; ${cleaned} ${plural(cleaned, 'file', 'files')} removed`,
   },
   update: {
     available: (version) => `New version ${version} available`,

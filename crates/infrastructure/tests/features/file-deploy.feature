@@ -54,3 +54,15 @@ Feature: Deploy only the session mods and recover their cleanup on the real file
     When I try to clean the session
     Then the operation returns an error
     And no external file is removed
+
+  Scenario: Deploying never changes an original game file
+    Given a game install with original file "Content/Paks/pakchunk0.pak" and user file "Content/Paks/~mods/my_own.pak"
+    When a profile with two mods is deployed
+    Then every original file and the user file are byte-for-byte unchanged
+
+  Scenario: Restoring the original game leaves it exactly as before
+    Given a game install with original file "Content/Paks/pakchunk0.pak" and user file "Content/Paks/~mods/my_own.pak"
+    And a profile with two mods is deployed
+    When the original game files are restored
+    Then no deployed file remains
+    And every file of the game install is byte-for-byte as before the deploy
