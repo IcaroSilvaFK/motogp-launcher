@@ -63,6 +63,8 @@ export interface Messages {
     import: string;
     remove: string;
     removeNamed: (name: string) => string;
+    confirmRemove: (name: string) => string;
+    cancel: string;
     size: string;
     fileCount: string;
     files: (count: number) => string;
@@ -194,6 +196,8 @@ export interface Messages {
     renameNamed: (name: string) => string;
     delete: string;
     deleteNamed: (name: string) => string;
+    confirmDelete: (name: string) => string;
+    cancel: string;
     save: string;
     moveUp: (modName: string) => string;
     moveDown: (modName: string) => string;

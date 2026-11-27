@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { selectProfileLocked } from '../application';
 import type { FileConflict, ModEntry } from '../domain';
 import { conflictsOfMod, isVanilla, modConflictStatus } from '../domain';
+import { ConfirmAction } from './ConfirmAction';
 import { Icon } from './Icon';
 import type { Messages } from './i18n';
 import { formatSize, useI18n } from './i18n';
@@ -53,6 +54,7 @@ export function LibraryScreen() {
   const { controller, state } = useLauncher();
   const [search, setSearch] = useState('');
   const [facet, setFacet] = useState<Facet>('all');
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   // Drop listener: released exactly once, even if the subscription resolves after unmount.
   useEffect(() => {
@@ -250,6 +252,7 @@ export function LibraryScreen() {
                         </span>
                       </span>
                       <button
+                        id={`remove-mod-${mod.id}`}
                         type="button"
                         className="btn btn-danger btn-sm"
                         aria-label={t.library.removeNamed(mod.name)}
@@ -257,11 +260,24 @@ export function LibraryScreen() {
                         aria-describedby={removeLocked ? 'library-remove-hint' : undefined}
                         title={removeLocked ? t.library.removeLocked : undefined}
                         onClick={() => {
-                          if (!removeLocked) void controller.removeMod(mod.id);
+                          if (!removeLocked) setConfirmingId(mod.id);
                         }}
                       >
                         {t.library.remove}
                       </button>
+                      {confirmingId === mod.id && !removeLocked && (
+                        <ConfirmAction
+                          prompt={t.library.confirmRemove(mod.name)}
+                          confirmLabel={t.library.remove}
+                          cancelLabel={t.library.cancel}
+                          returnFocusId={`remove-mod-${mod.id}`}
+                          onConfirm={() => {
+                            setConfirmingId(null);
+                            void controller.removeMod(mod.id);
+                          }}
+                          onCancel={() => setConfirmingId(null)}
+                        />
+                      )}
                     </li>
                   );
                 })}

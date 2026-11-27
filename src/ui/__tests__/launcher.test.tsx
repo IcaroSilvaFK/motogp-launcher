@@ -78,6 +78,10 @@ describe('Given the Library screen', () => {
     expect(within(row).getByText('2 KB')).toBeInTheDocument();
     expect(within(row).getByText('2 files')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Remove Mod A' }));
+    expect(controller.removeMod).not.toHaveBeenCalled();
+    await user.click(
+      within(screen.getByRole('group', { name: /This cannot be undone/ })).getByRole('button', { name: 'Remove' }),
+    );
     expect(controller.removeMod).toHaveBeenCalledWith('A');
   });
 
@@ -168,6 +172,10 @@ describe('Given the Profiles screen', () => {
     expect(controller.renameProfile).toHaveBeenCalledWith('p1', 'Renamed');
 
     await user.click(screen.getByRole('button', { name: 'Delete Teste' }));
+    expect(controller.deleteProfile).not.toHaveBeenCalled();
+    await user.click(
+      within(screen.getByRole('group', { name: /This cannot be undone/ })).getByRole('button', { name: 'Delete' }),
+    );
     expect(controller.deleteProfile).toHaveBeenCalledWith('p1');
   });
 

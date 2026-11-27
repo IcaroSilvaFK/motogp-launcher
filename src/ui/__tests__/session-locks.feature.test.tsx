@@ -144,6 +144,9 @@ describeFeature(feature, ({ Background, Scenario, AfterEachScenario }) => {
       const { user } = await getWorld();
       expect(removeButton('Rain Tyres')).not.toHaveAttribute('aria-disabled');
       await user.click(removeButton('Rain Tyres'));
+      await user.click(
+        within(screen.getByRole('group', { name: /This cannot be undone/ })).getByRole('button', { name: 'Remove' }),
+      );
     });
     Then('"Rain Tyres" is removed', async () => {
       const { gateway } = await getWorld();

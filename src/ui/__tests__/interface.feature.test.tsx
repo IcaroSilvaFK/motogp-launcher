@@ -274,7 +274,7 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       await openScreen(world.user, 'Profiles');
     });
 
-    When('I rename the regular profile and then delete it', async () => {
+    When('I rename the regular profile and then delete it after confirming', async () => {
       await world.user.click(screen.getByRole('button', { name: 'Teste' }));
       const input = screen.getByLabelText('New name');
       await world.user.clear(input);
@@ -287,6 +287,8 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
 
       await world.user.click(renamed);
       await world.user.click(screen.getByRole('button', { name: 'Delete Renomeado' }));
+      const confirm = screen.getByRole('group', { name: 'Delete Renomeado? This cannot be undone.' });
+      await world.user.click(within(confirm).getByRole('button', { name: 'Delete' }));
     });
 
     Then('the list reflects both changes', async () => {
@@ -298,6 +300,41 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
     And('Vanilla offers no delete action', async () => {
       await world.user.click(screen.getByRole('button', { name: 'Vanilla' }));
       expect(screen.queryByRole('button', { name: /^Delete/ })).not.toBeInTheDocument();
+    });
+  });
+
+  Scenario('Deleting a profile asks first', ({ Given, When, Then }) => {
+    let world: World;
+
+    Given('a regular profile and Vanilla', async () => {
+      world = await launch({
+        profiles: [
+          { id: 'vanilla', name: 'Vanilla', mod_ids: [] },
+          { id: 'p1', name: 'Teste', mod_ids: [] },
+        ],
+      });
+      await openScreen(world.user, 'Profiles');
+    });
+
+    When('I click Delete on the regular profile', async () => {
+      await world.user.click(screen.getByRole('button', { name: 'Teste' }));
+      await world.user.click(screen.getByRole('button', { name: 'Delete Teste' }));
+    });
+
+    Then('a confirmation appears and the profile is not deleted yet', () => {
+      expect(screen.getByRole('group', { name: 'Delete Teste? This cannot be undone.' })).toBeInTheDocument();
+      expect(world.gateway.callsOf('deleteProfile')).toEqual([]);
+    });
+
+    When('I cancel with Esc', async () => {
+      await world.user.keyboard('{Escape}');
+    });
+
+    Then('the profile is still listed', () => {
+      expect(screen.queryByRole('group', { name: /This cannot be undone/ })).not.toBeInTheDocument();
+      expect(world.gateway.callsOf('deleteProfile')).toEqual([]);
+      expect(screen.getByRole('button', { name: 'Teste' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Delete Teste' })).toHaveFocus();
     });
   });
 
@@ -314,8 +351,10 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       });
     });
 
-    When('I remove it from the Library', async () => {
+    When('I remove it from the Library after confirming', async () => {
       await world.user.click(screen.getByRole('button', { name: 'Remove Mod A' }));
+      const confirm = screen.getByRole('group', { name: 'Remove Mod A from the library? This cannot be undone.' });
+      await world.user.click(within(confirm).getByRole('button', { name: 'Remove' }));
     });
 
     Then('it no longer appears in the library nor in the profile selection', async () => {
@@ -328,6 +367,58 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       expect(screen.queryByRole('checkbox', { name: 'Mod A' })).not.toBeInTheDocument();
       expect(screen.getByRole('checkbox', { name: 'Mod B' })).toBeInTheDocument();
       expect(world.gateway.profiles.find((profile) => profile.id === 'p1')?.mod_ids).toEqual([]);
+    });
+  });
+
+  Scenario('Removing a mod asks first', ({ Given, When, Then }) => {
+    let world: World;
+
+    Given('a listed mod referenced in a profile', async () => {
+      world = await launch({ mods: [modA, modB] });
+    });
+
+    When('I click Remove on the mod', async () => {
+      await world.user.click(screen.getByRole('button', { name: 'Remove Mod A' }));
+    });
+
+    Then('a confirmation appears and the mod is not removed yet', () => {
+      expect(
+        screen.getByRole('group', { name: 'Remove Mod A from the library? This cannot be undone.' }),
+      ).toBeInTheDocument();
+      expect(world.gateway.callsOf('removeMod')).toEqual([]);
+      expect(screen.getByText('Mod A')).toBeInTheDocument();
+    });
+
+    When('I cancel with the Cancel button', async () => {
+      const confirm = screen.getByRole('group', { name: 'Remove Mod A from the library? This cannot be undone.' });
+      await world.user.click(within(confirm).getByRole('button', { name: 'Cancel' }));
+    });
+
+    Then('the mod stays installed', () => {
+      expect(screen.queryByRole('group', { name: /This cannot be undone/ })).not.toBeInTheDocument();
+      expect(world.gateway.callsOf('removeMod')).toEqual([]);
+      expect(screen.getByRole('button', { name: 'Remove Mod A' })).toHaveFocus();
+    });
+  });
+
+  Scenario('A failed removal is reported', ({ Given, When, Then }) => {
+    let world: World;
+
+    Given('a listed mod whose removal fails', async () => {
+      world = await launch({ mods: [modA, modB] });
+      world.gateway.failNext('removeMod', { code: 'write_failed', message: 'disk' });
+    });
+
+    When('I remove it from the Library after confirming', async () => {
+      await world.user.click(screen.getByRole('button', { name: 'Remove Mod A' }));
+      const confirm = screen.getByRole('group', { name: 'Remove Mod A from the library? This cannot be undone.' });
+      await world.user.click(within(confirm).getByRole('button', { name: 'Remove' }));
+    });
+
+    Then('I see the error in the accessible notice at the top', async () => {
+      const alert = await screen.findByRole('alert');
+      expect(alert).toBeInTheDocument();
+      expect(screen.queryByRole('status')).not.toBeInTheDocument();
     });
   });
 
