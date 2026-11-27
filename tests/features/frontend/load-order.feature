@@ -22,3 +22,10 @@ Feature: Load order and conflicts in the UI (frontend)
     Then the "Alpha" row shows an "overridden" conflict badge
     And the "Beta" row shows a "wins" conflict badge
     And mods without conflicts show no conflict badge
+
+  Scenario: Conflict details of a mod in the load order
+    Given "Alpha" and "Beta" ship the same file and "Beta" is lower in the draft order
+    When I open the conflict details of "Alpha"
+    Then the details list the file with "Beta" as the winner
+    When I move "Alpha" below "Beta"
+    Then the details show "Alpha" as the winner

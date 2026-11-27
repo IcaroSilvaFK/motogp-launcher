@@ -220,6 +220,9 @@ export interface Messages {
     conflictsHint: string;
     conflictsEmpty: string;
     conflictWinner: string;
+    conflictDetailsTitle: (name: string) => string;
+    conflictDetailsClose: string;
+    conflictDetailsToggle: (name: string) => string;
   };
   settings: {
     title: string;
