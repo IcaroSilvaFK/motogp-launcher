@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { loadLibrarySort, saveLibrarySort, selectConflictingMods, selectProfileLocked, sortMods } from '../application';
 import type { LibrarySort, LibrarySortStore } from '../application';
 import type { FileConflict, ModEntry } from '../domain';
@@ -10,6 +10,7 @@ import type { Messages } from './i18n';
 import { formatSize, useI18n } from './i18n';
 import { useLauncher } from './LauncherContext';
 import { stagger } from './motion';
+import { useShortcutSearch } from './useShortcuts';
 
 type Facet = 'all' | 'in' | 'out';
 
@@ -55,6 +56,8 @@ export function LibraryScreen({ sortStore }: { sortStore?: LibrarySortStore }) {
   const { t, locale } = useI18n();
   const { controller, state } = useLauncher();
   const [search, setSearch] = useState('');
+  const searchInput = useRef<HTMLInputElement>(null);
+  useShortcutSearch(searchInput);
   const [facet, setFacet] = useState<Facet>('all');
   const [sort, setSort] = useState<LibrarySort>(() => (sortStore ? loadLibrarySort(sortStore) : 'name'));
   const [onlyConflicts, setOnlyConflicts] = useState(false);
@@ -173,6 +176,7 @@ export function LibraryScreen({ sortStore }: { sortStore?: LibrarySortStore }) {
             <Icon name="search" className="search-icon" />
             <input
               id="library-search"
+              ref={searchInput}
               type="search"
               className="input"
               placeholder={t.library.searchPlaceholder}

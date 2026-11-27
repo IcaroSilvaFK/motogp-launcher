@@ -4859,3 +4859,30 @@ button {
 .welcome-back {
   margin-right: auto;
 }
+
+/* Settings > About: the keyboard shortcuts list (#157). */
+.shortcut-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  text-align: left;
+}
+
+.shortcut-item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.shortcut-item dt,
+.shortcut-item dd {
+  margin: 0;
+}
+
+.shortcut-item kbd {
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-family: inherit;
+}

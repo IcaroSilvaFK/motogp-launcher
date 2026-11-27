@@ -53,6 +53,7 @@ import { StatusBar } from './StatusBar';
 import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
 import { WelcomeContext } from './WelcomeContext';
+import { ShortcutContext, createShortcutRegistry, useShortcuts } from './useShortcuts';
 import { WelcomeDialog } from './WelcomeDialog';
 import './styles.css';
 
@@ -151,6 +152,9 @@ function Shell({
     [welcomeStore],
   );
   const welcome = useMemo(() => (welcomeStore ? { show: () => setWelcomeOpen(true) } : null), [welcomeStore]);
+  // Keyboard shortcuts (#157): one listener; screens register their search field and back action.
+  const [shortcuts] = useState(createShortcutRegistry);
+  useShortcuts(shortcuts, screens, setScreen);
   const [version, setVersion] = useState<string | null>(null);
   const [userChecked, setUserChecked] = useState(false);
   const value = useMemo(() => ({ controller, state }), [controller, state]);
@@ -202,47 +206,49 @@ function Shell({
               <CommunityContext.Provider value={community}>
                 <DownloadStatsProvider stats={downloadStats} usagePreference={usagePreference}>
                   <WelcomeContext.Provider value={welcome}>
-                    {/* Inert behind the welcome dialog: no focus, clicks or screen reader access. */}
-                    <div className="app-shell" inert={welcomeShown}>
-                      <TitleBar controls={windowControls} />
-                      <Sidebar
-                        screens={screens}
-                        current={screen}
-                        onSelect={setScreen}
-                        collapsed={collapsed}
-                        onToggle={toggleSidebar}
-                      />
-                      <div className="app-content">
-                        <div className="app-messages">
-                          <NoticeBar onOpenLibrary={() => setScreen('library')} />
-                          <div className="notices">
-                            <AdConsentBar />
+                    <ShortcutContext.Provider value={shortcuts}>
+                      {/* Inert behind the welcome dialog: no focus, clicks or screen reader access. */}
+                      <div className="app-shell" inert={welcomeShown}>
+                        <TitleBar controls={windowControls} />
+                        <Sidebar
+                          screens={screens}
+                          current={screen}
+                          onSelect={setScreen}
+                          collapsed={collapsed}
+                          onToggle={toggleSidebar}
+                        />
+                        <div className="app-content">
+                          <div className="app-messages">
+                            <NoticeBar onOpenLibrary={() => setScreen('library')} />
+                            <div className="notices">
+                              <AdConsentBar />
+                            </div>
+                            {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
                           </div>
-                          {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
+                          <main aria-busy={loading ? 'true' : undefined}>
+                            {loading ? (
+                              <LoadingState />
+                            ) : (
+                              // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
+                              <ScreenTransition key={screen}>
+                                {screen === 'library' && <LibraryScreen sortStore={librarySortStore} />}
+                                {screen === 'discover' && catalog && (
+                                  <DiscoverScreen
+                                    catalog={catalog}
+                                    onGoToLibrary={() => setScreen('library')}
+                                    viewStore={discoverViewStore}
+                                  />
+                                )}
+                                {screen === 'profiles' && <ProfilesScreen />}
+                                {screen === 'settings' && <SettingsScreen />}
+                              </ScreenTransition>
+                            )}
+                          </main>
                         </div>
-                        <main aria-busy={loading ? 'true' : undefined}>
-                          {loading ? (
-                            <LoadingState />
-                          ) : (
-                            // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
-                            <ScreenTransition key={screen}>
-                              {screen === 'library' && <LibraryScreen sortStore={librarySortStore} />}
-                              {screen === 'discover' && catalog && (
-                                <DiscoverScreen
-                                  catalog={catalog}
-                                  onGoToLibrary={() => setScreen('library')}
-                                  viewStore={discoverViewStore}
-                                />
-                              )}
-                              {screen === 'profiles' && <ProfilesScreen />}
-                              {screen === 'settings' && <SettingsScreen />}
-                            </ScreenTransition>
-                          )}
-                        </main>
+                        <StatusBar onSetUpGame={() => setScreen('settings')} />
                       </div>
-                      <StatusBar onSetUpGame={() => setScreen('settings')} />
-                    </div>
-                    {welcomeShown && <WelcomeDialog hasCatalog={catalog !== undefined} onClose={closeWelcome} />}
+                      {welcomeShown && <WelcomeDialog hasCatalog={catalog !== undefined} onClose={closeWelcome} />}
+                    </ShortcutContext.Provider>
                   </WelcomeContext.Provider>
                 </DownloadStatsProvider>
               </CommunityContext.Provider>

@@ -25,6 +25,7 @@ import { ModPage } from './ModPage';
 import { stagger } from './motion';
 import { PublishScreen } from './PublishScreen';
 import { StarCount } from './StarButton';
+import { useShortcutBack, useShortcutSearch } from './useShortcuts';
 
 type View = DiscoverView;
 
@@ -173,6 +174,9 @@ export function DiscoverScreen({
     setOpenId(entryId);
   };
 
+  const searchInput = useRef<HTMLInputElement>(null);
+  useShortcutSearch(searchInput);
+
   const closeEntry = (filters?: { category?: string; query?: string }) => {
     catalog.dismissPageError();
     if (filters !== undefined && returnPoint.current !== null) returnPoint.current.restoreScroll = false;
@@ -183,6 +187,9 @@ export function DiscoverScreen({
     }
     setOpenId(null);
   };
+
+  // Esc on an open mod page goes back (#157), even when focus is not inside the page.
+  useShortcutBack(openId === null ? null : () => closeEntry());
 
   const loading = state.status === 'idle' || state.status === 'loading';
   const entries = state.catalog?.entries ?? [];
@@ -355,6 +362,7 @@ export function DiscoverScreen({
           <Icon name="search" className="search-icon" />
           <input
             id="discover-search"
+            ref={searchInput}
             type="search"
             className="input"
             placeholder={t.discover.searchPlaceholder}

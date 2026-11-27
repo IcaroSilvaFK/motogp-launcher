@@ -298,6 +298,11 @@ export const en: Messages = {
     copyDiagnostics: 'Copy diagnostics',
     copied: 'Copied',
     copyFailed: 'Could not copy to the clipboard.',
+    shortcutsLabel: 'Keyboard shortcuts',
+    shortcutsHint: 'Shortcuts are ignored while you type in a field or a dialog is open.',
+    shortcutEsc: 'Go back from a mod page',
+    shortcutSearch: 'Focus the search field',
+    shortcutSections: 'Switch section (in sidebar order)',
   },
   community: {
     title: 'Community',
