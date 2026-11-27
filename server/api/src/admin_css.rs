@@ -70,6 +70,7 @@ transition:border-color var(--duration) var(--easing)}\
 input[type=text]:hover{border-color:var(--text-muted)}\
 input[type=text]::placeholder{color:var(--text-muted)}\
 input[name=reason]{width:240px}\
+.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}\
 button,a.button{display:inline-flex;align-items:center;justify-content:center;height:var(--control-height);\
 padding:0 var(--space-4);color:var(--text);font:inherit;font-weight:500;text-decoration:none;cursor:pointer;\
 background:var(--surface-3);border:1px solid var(--border-strong);border-radius:var(--radius-md);\

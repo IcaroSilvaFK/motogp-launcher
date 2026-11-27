@@ -339,9 +339,15 @@ fn action_form(
     reason_placeholder: Option<&str>,
 ) -> String {
     let reason = reason_placeholder.map_or_else(String::new, |placeholder| {
+        // The action URL is unique per row, so it makes a unique id.
+        let id: String = format!("reason{action}")
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() { c } else { '-' })
+            .collect();
         format!(
-            "<input type=\"text\" name=\"reason\" maxlength=\"500\" required placeholder=\"{}\">",
-            esc(placeholder)
+            "<label class=\"visually-hidden\" for=\"{id}\">{p}</label>\
+             <input type=\"text\" id=\"{id}\" name=\"reason\" maxlength=\"500\" required placeholder=\"{p}\">",
+            p = esc(placeholder)
         )
     });
     format!(
@@ -561,8 +567,10 @@ async fn dashboard(
     );
     let ban_form = format!(
         "<form class=\"admin-form ban-by-id\" method=\"post\" action=\"/admin/users/ban\">{}\
-         <input type=\"text\" name=\"discord_id\" inputmode=\"numeric\" maxlength=\"20\" required placeholder=\"Discord id\">\
-         <input type=\"text\" name=\"reason\" maxlength=\"500\" required placeholder=\"Ban reason\">\
+         <label class=\"visually-hidden\" for=\"ban-discord-id\">Discord id</label>\
+         <input type=\"text\" id=\"ban-discord-id\" name=\"discord_id\" inputmode=\"numeric\" maxlength=\"20\" required placeholder=\"Discord id\">\
+         <label class=\"visually-hidden\" for=\"ban-discord-reason\">Ban reason</label>\
+         <input type=\"text\" id=\"ban-discord-reason\" name=\"reason\" maxlength=\"500\" required placeholder=\"Ban reason\">\
          <button type=\"submit\" class=\"danger\">Ban by Discord id</button></form>",
         csrf_field(csrf)
     );
