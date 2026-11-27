@@ -28,6 +28,8 @@ mod load_order;
 #[path = "bdd/profiles.rs"]
 mod profiles;
 
+#[path = "bdd/restore_game.rs"]
+mod restore_game;
 #[path = "bdd/session_control.rs"]
 mod session_control;
 #[path = "bdd/session_tracking.rs"]
@@ -74,6 +76,7 @@ const FEATURES: &[(&str, Runner)] = &[
     ("stale-session-recovery", || {
         Box::pin(stale_session_recovery::run())
     }),
+    ("restore-game", || Box::pin(restore_game::run())),
     ("catalog", || Box::pin(catalog::run())),
     ("catalog-open-page", || Box::pin(catalog_open_page::run())),
     ("catalog-install", || Box::pin(catalog_install::run())),

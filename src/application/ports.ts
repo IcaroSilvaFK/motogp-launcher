@@ -45,6 +45,8 @@ export interface LauncherGateway {
   forgetStaleSession(): Promise<void>;
   /** Cleans the stale folder; `confirmedDir` must equal the manifest's folder. Resolves with the files removed. */
   cleanStaleSession(confirmedDir: string): Promise<number>;
+  /** Removes every deployed mod file of the current install; resolves with the files removed. */
+  restoreGameFiles(): Promise<number>;
   /** Measures the launcher data folder (read-only; never waits for a running mutation). */
   getStorageUsage(): Promise<StorageUsage>;
   /** The Steam artwork of the configured game as a `data:` URL; `null` when there is none. */

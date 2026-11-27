@@ -219,6 +219,14 @@ pub async fn clean_stale_session(
     .await
 }
 
+/// Recovery on demand: removes every file the launcher deployed into the
+/// current install's `~mods` and returns how many. Refused while a session or
+/// the game is running; also retries a failed cleanup.
+#[tauri::command]
+pub async fn restore_game_files(state: State<'_, AppState>) -> CommandResult<usize> {
+    mutate(state, |state| Ok(state.play.restore_game_files()?)).await
+}
+
 /// Runs a read-only blocking use case off the caller's thread. It never takes
 /// `write_lock`: a long measurement must not wait for, or hold up, a mutation.
 pub(crate) async fn read_blocking<T, F>(state: State<'_, AppState>, job: F) -> CommandResult<T>
@@ -402,6 +410,7 @@ pub fn configure<R: Runtime>(builder: Builder<R>) -> Builder<R> {
         deploy_session,
         forget_stale_session,
         clean_stale_session,
+        restore_game_files,
         get_storage_usage,
         open_data_folder,
         crate::commands_diagnostics::get_diagnostics,

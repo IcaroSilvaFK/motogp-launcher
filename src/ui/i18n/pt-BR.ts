@@ -251,6 +251,21 @@ export const ptBR: Messages = {
     refresh: 'Atualizar',
     measuring: 'Medindo…',
     breakdownLabel: 'Uso por categoria',
+    gameFiles: {
+      label: 'Arquivos do jogo',
+      hint: 'O launcher nunca altera os arquivos originais do jogo: os mods são adicionados à pasta ~mods e removidos quando o jogo fecha.',
+      status: (count) =>
+        count === 0
+          ? 'Nenhum arquivo de mod aplicado'
+          : `${count} ${plural(count, 'arquivo de mod aplicado', 'arquivos de mod aplicados')}`,
+      restore: 'Restaurar arquivos originais do jogo',
+      restoring: 'Restaurando…',
+      blocked: {
+        session: 'Aguarde o fim da sessão do jogo antes de restaurar.',
+        'no-game': 'Escolha primeiro a pasta do jogo.',
+        stale: 'Resolva primeiro o aviso da sessão antiga.',
+      },
+    },
     categories: { mods: 'Mods', launcher_data: 'Dados do launcher', other: 'Outros' },
     categoryHints: {
       mods: 'Arquivos dos mods importados',
@@ -525,6 +540,8 @@ export const ptBR: Messages = {
     staleForgotten: 'Sessão antiga esquecida',
     staleCleaned: (cleaned) =>
       `Pasta antiga limpa; ${cleaned} ${plural(cleaned, 'arquivo removido', 'arquivos removidos')}`,
+    gameRestored: (cleaned) =>
+      `Arquivos originais do jogo restaurados; ${cleaned} ${plural(cleaned, 'arquivo removido', 'arquivos removidos')}`,
   },
   update: {
     available: (version) => `Nova versão ${version} disponível`,

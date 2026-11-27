@@ -34,6 +34,7 @@ export type Notice =
   | { kind: 'game-running' }
   | { kind: 'stale-forgotten' }
   | { kind: 'stale-cleaned'; cleaned: number }
+  | { kind: 'game-restored'; cleaned: number }
   | { kind: 'mod-installed'; modId: string; name: string; enabled: boolean; conflictWith?: string };
 
 export interface LauncherState {
@@ -53,6 +54,8 @@ export interface LauncherState {
   recovery: RecoveryStatus | null;
   /** Set when the deploy manifest points to another game install and needs the user's decision. */
   staleSession: { modsDir: string; tracked: number } | null;
+  /** Mod files the launcher has deployed into the current install (the manifest's count); 0 when none. */
+  deployedFiles: number;
   error: CommandError | null;
   notice: Notice | null;
   /** Files are being dragged over the window while the drop listener is active (#152). */
@@ -97,6 +100,8 @@ export interface LauncherController {
   forgetStaleSession(): Promise<void>;
   /** Cleans the stale folder, confirming the folder shown in the notice; no-op without a stale session. */
   cleanStaleSession(): Promise<void>;
+  /** Removes every deployed mod file of the current install (the original game is never touched). */
+  restoreGameFiles(): Promise<void>;
   play(): Promise<void>;
   /**
    * Stops the game (only while `selectCanStop`): the phase becomes `stopping` until the session events
