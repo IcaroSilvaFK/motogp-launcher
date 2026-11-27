@@ -3,6 +3,7 @@
 
 pub mod auth;
 pub mod comments;
+pub mod dev_seed;
 pub mod downloads;
 pub mod error;
 pub mod mod_ports;

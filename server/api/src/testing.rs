@@ -229,3 +229,30 @@ pub fn moderation_service(
         admin_discord_ids,
     })
 }
+
+/// The dev-mode seeder over the SQLite store and the given mod hosting service.
+pub fn dev_seeder(
+    store: Arc<SqliteStore>,
+    clock: Arc<dyn Clock>,
+    mods: Arc<community_application::ModHostingService>,
+    admin_discord_ids: Vec<DiscordId>,
+) -> community_application::dev_seed::DevSeeder {
+    community_application::dev_seed::DevSeeder {
+        clock: clock.clone(),
+        tokens: Arc::new(OsTokenGenerator),
+        users: store.clone(),
+        mods,
+        comments: Arc::new(CommentsService {
+            clock: clock.clone(),
+            tokens: Arc::new(OsTokenGenerator),
+            comments: store.clone(),
+        }),
+        stars: star_service(store.clone()),
+        downloads: Arc::new(community_application::DownloadService {
+            clock,
+            hasher: Arc::new(Sha256Hasher),
+            downloads: store,
+        }),
+        admin_discord_ids,
+    }
+}
