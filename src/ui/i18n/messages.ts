@@ -252,6 +252,10 @@ export interface Messages {
     subtitle: string;
     sectionsLabel: string;
     folderTitle: string;
+    /** First-run welcome (#147): the Preferences row that opens it again. */
+    welcome: string;
+    welcomeHint: string;
+    welcomeAgain: string;
   };
   storage: {
     title: string;
@@ -535,6 +539,37 @@ export interface Messages {
     chartSummary: (total: number, formatted: string, peak: { count: string; date: string } | null) => string;
     /** Tooltip of one bar. */
     bar: (date: string, count: number, formatted: string) => string;
+  };
+  /** First-run welcome (#147): a three-step dialog (game folder, how mods work, go to Discover). */
+  welcome: {
+    /** Accessible name of the dialog. */
+    label: string;
+    step: (current: number, total: number) => string;
+    skip: string;
+    back: string;
+    next: string;
+    gameTitle: string;
+    detecting: string;
+    foundBody: string;
+    looksRight: string;
+    chooseOther: string;
+    notFoundBody: string;
+    chooseFolder: string;
+    later: string;
+    modsTitle: string;
+    modsBody: string;
+    installTitle: string;
+    installText: string;
+    enableTitle: string;
+    enableText: string;
+    playTitle: string;
+    playText: string;
+    doneTitle: string;
+    doneBody: string;
+    /** Without the online catalog the last step points to Library instead. */
+    doneBodyLibrary: string;
+    goToDiscover: string;
+    goToLibrary: string;
   };
   errors: Record<ErrorCode, string>;
 }

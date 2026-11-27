@@ -1,5 +1,6 @@
 export { createLocalStorageLocaleStore } from './localStorageLocaleStore';
 export { createLocalStorageNavStore } from './localStorageNavStore';
+export { createLocalStorageWelcomeStore } from './localStorageWelcomeStore';
 export { createLocalStorageDiscoverViewStore } from './localStorageDiscoverViewStore';
 export { createLocalStorageAdPreferenceStore } from './localStorageAdPreferenceStore';
 export { createLocalStorageAutoEnableStore } from './localStorageAutoEnableStore';
