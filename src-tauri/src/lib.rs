@@ -7,6 +7,7 @@ mod app_log;
 mod bootstrap;
 mod catalog_fallback;
 mod catalog_install_support;
+mod command_log;
 mod commands;
 mod commands_comments;
 mod commands_diagnostics;
