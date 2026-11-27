@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { selectProfileLocked } from '../application';
+import { loadLibrarySort, saveLibrarySort, selectConflictingMods, selectProfileLocked, sortMods } from '../application';
+import type { LibrarySort, LibrarySortStore } from '../application';
 import type { FileConflict, ModEntry } from '../domain';
 import { conflictsOfMod, isVanilla, modConflictStatus } from '../domain';
 import { ConfirmAction } from './ConfirmAction';
@@ -49,11 +50,13 @@ function ConflictBadge({
   );
 }
 
-export function LibraryScreen() {
+export function LibraryScreen({ sortStore }: { sortStore?: LibrarySortStore }) {
   const { t, locale } = useI18n();
   const { controller, state } = useLauncher();
   const [search, setSearch] = useState('');
   const [facet, setFacet] = useState<Facet>('all');
+  const [sort, setSort] = useState<LibrarySort>(() => (sortStore ? loadLibrarySort(sortStore) : 'name'));
+  const [onlyConflicts, setOnlyConflicts] = useState(false);
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   // Drop listener: released exactly once, even if the subscription resolves after unmount.
@@ -87,10 +90,15 @@ export function LibraryScreen() {
 
   // Client-side filters: name search plus the "in the active profile" facet.
   const query = search.trim().toLocaleLowerCase();
-  const visible = state.mods.filter(
-    (mod) =>
-      mod.name.toLocaleLowerCase().includes(query) &&
-      (facet === 'all' || (facet === 'in') === activeModIds.has(mod.id)),
+  const conflicting = new Set(selectConflictingMods(state.mods, state.conflicts).map((mod) => mod.id));
+  const visible = sortMods(
+    state.mods.filter(
+      (mod) =>
+        mod.name.toLocaleLowerCase().includes(query) &&
+        (facet === 'all' || (facet === 'in') === activeModIds.has(mod.id)) &&
+        (!onlyConflicts || conflicting.has(mod.id)),
+    ),
+    sort,
   );
 
   // Why the row switches cannot be used right now (null when they can, or only while busy).
@@ -111,6 +119,7 @@ export function LibraryScreen() {
   const clearFilters = () => {
     setSearch('');
     setFacet('all');
+    setOnlyConflicts(false);
   };
 
   const head = (actions: boolean) => (
@@ -185,6 +194,33 @@ export function LibraryScreen() {
                 <span className="facet-count num">{counts[option]}</span>
               </button>
             ))}
+          </div>
+          <div className="facet-group">
+            <label htmlFor="library-sort" className="rail-title">
+              {t.library.sortLabel}
+            </label>
+            <select
+              id="library-sort"
+              className="input"
+              value={sort}
+              onChange={(event) => {
+                const next = event.target.value === 'size' ? 'size' : 'name';
+                setSort(next);
+                if (sortStore) saveLibrarySort(sortStore, next);
+              }}
+            >
+              <option value="name">{t.library.sortName}</option>
+              <option value="size">{t.library.sortSize}</option>
+            </select>
+            <button
+              type="button"
+              className="facet"
+              aria-pressed={onlyConflicts}
+              onClick={() => setOnlyConflicts((on) => !on)}
+            >
+              <span className="facet-label">{t.library.filterConflicts}</span>{' '}
+              <span className="facet-count num">{conflicting.size}</span>
+            </button>
           </div>
           <p className="hint drop-hint">{t.library.dropHint}</p>
         </aside>

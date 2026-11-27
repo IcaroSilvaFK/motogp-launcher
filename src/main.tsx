@@ -16,6 +16,7 @@ import {
   createLocalStorageAdPreferenceStore,
   createLocalStorageAutoEnableStore,
   createLocalStorageDiscoverViewStore,
+  createLocalStorageLibrarySortStore,
   createTauriAdProvider,
   createTauriCommunityAccount,
   createTauriModStats,
@@ -92,6 +93,7 @@ createRoot(container).render(
       windowControls={createTauriWindowControls()}
       catalog={catalog}
       discoverViewStore={createLocalStorageDiscoverViewStore()}
+      librarySortStore={createLocalStorageLibrarySortStore()}
       adPreferenceStore={createLocalStorageAdPreferenceStore()}
       autoEnableStore={createLocalStorageAutoEnableStore()}
       // Sponsored placements (#104): slots render only while the preference above allows them.
