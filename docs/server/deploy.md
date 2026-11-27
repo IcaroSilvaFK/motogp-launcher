@@ -226,3 +226,27 @@ sudo systemctl start motogp-community
 ```
 
 Migrations run automatically on start. Take a backup first.
+
+## 9. Local development
+
+Run the server on your machine with a fake Discord sign-in and demo data, so the launcher's debug build
+(which already points at `http://127.0.0.1:8787`) can exercise comments, stars, downloads, publishing and
+moderation without a Discord application or a VPS:
+
+```sh
+scripts/dev-server.sh
+```
+
+It sets the variables below, keeps the SQLite database and mod files under `server/.dev-data/` (git-ignored; delete
+the folder to start over) and runs `cargo run -p community-api --bin motogp-community`.
+
+| Variable | Default | Meaning |
+|----------|---------|---------|
+| `DEV_FAKE_AUTH` | off | `1` replaces the Discord adapter with a fake one. `/auth/discord/start` redirects straight to the server's own callback, so the launcher's real loopback sign-in and the admin web sign-in run unchanged. `DISCORD_CLIENT_ID` and `DISCORD_CLIENT_SECRET` become optional |
+| `DEV_FAKE_USER` | `dev-user` | Username of the fake user |
+| `DEV_FAKE_DISCORD_ID` | `900000000000000001` | Its numeric Discord id. It is an admin when listed in `ADMIN_DISCORD_IDS` (the script does that by default) |
+| `DEV_SEED` or `--seed` | off | Inserts demo users, one approved mod `demo-livery` (with a tiny zip), three comments, three stars and five downloads. Idempotent: the mod is the marker, so a second start adds nothing. Requires `DEV_FAKE_AUTH` |
+
+Safety: the server **refuses to start** when `DEV_FAKE_AUTH` or `DEV_SEED` is set and `PUBLIC_BASE_URL` is not a
+loopback URL (`127.0.0.1`, `localhost` or `[::1]`), and logs a loud `DEV MODE` warning when fake sign-in is on. A
+normal configuration never enables any of this.

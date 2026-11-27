@@ -27,12 +27,52 @@ pub struct Config {
     pub mod_max_upload_bytes: u64,
     pub mod_user_quota_bytes: u64,
     pub mod_uploads_per_day: u32,
+    /// Local development only: sign in as a fake user, never contacting Discord.
+    pub dev_fake_auth: Option<DevFakeAuth>,
+    /// Local development only: insert demo data at startup (idempotent).
+    pub dev_seed: bool,
 }
+
+/// The fake Discord identity used by dev mode.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DevFakeAuth {
+    pub username: String,
+    /// Numeric Discord id. List it in `ADMIN_DISCORD_IDS` to make the fake user an admin.
+    pub discord_id: String,
+}
+
+pub const DEFAULT_DEV_FAKE_USER: &str = "dev-user";
+pub const DEFAULT_DEV_FAKE_DISCORD_ID: &str = "900000000000000001";
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ConfigError {
     Missing(&'static str),
     Invalid(&'static str),
+    /// A dev-only switch was set on a server that is not on a loopback URL.
+    DevModeNeedsLoopback(&'static str),
+}
+
+/// True when `url` is an `http(s)` URL whose host is exactly `127.0.0.1`,
+/// `localhost` or `[::1]` (no userinfo tricks, no look-alike hosts).
+pub fn is_loopback_url(url: &str) -> bool {
+    let Some(rest) = url
+        .strip_prefix("http://")
+        .or_else(|| url.strip_prefix("https://"))
+    else {
+        return false;
+    };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    if authority.contains('@') {
+        return false;
+    }
+    if let Some(bracketed) = authority.strip_prefix('[') {
+        return match bracketed.split_once(']') {
+            Some((host, tail)) => host == "::1" && (tail.is_empty() || tail.starts_with(':')),
+            None => false,
+        };
+    }
+    let host = authority.split(':').next().unwrap_or_default();
+    host == "127.0.0.1" || host.eq_ignore_ascii_case("localhost")
 }
 
 impl fmt::Display for ConfigError {
@@ -40,6 +80,10 @@ impl fmt::Display for ConfigError {
         match self {
             Self::Missing(name) => write!(f, "missing required environment variable {name}"),
             Self::Invalid(name) => write!(f, "invalid value for environment variable {name}"),
+            Self::DevModeNeedsLoopback(name) => write!(
+                f,
+                "{name} is only allowed when PUBLIC_BASE_URL is a loopback URL (127.0.0.1, localhost or [::1])"
+            ),
         }
     }
 }
@@ -50,6 +94,15 @@ impl Config {
     /// Reads the process environment.
     pub fn from_env() -> Result<Self, ConfigError> {
         Self::from_lookup(|name| std::env::var(name).ok())
+    }
+
+    /// Like [`Self::from_env`], and `--seed` in `args` acts as `DEV_SEED=1`.
+    pub fn from_env_and_args(args: &[String]) -> Result<Self, ConfigError> {
+        let seed = args.iter().any(|arg| arg == "--seed");
+        Self::from_lookup(|name| match name {
+            "DEV_SEED" if seed => Some("1".to_owned()),
+            _ => std::env::var(name).ok(),
+        })
     }
 
     /// Builds the config from any variable lookup (tests pass a map).
@@ -66,11 +119,54 @@ impl Config {
                 .filter(|value| !value.is_empty())
         };
 
-        let discord_client_id = required("DISCORD_CLIENT_ID")?;
-        let discord_client_secret = required("DISCORD_CLIENT_SECRET")?;
         let public_base_url = required("PUBLIC_BASE_URL")?
             .trim_end_matches('/')
             .to_owned();
+
+        let flag = |name: &'static str| match optional(name).as_deref() {
+            None | Some("0" | "false") => Ok(false),
+            Some("1" | "true") => Ok(true),
+            Some(_) => Err(ConfigError::Invalid(name)),
+        };
+        let dev_fake_enabled = flag("DEV_FAKE_AUTH")?;
+        let dev_seed = flag("DEV_SEED")?;
+        if (dev_fake_enabled || dev_seed) && !is_loopback_url(&public_base_url) {
+            return Err(ConfigError::DevModeNeedsLoopback(if dev_fake_enabled {
+                "DEV_FAKE_AUTH"
+            } else {
+                "DEV_SEED"
+            }));
+        }
+        if dev_seed && !dev_fake_enabled {
+            return Err(ConfigError::Invalid("DEV_SEED"));
+        }
+        let dev_fake_auth = if dev_fake_enabled {
+            let discord_id = optional("DEV_FAKE_DISCORD_ID")
+                .unwrap_or_else(|| DEFAULT_DEV_FAKE_DISCORD_ID.to_owned());
+            if DiscordId::parse(&discord_id).is_none() {
+                return Err(ConfigError::Invalid("DEV_FAKE_DISCORD_ID"));
+            }
+            Some(DevFakeAuth {
+                username: optional("DEV_FAKE_USER")
+                    .unwrap_or_else(|| DEFAULT_DEV_FAKE_USER.to_owned()),
+                discord_id,
+            })
+        } else {
+            None
+        };
+
+        // The Discord application is not needed when sign-in is faked.
+        let (discord_client_id, discord_client_secret) = if dev_fake_auth.is_some() {
+            (
+                optional("DISCORD_CLIENT_ID").unwrap_or_default(),
+                optional("DISCORD_CLIENT_SECRET").unwrap_or_default(),
+            )
+        } else {
+            (
+                required("DISCORD_CLIENT_ID")?,
+                required("DISCORD_CLIENT_SECRET")?,
+            )
+        };
         let database_url = required("DATABASE_URL")?;
         let admin_ids_raw = required("ADMIN_DISCORD_IDS")?;
 
@@ -129,6 +225,8 @@ impl Config {
             bind_addr,
             trust_proxy_headers,
             discord_api_base,
+            dev_fake_auth,
+            dev_seed,
         })
     }
 }
@@ -148,6 +246,8 @@ impl fmt::Debug for Config {
             .field("mod_max_upload_bytes", &self.mod_max_upload_bytes)
             .field("mod_user_quota_bytes", &self.mod_user_quota_bytes)
             .field("mod_uploads_per_day", &self.mod_uploads_per_day)
+            .field("dev_fake_auth", &self.dev_fake_auth)
+            .field("dev_seed", &self.dev_seed)
             .finish()
     }
 }
@@ -258,6 +358,106 @@ mod tests {
             vars.insert(name, value);
             assert_eq!(load(&vars).unwrap_err(), ConfigError::Invalid(name));
         }
+    }
+
+    fn dev(base_url: &'static str) -> HashMap<&'static str, &'static str> {
+        let mut vars = base();
+        vars.insert("PUBLIC_BASE_URL", base_url);
+        vars.insert("DEV_FAKE_AUTH", "1");
+        vars
+    }
+
+    #[test]
+    fn dev_mode_is_off_by_default() {
+        let config = load(&base()).unwrap();
+        assert_eq!(config.dev_fake_auth, None);
+        assert!(!config.dev_seed);
+    }
+
+    #[test]
+    fn dev_mode_refuses_a_public_base_url() {
+        for url in [
+            "https://community.example.com",
+            "http://127.0.0.1.evil.com:8787",
+            "http://localhost@evil.com",
+            "http://evil.com/localhost",
+            "ftp://127.0.0.1",
+            "127.0.0.1:8787",
+        ] {
+            assert_eq!(
+                load(&dev(url)).unwrap_err(),
+                ConfigError::DevModeNeedsLoopback("DEV_FAKE_AUTH"),
+                "{url}"
+            );
+        }
+        let mut vars = base();
+        vars.insert("DEV_SEED", "1");
+        assert_eq!(
+            load(&vars).unwrap_err(),
+            ConfigError::DevModeNeedsLoopback("DEV_SEED")
+        );
+    }
+
+    #[test]
+    fn dev_mode_accepts_loopback_urls_without_a_discord_app() {
+        for url in [
+            "http://127.0.0.1:8787",
+            "http://localhost:8787/",
+            "http://[::1]:8787",
+        ] {
+            let mut vars = dev(url);
+            vars.remove("DISCORD_CLIENT_ID");
+            vars.remove("DISCORD_CLIENT_SECRET");
+            let config = load(&vars).unwrap();
+            let fake = config.dev_fake_auth.expect("dev mode is on");
+            assert_eq!(fake.username, "dev-user", "{url}");
+            assert_eq!(fake.discord_id, DEFAULT_DEV_FAKE_DISCORD_ID);
+        }
+    }
+
+    #[test]
+    fn dev_user_and_seed_are_configurable() {
+        let mut vars = dev("http://127.0.0.1:8787");
+        vars.insert("DEV_FAKE_USER", "ana");
+        vars.insert("DEV_FAKE_DISCORD_ID", "111");
+        vars.insert("DEV_SEED", "1");
+        let config = load(&vars).unwrap();
+        let fake = config.dev_fake_auth.unwrap();
+        assert_eq!(
+            (fake.username.as_str(), fake.discord_id.as_str()),
+            ("ana", "111")
+        );
+        assert!(config.dev_seed);
+        vars.insert("DEV_FAKE_DISCORD_ID", "abc");
+        assert_eq!(
+            load(&vars).unwrap_err(),
+            ConfigError::Invalid("DEV_FAKE_DISCORD_ID")
+        );
+    }
+
+    #[test]
+    fn seeding_requires_fake_auth_and_a_known_flag_value() {
+        let mut vars = base();
+        vars.insert("PUBLIC_BASE_URL", "http://127.0.0.1:8787");
+        vars.insert("DEV_SEED", "1");
+        assert_eq!(load(&vars).unwrap_err(), ConfigError::Invalid("DEV_SEED"));
+        let mut vars = dev("http://127.0.0.1:8787");
+        vars.insert("DEV_FAKE_AUTH", "yes");
+        assert_eq!(
+            load(&vars).unwrap_err(),
+            ConfigError::Invalid("DEV_FAKE_AUTH")
+        );
+    }
+
+    #[test]
+    fn discord_credentials_stay_required_without_dev_mode() {
+        let mut vars = base();
+        vars.insert("PUBLIC_BASE_URL", "http://127.0.0.1:8787");
+        vars.remove("DISCORD_CLIENT_ID");
+        assert_eq!(
+            load(&vars).unwrap_err(),
+            ConfigError::Missing("DISCORD_CLIENT_ID")
+        );
     }
 
     #[test]
