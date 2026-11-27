@@ -2,8 +2,10 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import {
   createModStatsStore,
   loadSidebarCollapsed,
+  loadWelcomeSeen,
   readAppVersion,
   saveSidebarCollapsed,
+  saveWelcomeSeen,
   selectSessionClean,
   useLauncherState,
 } from '../application';
@@ -24,6 +26,7 @@ import type {
   PublishFilePicker,
   NavPreferenceStore,
   UpdateController,
+  WelcomeStore,
   WindowControls,
 } from '../application';
 import { AdConsentBar } from './AdConsentBar';
@@ -47,6 +50,8 @@ import { ScreenTransition } from './ScreenTransition';
 import { StatusBar } from './StatusBar';
 import { TitleBar } from './TitleBar';
 import { UpdateBanner } from './UpdateBanner';
+import { WelcomeContext } from './WelcomeContext';
+import { WelcomeDialog } from './WelcomeDialog';
 import './styles.css';
 
 function UpdateSlot({ updater, installBlocked }: { updater: UpdateController; installBlocked: boolean }) {
@@ -78,6 +83,7 @@ function Shell({
   updater,
   appInfo,
   navStore,
+  welcomeStore,
   windowControls,
   catalog,
   discoverViewStore,
@@ -107,6 +113,8 @@ function Shell({
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
+  /** First-run welcome (#147); absent means no welcome and no "Show welcome again". */
+  welcomeStore?: WelcomeStore;
   windowControls?: WindowControls;
   catalog?: CatalogController;
   discoverViewStore?: DiscoverViewStore;
@@ -125,6 +133,18 @@ function Shell({
     setCollapsed(next);
     if (navStore) saveSidebarCollapsed(navStore, next);
   }, [collapsed, navStore]);
+  // Shown once, on the first launch; finishing or skipping saves it as seen (#147).
+  const [welcomeOpen, setWelcomeOpen] = useState(() => (welcomeStore ? !loadWelcomeSeen(welcomeStore) : false));
+  // The save stays out of the state updater, which StrictMode may run twice.
+  const closeWelcome = useCallback(
+    (goTo?: ScreenId) => {
+      setWelcomeOpen(false);
+      if (welcomeStore) saveWelcomeSeen(welcomeStore);
+      if (goTo) setScreen(goTo);
+    },
+    [welcomeStore],
+  );
+  const welcome = useMemo(() => (welcomeStore ? { show: () => setWelcomeOpen(true) } : null), [welcomeStore]);
   const [version, setVersion] = useState<string | null>(null);
   const [userChecked, setUserChecked] = useState(false);
   const value = useMemo(() => ({ controller, state }), [controller, state]);
@@ -134,6 +154,8 @@ function Shell({
     [version, updater, userChecked, markUserChecked],
   );
   const loading = state.status === 'loading';
+  // Waits for the launcher data, so step 1 knows whether a game is configured.
+  const welcomeShown = welcomeOpen && !loading;
   const ads = useMemo(() => ({ provider: adProvider }), [adProvider]);
   // One stars store per source, so Discover and the mod page share its 60 s cache (#119).
   const starsStore = useMemo(() => (modStats ? createModStatsStore(modStats) : undefined), [modStats]);
@@ -173,45 +195,49 @@ function Shell({
             <AdsContext.Provider value={ads}>
               <CommunityContext.Provider value={community}>
                 <DownloadStatsProvider stats={downloadStats} usagePreference={usagePreference}>
-                  <div className="app-shell">
-                    <TitleBar controls={windowControls} />
-                    <Sidebar
-                      screens={screens}
-                      current={screen}
-                      onSelect={setScreen}
-                      collapsed={collapsed}
-                      onToggle={toggleSidebar}
-                    />
-                    <div className="app-content">
-                      <div className="app-messages">
-                        <NoticeBar onOpenLibrary={() => setScreen('library')} />
-                        <div className="notices">
-                          <AdConsentBar />
+                  <WelcomeContext.Provider value={welcome}>
+                    {/* Inert behind the welcome dialog: no focus, clicks or screen reader access. */}
+                    <div className="app-shell" inert={welcomeShown}>
+                      <TitleBar controls={windowControls} />
+                      <Sidebar
+                        screens={screens}
+                        current={screen}
+                        onSelect={setScreen}
+                        collapsed={collapsed}
+                        onToggle={toggleSidebar}
+                      />
+                      <div className="app-content">
+                        <div className="app-messages">
+                          <NoticeBar onOpenLibrary={() => setScreen('library')} />
+                          <div className="notices">
+                            <AdConsentBar />
+                          </div>
+                          {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
                         </div>
-                        {updater && <UpdateSlot updater={updater} installBlocked={!selectSessionClean(state)} />}
+                        <main aria-busy={loading ? 'true' : undefined}>
+                          {loading ? (
+                            <LoadingState />
+                          ) : (
+                            // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
+                            <ScreenTransition key={screen}>
+                              {screen === 'library' && <LibraryScreen />}
+                              {screen === 'discover' && catalog && (
+                                <DiscoverScreen
+                                  catalog={catalog}
+                                  onGoToLibrary={() => setScreen('library')}
+                                  viewStore={discoverViewStore}
+                                />
+                              )}
+                              {screen === 'profiles' && <ProfilesScreen />}
+                              {screen === 'settings' && <SettingsScreen />}
+                            </ScreenTransition>
+                          )}
+                        </main>
                       </div>
-                      <main aria-busy={loading ? 'true' : undefined}>
-                        {loading ? (
-                          <LoadingState />
-                        ) : (
-                          // Keyed by screen: each switch mounts a fresh wrapper, which plays the enter animation.
-                          <ScreenTransition key={screen}>
-                            {screen === 'library' && <LibraryScreen />}
-                            {screen === 'discover' && catalog && (
-                              <DiscoverScreen
-                                catalog={catalog}
-                                onGoToLibrary={() => setScreen('library')}
-                                viewStore={discoverViewStore}
-                              />
-                            )}
-                            {screen === 'profiles' && <ProfilesScreen />}
-                            {screen === 'settings' && <SettingsScreen />}
-                          </ScreenTransition>
-                        )}
-                      </main>
+                      <StatusBar onSetUpGame={() => setScreen('settings')} />
                     </div>
-                    <StatusBar onSetUpGame={() => setScreen('settings')} />
-                  </div>
+                    {welcomeShown && <WelcomeDialog hasCatalog={catalog !== undefined} onClose={closeWelcome} />}
+                  </WelcomeContext.Provider>
                 </DownloadStatsProvider>
               </CommunityContext.Provider>
             </AdsContext.Provider>
@@ -229,6 +255,7 @@ export function App({
   updater,
   appInfo,
   navStore,
+  welcomeStore,
   windowControls,
   catalog,
   discoverViewStore,
@@ -249,6 +276,8 @@ export function App({
   updater?: UpdateController;
   appInfo?: AppInfo;
   navStore?: NavPreferenceStore;
+  /** First-run welcome (#147); absent means no welcome and no "Show welcome again". */
+  welcomeStore?: WelcomeStore;
   windowControls?: WindowControls;
   /** The Discover tab (#73) is listed only when a catalog controller is wired. */
   catalog?: CatalogController;
@@ -278,6 +307,7 @@ export function App({
         updater={updater}
         appInfo={appInfo}
         navStore={navStore}
+        welcomeStore={welcomeStore}
         windowControls={windowControls}
         catalog={catalog}
         discoverViewStore={discoverViewStore}

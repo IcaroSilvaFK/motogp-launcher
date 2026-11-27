@@ -190,6 +190,15 @@
   --star-prompt-width: 280px;
   --layer-popover: 10;
 
+  /* First-run welcome (#147): a Material basic dialog. Width, the standard scrim, elevation
+     level 3, its layer (above popovers, below nothing else) and the step tiles / progress bar. */
+  --welcome-width: 520px;
+  --scrim: rgba(0, 0, 0, 0.6);
+  --elevation-3: 0 4px 8px 3px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.45);
+  --layer-dialog: 20;
+  --welcome-tile-size: 32px;
+  --welcome-progress-height: 4px;
+
   font-family: var(--font-body);
   font-size: var(--type-body-large);
   color: var(--text);
@@ -4568,4 +4577,203 @@ button {
 .my-mod-status .icon {
   width: var(--icon-size-sm);
   height: var(--icon-size-sm);
+}
+
+/* First-run welcome (#147): a Material basic dialog (surface-container, elevation 3) over the
+   standard scrim, below the custom title bar so the window can still be moved and closed. */
+.welcome {
+  position: fixed;
+  inset: var(--titlebar-height) 0 0 0;
+  z-index: var(--layer-dialog);
+  display: grid;
+  place-items: center;
+  padding: var(--space-5);
+}
+
+.welcome-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  animation: fade-in var(--motion-enter) backwards;
+}
+
+.welcome-dialog {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: var(--welcome-width);
+  max-height: 100%;
+  overflow-y: auto;
+  padding: var(--space-5);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elevation-3);
+  animation: enter-up var(--motion-enter) backwards;
+}
+
+.welcome-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: calc(-1 * var(--space-2));
+}
+
+.welcome-step {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--type-label-medium);
+  font-weight: var(--type-label-large-weight);
+}
+
+/* Three segments; the done and current ones take the neutral text tone (the accent stays for Play). */
+.welcome-progress {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-1);
+}
+
+.welcome-progress-segment {
+  height: var(--welcome-progress-height);
+  border-radius: var(--radius-sm);
+  background: var(--progress-track);
+  transition: background var(--transition);
+}
+
+.welcome-progress-segment[data-active='true'] {
+  background: var(--text-muted);
+}
+
+.welcome-title {
+  margin: 0;
+  font-size: var(--type-headline-small);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.welcome-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  animation: fade-in var(--motion-enter) backwards;
+}
+
+.welcome-text {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--text-muted);
+  font-size: var(--type-body-medium);
+}
+
+.welcome-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--type-body-medium);
+}
+
+.welcome-spin {
+  animation: spin var(--spin);
+}
+
+.welcome-path {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.welcome-path > .icon {
+  flex: none;
+  color: var(--text-muted);
+}
+
+.welcome-path-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.welcome-path-name {
+  font-size: var(--type-title-small);
+  font-weight: var(--type-label-large-weight);
+}
+
+.welcome-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-md);
+  color: var(--error-fg);
+  font-size: var(--type-body-medium);
+}
+
+.welcome-error .icon {
+  flex: none;
+}
+
+.welcome-steps {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.welcome-steps-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.welcome-steps-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: var(--welcome-tile-size);
+  height: var(--welcome-tile-size);
+  border-radius: var(--radius-md);
+  background: var(--surface-3);
+  color: var(--text);
+}
+
+.welcome-steps-title {
+  margin: 0;
+  font-size: var(--type-title-small);
+  font-weight: var(--type-label-large-weight);
+}
+
+.welcome-steps-number {
+  color: var(--text-muted);
+}
+
+.welcome-steps-item .hint {
+  margin: var(--space-1) 0 0;
+}
+
+.welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.welcome-actions:empty {
+  display: none;
+}
+
+/* Back sits on the left, away from the forward action. */
+.welcome-back {
+  margin-right: auto;
 }

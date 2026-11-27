@@ -32,7 +32,7 @@ function noticeText(t: Messages, notice: Notice): string {
 }
 
 /** Translated text for an error code; an unexpected code (newer backend) falls back to the generic text. */
-function errorText(t: Messages, code: string): string {
+export function errorText(t: Messages, code: string): string {
   const known: Partial<Record<string, string>> = t.errors;
   return known[code] ?? t.errors.unknown;
 }
