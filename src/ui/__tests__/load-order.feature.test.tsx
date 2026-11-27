@@ -199,4 +199,31 @@ describeFeature(feature, ({ Scenario, AfterEachScenario }) => {
       expect(within(row).queryByText('Overridden')).not.toBeInTheDocument();
     });
   });
+
+  Scenario('Conflict details of a mod in the load order', ({ Given, When, Then }) => {
+    const details = () => screen.getByRole('region', { name: 'Conflicts of Alpha' });
+    const detailMods = () =>
+      within(within(details()).getByRole('list', { name: 'Shared_P.pak' }))
+        .getAllByRole('listitem')
+        .map((item) => item.textContent);
+    Given('"Alpha" and "Beta" ship the same file and "Beta" is lower in the draft order', async () => {
+      world = await launch(libraryOf([alpha, beta], ['alpha', 'beta']));
+      await openEditor(getWorld());
+      await waitFor(() => expect(screen.getByRole('button', { name: 'Show conflict details of Alpha' })).toBeVisible());
+    });
+    When('I open the conflict details of "Alpha"', async () => {
+      await getWorld().user.click(screen.getByRole('button', { name: 'Show conflict details of Alpha' }));
+    });
+    Then('the details list the file with "Beta" as the winner', () => {
+      expect(detailMods()).toEqual(['Alpha', 'Beta Wins']);
+      // Only the files Alpha shares: its own unique file is not listed.
+      expect(within(details()).queryByText('Alpha_P.pak')).not.toBeInTheDocument();
+    });
+    When('I move "Alpha" below "Beta"', async () => {
+      await getWorld().user.click(screen.getByRole('button', { name: 'Move Alpha down' }));
+    });
+    Then('the details show "Alpha" as the winner', async () => {
+      await waitFor(() => expect(detailMods()).toEqual(['Beta', 'Alpha Wins']));
+    });
+  });
 });

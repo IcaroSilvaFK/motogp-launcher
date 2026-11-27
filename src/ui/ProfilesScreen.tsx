@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { selectProfileLocked } from '../application';
 import type { FileConflict, Profile } from '../domain';
-import { isVanilla, moveItem, toggleMod } from '../domain';
+import { conflictsOfMod, isVanilla, modConflictStatus, moveItem, toggleMod } from '../domain';
 import { ConfirmAction } from './ConfirmAction';
 import { Icon } from './Icon';
 import { useI18n } from './i18n';
@@ -14,17 +14,13 @@ type Direction = 'up' | 'down';
 /**
  * Conflicts of the unsaved draft order. Each order change asks the back end again; a response
  * that arrives after a newer request is dropped. Fewer than two mods cannot conflict, so nothing
- * is asked.
+ * is asked. The previous result stays while a new one loads, so the UI does not flicker.
  */
-function ConflictsPanel({ order, nameOf }: { order: string[]; nameOf: (id: string) => string }) {
-  const { t } = useI18n();
+function useDraftConflicts(order: string[]): FileConflict[] {
   const { controller } = useLauncher();
   const [conflicts, setConflicts] = useState<FileConflict[]>([]);
   // A string key so the effect reruns on a real order change, not on every render.
   const orderKey = JSON.stringify(order);
-
-  // The previous result stays on screen while a new one loads, so the panel does not flicker.
-  const shown = order.length < 2 ? [] : conflicts;
 
   useEffect(() => {
     const ids = JSON.parse(orderKey) as string[];
@@ -37,6 +33,72 @@ function ConflictsPanel({ order, nameOf }: { order: string[]; nameOf: (id: strin
       current = false;
     };
   }, [controller, orderKey]);
+
+  return order.length < 2 ? [] : conflicts;
+}
+
+/**
+ * Files one mod shares with others under the draft order: every provider in load order and the
+ * winner. The winner is `conflict.winner`, computed by the back end: the mod that loads last wins
+ * (`FileConflict::winner` and `detect_conflicts` in crates/domain/src/conflict.rs; the order
+ * contract in crates/application/src/profile_service.rs: "index 0 loads first, the last wins").
+ * The UI only renders it.
+ */
+function ConflictDetails({
+  modId,
+  conflicts,
+  nameOf,
+  onClose,
+}: {
+  modId: string;
+  conflicts: FileConflict[];
+  nameOf: (id: string) => string;
+  onClose: () => void;
+}) {
+  const { t } = useI18n();
+  const involved = conflictsOfMod(conflicts, modId);
+  if (involved.length === 0) return null;
+  return (
+    <section aria-labelledby="conflict-details-title" className="conflicts conflict-details">
+      <div className="conflicts-head">
+        <h4 id="conflict-details-title" className="section-title">
+          {t.profiles.conflictDetailsTitle(nameOf(modId))}
+        </h4>
+        <button type="button" className="btn btn-sm" onClick={onClose}>
+          {t.profiles.conflictDetailsClose}
+        </button>
+      </div>
+      <ul className="conflict-list">
+        {involved.map((conflict, index) => {
+          const pathId = `conflict-details-path-${index}`;
+          return (
+            <li key={conflict.path} className="conflict-item">
+              <span id={pathId} className="conflict-path" title={conflict.path}>
+                {conflict.path}
+              </span>
+              <ol className="conflict-mods" aria-labelledby={pathId}>
+                {conflict.mod_ids.map((id) => (
+                  <li key={id} className={id === conflict.winner ? 'conflict-mod conflict-mod-winner' : 'conflict-mod'}>
+                    <span className="conflict-mod-name">{nameOf(id)}</span>
+                    {id === conflict.winner && (
+                      <>
+                        {' '}
+                        <span className="badge badge-info">{t.profiles.conflictWinner}</span>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function ConflictsPanel({ conflicts: shown, nameOf }: { conflicts: FileConflict[]; nameOf: (id: string) => string }) {
+  const { t } = useI18n();
 
   return (
     <section aria-labelledby="conflicts-title" className="conflicts">
@@ -92,6 +154,37 @@ function ConflictsPanel({ order, nameOf }: { order: string[]; nameOf: (id: strin
   );
 }
 
+/** Badge of a load-order row whose mod shares files with others; a button that toggles its details. */
+function OrderConflictBadge({
+  modId,
+  modName,
+  conflicts,
+  open,
+  onToggle,
+}: {
+  modId: string;
+  modName: string;
+  conflicts: FileConflict[];
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const { t } = useI18n();
+  const status = modConflictStatus(conflicts, modId);
+  if (status === 'none') return null;
+  return (
+    <button
+      type="button"
+      className={`badge badge-conflict badge-conflict-button badge-${status === 'wins' ? 'info' : 'warning'}`}
+      aria-expanded={open}
+      aria-controls="conflict-details-title"
+      aria-label={t.profiles.conflictDetailsToggle(modName)}
+      onClick={onToggle}
+    >
+      {status === 'wins' ? t.library.conflictWins : t.library.conflictOverridden}
+    </button>
+  );
+}
+
 function ProfileEditor({ profile }: { profile: Profile }) {
   const { t } = useI18n();
   const { controller, state } = useLauncher();
@@ -100,6 +193,8 @@ function ProfileEditor({ profile }: { profile: Profile }) {
   const modsById = new Map(state.mods.map((mod) => [mod.id, mod]));
   const ordered = draft.filter((id) => modsById.has(id));
   const nameOf = (id: string) => modsById.get(id)?.name ?? id;
+  const conflicts = useDraftConflicts(ordered);
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   // Keyboard focus follows the moved mod: its button in the same direction, or the other one
   // when the move reached an end of the list (that button is then disabled).
@@ -239,6 +334,13 @@ function ProfileEditor({ profile }: { profile: Profile }) {
                         <span className="order-name" title={modName}>
                           {modName}
                         </span>
+                        <OrderConflictBadge
+                          modId={id}
+                          modName={modName}
+                          conflicts={conflicts}
+                          open={detailId === id}
+                          onToggle={() => setDetailId(detailId === id ? null : id)}
+                        />
                         <button
                           ref={bindMoveButton(id, 'up')}
                           type="button"
@@ -267,7 +369,11 @@ function ProfileEditor({ profile }: { profile: Profile }) {
             )}
           </div>
 
-          <ConflictsPanel order={ordered} nameOf={nameOf} />
+          {detailId !== null && ordered.includes(detailId) && (
+            <ConflictDetails modId={detailId} conflicts={conflicts} nameOf={nameOf} onClose={() => setDetailId(null)} />
+          )}
+
+          <ConflictsPanel conflicts={conflicts} nameOf={nameOf} />
 
           <div className="card-footer">
             <button
